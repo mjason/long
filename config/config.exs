@@ -12,9 +12,15 @@ config :ash_oban, pro?: false
 config :long, Oban,
   engine: Oban.Engines.Lite,
   notifier: Oban.Notifiers.PG,
-  queues: [default: 10],
+  queues: [default: 10, agent: 5],
   repo: Long.Repo,
-  plugins: [{Oban.Plugins.Cron, []}]
+  plugins: [
+    {Oban.Plugins.Cron,
+     crontab: [
+       {"* * * * *", Long.Agent.Workers.SchedulerTick},
+       {"0 */12 * * *", Long.Agent.Workers.L4Archive}
+     ]}
+  ]
 
 config :ash,
   allow_forbidden_field_for_relationships_by_default?: true,
@@ -59,7 +65,11 @@ config :spark,
 config :long,
   ecto_repos: [Long.Repo],
   generators: [timestamp_type: :utc_datetime],
-  ash_domains: []
+  ash_domains: [Long.Agent]
+
+config :long, Long.Agent,
+  memory_root: Path.expand("../priv/agent/memory", __DIR__),
+  temp_root: Path.expand("../priv/agent/temp", __DIR__)
 
 # Configure the endpoint
 config :long, LongWeb.Endpoint,

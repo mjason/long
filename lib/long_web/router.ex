@@ -20,12 +20,15 @@ defmodule LongWeb.Router do
     pipe_through :browser
 
     get "/", PageController, :home
+
+    live "/chat", AgentLive.Chat
+    live "/chat/:session_id", AgentLive.Chat
   end
 
-  # Other scopes may use custom stacks.
-  # scope "/api", LongWeb do
-  #   pipe_through :api
-  # end
+  scope "/webhooks/feishu", LongWeb do
+    pipe_through :api
+    post "/", FeishuController, :receive
+  end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development
   if Application.compile_env(:long, :dev_routes) do

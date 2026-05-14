@@ -17,8 +17,8 @@ defmodule Long.Application do
          Application.fetch_env!(:long, :ash_domains),
          Application.fetch_env!(:long, Oban)
        )},
-      # Start a worker by calling: Long.Worker.start_link(arg)
-      # {Long.Worker, arg},
+      {Task.Supervisor, name: Long.Agent.TaskSup},
+      Long.Agent.Bots.Telegram,
       # Start to serve requests, typically the last entry
       {DNSCluster, query: Application.get_env(:long, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Long.PubSub},
