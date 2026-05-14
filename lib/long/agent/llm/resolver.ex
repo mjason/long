@@ -1,7 +1,8 @@
 defmodule Long.Agent.LLM.Resolver do
   @moduledoc """
-  Loads a backend struct from a `Long.Agent.LLMConfig` row. API keys are read
-  from the env var named by `:api_key_env_var` — never stored in the DB.
+  Loads a backend struct from a `Long.Agent.LLMConfig` row. API keys come
+  from `:api_key_env_var` (preferred — keeps secrets out of the DB) or
+  fall back to the inline `:api_key` field for single-machine setups.
   """
 
   alias Long.Agent
@@ -108,9 +109,15 @@ defmodule Long.Agent.LLM.Resolver do
 
   defp resolve_members(_), do: {:error, :invalid_members}
 
-  defp fetch_key(%Agent.LLMConfig{api_key_env_var: nil}), do: {:error, :missing_env_var_name}
+  defp fetch_key(%Agent.LLMConfig{api_key_env_var: var, api_key: key}) do
+    cond do
+      is_binary(var) and var != "" -> fetch_env(var)
+      is_binary(key) and key != "" -> {:ok, key}
+      true -> {:error, :no_credential}
+    end
+  end
 
-  defp fetch_key(%Agent.LLMConfig{api_key_env_var: var}) do
+  defp fetch_env(var) do
     case System.get_env(var) do
       nil -> {:error, {:env_var_unset, var}}
       "" -> {:error, {:env_var_blank, var}}

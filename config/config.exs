@@ -69,7 +69,8 @@ config :long,
 
 config :long, Long.Agent,
   memory_root: Path.expand("../priv/agent/memory", __DIR__),
-  temp_root: Path.expand("../priv/agent/temp", __DIR__)
+  temp_root: Path.expand("../priv/agent/workspace", __DIR__),
+  workspace_root: Path.expand("../priv/agent/workspace", __DIR__)
 
 # Configure the endpoint
 config :long, LongWeb.Endpoint,

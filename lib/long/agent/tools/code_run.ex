@@ -4,15 +4,19 @@ defmodule Long.Agent.Tools.CodeRun do
   back to the agent loop as it appears, and killing the child on timeout or
   loop shutdown.
 
-  - `:python` — writes the snippet to a temp file and runs
-    `python3 -X utf8 -u <file>`
-  - `:bash` / `:shell` / `:sh` — runs `bash -c <code>`
-  - `:powershell` — only supported on Windows; on other OSes returns an error
+  - `:python` — writes the snippet to a temp file under
+    `Long.Agent.PythonEnv.root/0` and runs it via `uv run python -X utf8
+    -u <file>`. The workspace is a uv-managed project; the agent can
+    install missing libraries on demand by running
+    `code_run(type: "bash", code: "uv add <pkg>")`.
+  - `:bash` / `:shell` / `:sh` — runs `bash -c <code>`. `cwd` defaults to
+    the same workspace so `uv add` / `uv pip install` Just Work.
+  - `:powershell` — only supported on Windows; on other OSes returns an error.
   """
 
   @behaviour Long.Agent.Tool
 
-  alias Long.Agent.{StepOutcome, ToolContext}
+  alias Long.Agent.{PythonEnv, StepOutcome, ToolContext}
 
   @default_timeout_seconds 60
   @default_max_output_bytes 10_000
@@ -26,8 +30,32 @@ defmodule Long.Agent.Tools.CodeRun do
       "type" => "function",
       "function" => %{
         "name" => name(),
-        "description" =>
-          "Execute a Python or shell snippet. Prefer Python for non-trivial work; use bash for one-liners.",
+        "description" => """
+        Execute a Python or shell snippet.
+
+        Python runs under a uv-managed workspace (`uv run python …`). Bare `python` /
+        `python3` in bash also route through the same uv venv (workspace `.venv/bin`
+        is prepended to PATH), so heredocs and one-liners work without prefixing.
+
+        Python stdlib is rich — reach for it first before installing anything:
+          - http: `urllib.request` / `http.client`
+          - html / xml: `html.parser` / `xml.etree.ElementTree`
+          - json / dates / paths: `json` / `datetime` / `pathlib`
+          - shell-out / threads: `subprocess` / `threading` / `concurrent.futures`
+          - data: `csv` / `sqlite3` / `re` / `collections`
+
+        If you need an external package (e.g. `requests`, `beautifulsoup4`,
+        `pandas`), install it persistently into the workspace via bash:
+          `code_run(type="bash", code="uv add <package>")`
+        then call Python. Dependencies stick across calls. Inspect what's already
+        installed with `uv tree` or by reading `pyproject.toml`.
+
+        For "just GET a URL and look at the content", prefer the `http_fetch` tool —
+        it's a single round-trip with no Python or browser needed.
+
+        Use `web_scan` / `web_execute_js` only when you need a real browser (Chrome
+        running with --remote-debugging-port=9222).
+        """,
         "parameters" => %{
           "type" => "object",
           "properties" => %{
@@ -38,7 +66,11 @@ defmodule Long.Agent.Tools.CodeRun do
               "default" => "python"
             },
             "timeout" => %{"type" => "integer", "default" => @default_timeout_seconds},
-            "cwd" => %{"type" => "string", "description" => "Relative to the agent cwd."}
+            "cwd" => %{
+              "type" => "string",
+              "description" =>
+                "Relative to the uv workspace root. Leave blank to run in the workspace itself."
+            }
           },
           "required" => ["code"]
         }
@@ -51,22 +83,18 @@ defmodule Long.Agent.Tools.CodeRun do
     code = args["code"] || args["script"]
     code_type = normalize_type(args["type"] || "python")
     timeout = (args["timeout"] || @default_timeout_seconds) * 1000
-    cwd = base_cwd |> Path.join(args["cwd"] || "./") |> Path.expand()
     max_bytes = div(@default_max_output_bytes, max(1, tool_count))
 
-    cond do
-      is_nil(code) or code == "" ->
-        [
-          {:output, "[Status] ❌ 失败: code 为空\n"},
-          {:outcome, StepOutcome.cont(%{"status" => "error", "msg" => "code missing"})}
-        ]
-
-      not File.dir?(cwd) ->
-        File.mkdir_p!(cwd)
-        execute(code, code_type, timeout, cwd, max_bytes)
-
-      true ->
-        execute(code, code_type, timeout, cwd, max_bytes)
+    if is_nil(code) or code == "" do
+      [
+        {:output, "[Status] ❌ 失败: code 为空\n"},
+        {:outcome, StepOutcome.cont(%{"status" => "error", "msg" => "code missing"})}
+      ]
+    else
+      {:ok, workspace} = PythonEnv.ensure!(base_cwd)
+      cwd = workspace |> Path.join(args["cwd"] || "./") |> Path.expand()
+      File.mkdir_p!(cwd)
+      execute(code, code_type, timeout, workspace, cwd, max_bytes)
     end
   end
 
@@ -75,7 +103,7 @@ defmodule Long.Agent.Tools.CodeRun do
   defp normalize_type("sh"), do: "bash"
   defp normalize_type(t), do: t
 
-  defp execute(code, type, timeout, cwd, max_bytes) do
+  defp execute(code, type, timeout, workspace, cwd, max_bytes) do
     case build_command(code, type, cwd) do
       {:error, msg} ->
         [
@@ -88,7 +116,7 @@ defmodule Long.Agent.Tools.CodeRun do
 
         Stream.concat([
           [{:output, "[Action] Running #{type} in #{Path.basename(cwd)}: #{preview}\n"}],
-          run_port(exe, args, cwd, timeout, max_bytes, cleanup)
+          run_port(exe, args, workspace, cwd, timeout, max_bytes, cleanup)
         ])
     end
   end
@@ -103,9 +131,17 @@ defmodule Long.Agent.Tools.CodeRun do
   end
 
   defp build_command(code, "python", cwd) do
-    tmp = Path.join(cwd, ".ai_#{System.unique_integer([:positive])}.py")
-    File.write!(tmp, code)
-    {:ok, python_bin(), ["-X", "utf8", "-u", tmp], fn -> File.rm(tmp) end}
+    case PythonEnv.uv_bin() do
+      {:error, :uv_missing} ->
+        {:error,
+         "uv not installed. Install from https://docs.astral.sh/uv/ and retry " <>
+           "(the workspace at #{PythonEnv.root()} is uv-managed)."}
+
+      {:ok, uv} ->
+        tmp = Path.join(cwd, ".ai_#{System.unique_integer([:positive])}.py")
+        File.write!(tmp, code)
+        {:ok, uv, ["run", "python", "-X", "utf8", "-u", tmp], fn -> File.rm(tmp) end}
+    end
   end
 
   defp build_command(code, "bash", _cwd), do: {:ok, "bash", ["-c", code], fn -> :ok end}
@@ -120,11 +156,7 @@ defmodule Long.Agent.Tools.CodeRun do
 
   defp build_command(_code, type, _cwd), do: {:error, "unsupported code_type: #{type}"}
 
-  defp python_bin do
-    System.find_executable("python3") || System.find_executable("python") || "python3"
-  end
-
-  defp run_port(exe, args, cwd, timeout, max_bytes, cleanup) do
+  defp run_port(exe, args, workspace, cwd, timeout, max_bytes, cleanup) do
     Stream.resource(
       fn ->
         port =
@@ -134,6 +166,7 @@ defmodule Long.Agent.Tools.CodeRun do
             :stderr_to_stdout,
             {:cd, cwd},
             {:args, args},
+            {:env, port_env(workspace)},
             :hide
           ])
 
@@ -142,6 +175,7 @@ defmodule Long.Agent.Tools.CodeRun do
         %{
           port: port,
           deadline: deadline,
+          timeout: timeout,
           collected: [],
           collected_size: 0,
           max_bytes: max_bytes,
@@ -198,8 +232,7 @@ defmodule Long.Agent.Tools.CodeRun do
             "status" => "error",
             "exit_code" => nil,
             "stdout" => truncate(body, s.max_bytes),
-            "msg" =>
-              "timeout after #{div(deadline + timeout_now() - System.monotonic_time(:millisecond), 1000)}s"
+            "msg" => "timeout after #{div(s.timeout, 1000)}s"
           })
 
         {[{:output, "[Timeout]\n"}, {:outcome, outcome}], %{s | done?: true}}
@@ -221,7 +254,15 @@ defmodule Long.Agent.Tools.CodeRun do
     end
   end
 
-  defp timeout_now, do: 0
+  # Prepend the workspace root + its .venv/bin to PATH so bare `python` /
+  # `python3` (resolved via the PythonEnv shims) and any pip console
+  # scripts installed via `uv add` resolve cleanly from bash subprocesses.
+  defp port_env(workspace) do
+    venv_bin = Path.join([workspace, ".venv", "bin"])
+    parent = System.get_env("PATH") || ""
+    new_path = Enum.join([venv_bin, workspace, parent], ":")
+    [{~c"PATH", String.to_charlist(new_path)}]
+  end
 
   defp truncate(s, max) when byte_size(s) > max do
     binary_part(s, 0, div(max, 2)) <>

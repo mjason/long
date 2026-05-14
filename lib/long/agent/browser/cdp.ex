@@ -32,6 +32,37 @@ defmodule Long.Agent.Browser.CDP do
     defstruct [:id, :title, :url, :type, :ws_url]
   end
 
+  @doc """
+  True if `reason` smells like "Chrome isn't reachable" (connection
+  refused, transport timeout, …). Used by `web_scan` / `web_execute_js` to
+  upgrade an opaque transport error to an actionable hint.
+  """
+  def unreachable?(%{reason: r}) when r in [:econnrefused, :timeout, :enetunreach, :ehostunreach],
+    do: true
+
+  def unreachable?(%{__struct__: Mint.TransportError}), do: true
+  def unreachable?(_), do: false
+
+  @doc """
+  Hint string to show the model when Chrome can't be reached. Same wording
+  for both web tools so the model learns one recovery path.
+  """
+  def unreachable_hint do
+    "Chrome doesn't appear to be running with remote debugging enabled. " <>
+      "Start it with `google-chrome --remote-debugging-port=9222` (or set " <>
+      "`CHROME_DEBUG_URL` to a custom host). For plain HTTP scraping that " <>
+      "doesn't need a real browser, use the `http_fetch` tool instead."
+  end
+
+  @doc """
+  Build a standard error payload for the agent. Tools can pipe their CDP
+  errors through this for uniform shape + hinting.
+  """
+  def error_payload(reason) do
+    base = %{"status" => "error", "msg" => inspect(reason)}
+    if unreachable?(reason), do: Map.put(base, "hint", unreachable_hint()), else: base
+  end
+
   def targets(opts \\ []) do
     base = Keyword.get(opts, :endpoint, @default_endpoint)
     http = Keyword.get(opts, :http, &Req.request/1)

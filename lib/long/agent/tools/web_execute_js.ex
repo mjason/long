@@ -42,15 +42,13 @@ defmodule Long.Agent.Tools.WebExecuteJs do
   defp do_run(args) do
     script = args["script"] || ""
 
-    cond do
-      script == "" ->
-        StepOutcome.cont(%{"status" => "error", "msg" => "script must not be empty"})
-
-      true ->
-        case eval(script) do
-          {:ok, result} -> StepOutcome.cont(%{"status" => "success", "result" => result})
-          {:error, e} -> StepOutcome.cont(%{"status" => "error", "msg" => inspect(e)})
-        end
+    if script == "" do
+      StepOutcome.cont(%{"status" => "error", "msg" => "script must not be empty"})
+    else
+      case eval(script) do
+        {:ok, result} -> StepOutcome.cont(%{"status" => "success", "result" => result})
+        {:error, e} -> StepOutcome.cont(CDP.error_payload(e))
+      end
     end
   end
 

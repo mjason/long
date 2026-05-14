@@ -2,12 +2,19 @@ defmodule Long.Agent.LLMConfig do
   @moduledoc """
   Replacement for GenericAgent's `mykey.py` — one row per LLM endpoint/alias.
 
-  API keys are **never** stored in the DB. Each row points to an environment
-  variable name (`api_key_env_var`), and the runtime (`Long.Agent.LLM.*`,
-  Phase 1) reads the actual secret from `System.get_env/1`.
+  Two ways to provide the API key:
 
-  For `kind: :mixin`, `params["members"]` holds an ordered list of other aliases
-  to round-robin/route through (mirrors `llmcore.MixinSession`).
+  - `:api_key` — paste it directly. Marked sensitive so Ash redacts it in
+    logs/errors. Convenient for single-machine setups.
+  - `:api_key_env_var` — name of an env var holding the key (12-factor
+    style). Use this when you don't want the secret in SQLite, e.g. shared
+    DB files or deployment via env vars.
+
+  `api_key_env_var` takes precedence if both are set — lets you override
+  the DB value from the environment without editing the row.
+
+  For `kind: :mixin`, `params["members"]` holds an ordered list of other
+  aliases to round-robin/route through (mirrors `llmcore.MixinSession`).
   """
 
   use Ash.Resource,
@@ -19,28 +26,29 @@ defmodule Long.Agent.LLMConfig do
     repo Long.Repo
   end
 
+  @mutable_fields [
+    :kind,
+    :model,
+    :api_base,
+    :api_key,
+    :api_key_env_var,
+    :params,
+    :enabled,
+    :sort_order
+  ]
+
   actions do
     defaults [:read, :destroy]
 
     create :register do
-      accept [:alias, :kind, :model, :api_base, :api_key_env_var, :params, :enabled, :sort_order]
+      accept [:alias | @mutable_fields]
       upsert? true
       upsert_identity :alias
-
-      upsert_fields [
-        :kind,
-        :model,
-        :api_base,
-        :api_key_env_var,
-        :params,
-        :enabled,
-        :sort_order,
-        :updated_at
-      ]
+      upsert_fields @mutable_fields ++ [:updated_at]
     end
 
     update :update do
-      accept [:kind, :model, :api_base, :api_key_env_var, :params, :enabled, :sort_order]
+      accept @mutable_fields
     end
   end
 
@@ -67,8 +75,14 @@ defmodule Long.Agent.LLMConfig do
       public? true
     end
 
+    attribute :api_key, :string do
+      description "Raw API key. Sensitive — redacted in logs. Leave blank to use api_key_env_var instead."
+      sensitive? true
+      public? true
+    end
+
     attribute :api_key_env_var, :string do
-      description "Name of the env var that holds the secret. We never store the key itself."
+      description "Name of an env var that holds the key (12-factor style). Takes precedence over api_key when set."
       public? true
     end
 

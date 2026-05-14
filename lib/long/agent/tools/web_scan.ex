@@ -53,8 +53,7 @@ defmodule Long.Agent.Tools.WebScan do
       payload = build_payload(target, simplified, args["text_only"] == true)
       StepOutcome.cont(payload)
     else
-      {:error, reason} ->
-        StepOutcome.cont(%{"status" => "error", "msg" => inspect(reason)})
+      {:error, reason} -> StepOutcome.cont(CDP.error_payload(reason))
     end
   end
 

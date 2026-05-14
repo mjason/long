@@ -36,6 +36,7 @@ defmodule Long.Agent.Loop do
     FileRead,
     FileWrite,
     FilePatch,
+    HttpFetch,
     MemorySearch,
     MemoryUpsert,
     StartLongTermUpdate,
@@ -53,6 +54,7 @@ defmodule Long.Agent.Loop do
     MemorySearch,
     MemoryUpsert,
     StartLongTermUpdate,
+    HttpFetch,
     WebScan,
     WebExecuteJs,
     AskUser
