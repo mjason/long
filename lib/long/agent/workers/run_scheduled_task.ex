@@ -11,7 +11,7 @@ defmodule Long.Agent.Workers.RunScheduledTask do
   use Oban.Worker, queue: :agent, max_attempts: 5
 
   alias Long.Agent
-  alias Long.Agent.SessionRunner
+  alias Long.SessionRunner
 
   @impl true
   def perform(%Oban.Job{args: %{"task_id" => task_id}}) do

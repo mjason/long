@@ -262,6 +262,49 @@ defmodule Long.Agent.LoopTest do
       Scripted.stop(backend)
     end
 
+    test "a crashing tool does not bring down the loop", %{cwd: cwd} do
+      defmodule CrashingTool do
+        @behaviour Long.Agent.Tool
+
+        def name, do: "crash"
+
+        def schema,
+          do: %{
+            "type" => "function",
+            "function" => %{"name" => name(), "parameters" => %{"type" => "object"}}
+          }
+
+        def run(_args, _ctx), do: raise("kaboom — synthetic tool failure")
+      end
+
+      backend =
+        Scripted.start([
+          Response.from_blocks([%{type: :tool_use, id: "x1", name: "crash", input: %{}}]),
+          Response.from_blocks([%{type: :text, text: "recovered"}])
+        ])
+
+      events =
+        Loop.run(
+          backend: backend,
+          user: "go",
+          cwd: cwd,
+          tools: [CrashingTool]
+        )
+        |> Enum.to_list()
+
+      tool_done =
+        Enum.find(events, fn
+          {:tool_done, %{name: "crash"}} -> true
+          _ -> false
+        end)
+
+      assert tool_done, "expected the loop to emit :tool_done with an error outcome"
+      assert tool_done |> elem(1) |> Map.get(:data) |> Map.get("status") == "error"
+      assert {:done, %{reason: :no_tool_call}} = List.last(events)
+
+      Scripted.stop(backend)
+    end
+
     test "code_run + file_read in the same turn", %{cwd: cwd} do
       backend =
         Scripted.start([

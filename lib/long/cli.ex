@@ -6,7 +6,7 @@ defmodule Long.CLI do
   """
 
   alias Long.Agent
-  alias Long.Agent.SessionRunner
+  alias Long.SessionRunner
 
   @io_module Application.compile_env(:long, [Long.CLI, :io_module], IO)
 

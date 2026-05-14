@@ -11,7 +11,7 @@ defmodule LongWeb.AgentLive.ChatTest do
       {:ok, view, html} = live(conn, ~p"/chat/new")
 
       assert html =~ "New session"
-      assert html =~ "echo (demo, no key)"
+      assert html =~ "echo (demo)"
       assert has_element?(view, "form[phx-submit=submit]")
     end
 

@@ -15,6 +15,10 @@ defmodule Long.Agent.LLM.StreamRunner do
   require Logger
 
   @recv_timeout 120_000
+  # Hard cap on the SSE accumulator. A misbehaving upstream that never
+  # emits a `\n\n` would otherwise grow `buffer` until BEAM OOMs. 8 MiB is
+  # comfortably above any legitimate Anthropic/OpenAI message.
+  @max_buffer_bytes 8 * 1024 * 1024
 
   def stream(req_opts, init_state, parser_fn, opts \\ []) do
     receive_timeout = opts[:receive_timeout] || @recv_timeout
@@ -76,13 +80,21 @@ defmodule Long.Agent.LLM.StreamRunner do
   defp read_step(s, parser, timeout) do
     receive do
       {ref, :chunk, chunk} when ref == s.ref ->
-        {events, new_state, leftover} = parser.(s.buffer <> chunk, s.state)
+        new_buffer = s.buffer <> chunk
 
-        halted? =
-          Enum.any?(events, &match?({:done, _}, &1)) or
-            Enum.any?(events, &match?({:error, _}, &1))
+        if byte_size(new_buffer) > @max_buffer_bytes do
+          Logger.warning("SSE buffer exceeded #{@max_buffer_bytes} bytes — upstream may be stuck")
 
-        {events, %{s | state: new_state, buffer: leftover, halted?: halted?}}
+          {[{:error, :sse_buffer_overflow}], %{s | halted?: true}}
+        else
+          {events, new_state, leftover} = parser.(new_buffer, s.state)
+
+          halted? =
+            Enum.any?(events, &match?({:done, _}, &1)) or
+              Enum.any?(events, &match?({:error, _}, &1))
+
+          {events, %{s | state: new_state, buffer: leftover, halted?: halted?}}
+        end
 
       {ref, :http_done} when ref == s.ref ->
         # flush any final events from accumulated state

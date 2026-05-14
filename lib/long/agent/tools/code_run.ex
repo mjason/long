@@ -16,7 +16,7 @@ defmodule Long.Agent.Tools.CodeRun do
 
   @behaviour Long.Agent.Tool
 
-  alias Long.Agent.{PythonEnv, StepOutcome, ToolContext}
+  alias Long.Agent.{PythonEnv, PythonRunner, StepOutcome, ToolContext}
 
   @default_timeout_seconds 60
   @default_max_output_bytes 10_000
@@ -81,7 +81,7 @@ defmodule Long.Agent.Tools.CodeRun do
   @impl true
   def run(args, %ToolContext{cwd: base_cwd, tool_count: tool_count}) do
     code = args["code"] || args["script"]
-    code_type = normalize_type(args["type"] || "python")
+    code_type = PythonRunner.normalize_type(args["type"] || "python")
     timeout = (args["timeout"] || @default_timeout_seconds) * 1000
     max_bytes = div(@default_max_output_bytes, max(1, tool_count))
 
@@ -98,13 +98,8 @@ defmodule Long.Agent.Tools.CodeRun do
     end
   end
 
-  defp normalize_type("py"), do: "python"
-  defp normalize_type("shell"), do: "bash"
-  defp normalize_type("sh"), do: "bash"
-  defp normalize_type(t), do: t
-
   defp execute(code, type, timeout, workspace, cwd, max_bytes) do
-    case build_command(code, type, cwd) do
+    case PythonRunner.build_command(code, type, cwd) do
       {:error, msg} ->
         [
           {:output, "[Status] ❌ #{msg}\n"},
@@ -112,49 +107,17 @@ defmodule Long.Agent.Tools.CodeRun do
         ]
 
       {:ok, exe, args, cleanup} ->
-        preview = preview(code)
-
         Stream.concat([
-          [{:output, "[Action] Running #{type} in #{Path.basename(cwd)}: #{preview}\n"}],
+          [{:output, "[Action] Running #{type} in #{Path.basename(cwd)}: #{preview(code)}\n"}],
           run_port(exe, args, workspace, cwd, timeout, max_bytes, cleanup)
         ])
     end
   end
 
   defp preview(code) do
-    head =
-      code
-      |> String.replace(~r/\s+/, " ")
-      |> String.slice(0, 60)
-
+    head = code |> String.replace(~r/\s+/, " ") |> String.slice(0, 60)
     if String.length(code) > 60, do: head <> "...", else: head
   end
-
-  defp build_command(code, "python", cwd) do
-    case PythonEnv.uv_bin() do
-      {:error, :uv_missing} ->
-        {:error,
-         "uv not installed. Install from https://docs.astral.sh/uv/ and retry " <>
-           "(the workspace at #{PythonEnv.root()} is uv-managed)."}
-
-      {:ok, uv} ->
-        tmp = Path.join(cwd, ".ai_#{System.unique_integer([:positive])}.py")
-        File.write!(tmp, code)
-        {:ok, uv, ["run", "python", "-X", "utf8", "-u", tmp], fn -> File.rm(tmp) end}
-    end
-  end
-
-  defp build_command(code, "bash", _cwd), do: {:ok, "bash", ["-c", code], fn -> :ok end}
-
-  defp build_command(_code, "powershell", _cwd) do
-    if match?({:win32, _}, :os.type()) do
-      {:ok, "powershell", ["-NoProfile", "-NonInteractive", "-Command"], fn -> :ok end}
-    else
-      {:error, "powershell only supported on Windows"}
-    end
-  end
-
-  defp build_command(_code, type, _cwd), do: {:error, "unsupported code_type: #{type}"}
 
   defp run_port(exe, args, workspace, cwd, timeout, max_bytes, cleanup) do
     Stream.resource(
@@ -166,7 +129,7 @@ defmodule Long.Agent.Tools.CodeRun do
             :stderr_to_stdout,
             {:cd, cwd},
             {:args, args},
-            {:env, port_env(workspace)},
+            {:env, PythonRunner.port_env(workspace)},
             :hide
           ])
 
@@ -203,7 +166,7 @@ defmodule Long.Agent.Tools.CodeRun do
         events = if truncated?, do: events ++ [{:output, "\n[Truncated]\n"}], else: events
 
         if truncated? do
-          kill_port(port)
+          PythonRunner.kill_port(port)
           {events, %{s | done?: true}}
         else
           {events, %{s | collected: collected, collected_size: collected_size}}
@@ -217,21 +180,21 @@ defmodule Long.Agent.Tools.CodeRun do
           StepOutcome.cont(%{
             "status" => if(status == 0, do: "success", else: "error"),
             "exit_code" => status,
-            "stdout" => truncate(body, s.max_bytes)
+            "stdout" => PythonRunner.truncate(body, s.max_bytes)
           })
 
         {[{:output, "[Status] #{icon} exit=#{status}\n"}, {:outcome, outcome}],
          %{s | done?: true}}
     after
       max(0, remaining) ->
-        kill_port(port)
+        PythonRunner.kill_port(port)
         body = s.collected |> Enum.reverse() |> IO.iodata_to_binary()
 
         outcome =
           StepOutcome.cont(%{
             "status" => "error",
             "exit_code" => nil,
-            "stdout" => truncate(body, s.max_bytes),
+            "stdout" => PythonRunner.truncate(body, s.max_bytes),
             "msg" => "timeout after #{div(s.timeout, 1000)}s"
           })
 
@@ -240,34 +203,7 @@ defmodule Long.Agent.Tools.CodeRun do
   end
 
   defp port_close(%{port: port, cleanup: cleanup}) do
-    kill_port(port)
+    PythonRunner.kill_port(port)
     cleanup.()
   end
-
-  defp kill_port(port) do
-    try do
-      Port.close(port)
-    rescue
-      _ -> :ok
-    catch
-      _, _ -> :ok
-    end
-  end
-
-  # Prepend the workspace root + its .venv/bin to PATH so bare `python` /
-  # `python3` (resolved via the PythonEnv shims) and any pip console
-  # scripts installed via `uv add` resolve cleanly from bash subprocesses.
-  defp port_env(workspace) do
-    venv_bin = Path.join([workspace, ".venv", "bin"])
-    parent = System.get_env("PATH") || ""
-    new_path = Enum.join([venv_bin, workspace, parent], ":")
-    [{~c"PATH", String.to_charlist(new_path)}]
-  end
-
-  defp truncate(s, max) when byte_size(s) > max do
-    binary_part(s, 0, div(max, 2)) <>
-      "\n\n[omitted long output]\n\n" <> binary_part(s, byte_size(s) - div(max, 2), div(max, 2))
-  end
-
-  defp truncate(s, _), do: s
 end

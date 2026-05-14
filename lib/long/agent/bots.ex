@@ -28,7 +28,7 @@ defmodule Long.Agent.Bots do
   """
 
   alias Long.Agent
-  alias Long.Agent.SessionRunner
+  alias Long.SessionRunner
 
   @default_timeout 120_000
 

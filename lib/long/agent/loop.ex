@@ -260,18 +260,30 @@ defmodule Long.Agent.Loop do
             turn: s.turn
         }
 
-        iter = wrap_stream(mod.run(tc.input, ctx))
+        case safe_run(mod, tc.input, ctx) do
+          {:ok, stream} ->
+            iter = wrap_stream(stream)
 
-        {[
-           {:tool_start,
-            %{
-              id: tc.id,
-              name: tc.name,
-              args: tc.input,
-              index: s.tool_index,
-              count: s.tool_count
-            }}
-         ], %{s | tool_iter: iter, current_tool: tc}}
+            {[
+               {:tool_start,
+                %{
+                  id: tc.id,
+                  name: tc.name,
+                  args: tc.input,
+                  index: s.tool_index,
+                  count: s.tool_count
+                }}
+             ], %{s | tool_iter: iter, current_tool: tc}}
+
+          {:error, msg} ->
+            outcome = StepOutcome.cont(%{"status" => "error", "msg" => msg})
+
+            s
+            |> accumulate(tc, outcome)
+            |> drop_pending()
+            |> bump_tool_index()
+            |> emit_tool_done(tc, outcome)
+        end
     end
   end
 
@@ -304,6 +316,17 @@ defmodule Long.Agent.Loop do
       _ ->
         {[], s}
     end
+  end
+
+  # Catches exceptions the tool module raises BEFORE returning its
+  # Enumerable — runtime crashes during iteration are handled by
+  # `wrap_stream/1`.
+  defp safe_run(mod, args, ctx) do
+    {:ok, mod.run(args, ctx)}
+  rescue
+    e -> {:error, "tool #{inspect(mod)} crashed: #{Exception.message(e)}"}
+  catch
+    kind, reason -> {:error, "tool #{inspect(mod)} #{kind}: #{inspect(reason)}"}
   end
 
   defp emit_tool_done(s, tc, outcome) do
@@ -408,17 +431,32 @@ defmodule Long.Agent.Loop do
 
   # ── Stream → polling iterator bridge ─────────────────────────────────────
 
+  # `Task.start` (not `Task.async`) — async/await links the worker to the
+  # consumer, which means an exception inside the iterated stream would
+  # propagate as an :EXIT signal and crash the consumer past any
+  # try/rescue. We don't need the link; we want to convert any crash into
+  # a regular `{:error, _}` event the Loop can handle.
   defp wrap_stream(stream) do
     parent = self()
     ref = make_ref()
 
-    task =
-      Task.async(fn ->
-        Enum.each(stream, fn ev -> send(parent, {ref, :ev, ev}) end)
-        send(parent, {ref, :done})
+    {:ok, pid} =
+      Task.start(fn ->
+        try do
+          Enum.each(stream, fn ev -> send(parent, {ref, :ev, ev}) end)
+          send(parent, {ref, :done})
+        rescue
+          e ->
+            send(parent, {ref, :ev, {:error, Exception.message(e)}})
+            send(parent, {ref, :done})
+        catch
+          kind, reason ->
+            send(parent, {ref, :ev, {:error, "#{kind}: #{inspect(reason)}"}})
+            send(parent, {ref, :done})
+        end
       end)
 
-    %{ref: ref, task: task}
+    %{ref: ref, pid: pid}
   end
 
   defp next_iter(%{ref: ref}) do
@@ -431,5 +469,9 @@ defmodule Long.Agent.Loop do
   end
 
   defp close_iter(nil), do: :ok
-  defp close_iter(%{task: task}), do: Task.shutdown(task, :brutal_kill)
+
+  defp close_iter(%{pid: pid}) do
+    if Process.alive?(pid), do: Process.exit(pid, :kill)
+    :ok
+  end
 end

@@ -226,7 +226,8 @@ defmodule Long.Agent.Memory do
   defp load_messages(session_id) do
     case Agent.list_messages() do
       {:ok, all} ->
-        {:ok, all |> Enum.filter(&(&1.session_id == session_id)) |> Enum.sort_by(& &1.turn)}
+        {:ok,
+         all |> Enum.filter(&(&1.session_id == session_id)) |> Enum.sort_by(& &1.inserted_at, DateTime)}
 
       err ->
         err

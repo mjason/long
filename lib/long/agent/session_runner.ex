@@ -159,7 +159,7 @@ defmodule Long.Agent.SessionRunner do
 
     all
     |> Enum.filter(&(&1.session_id == session_id))
-    |> Enum.sort_by(& &1.turn)
+    |> Enum.sort_by(& &1.inserted_at, DateTime)
     |> Enum.map(&row_to_canonical/1)
   end
 
