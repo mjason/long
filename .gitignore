@@ -39,3 +39,5 @@ npm-debug.log
 *.db
 *.db-*
 
+.claude/skills/ash-framework
+.claude/skills/phoenix-framework
