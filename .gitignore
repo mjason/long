@@ -39,5 +39,8 @@ npm-debug.log
 *.db
 *.db-*
 
+# Agent runtime workspace (uv venv, pyproject.toml deps, AI scratch files)
+/priv/agent/
+
 .claude/skills/ash-framework
 .claude/skills/phoenix-framework
