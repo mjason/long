@@ -27,12 +27,15 @@ defmodule LongWeb.AgentLive.Chat do
      |> assign(:checkpoint, load_checkpoint(session_id))
      |> assign(:global_memory, load_global_memory())
      |> assign(:ask_user, nil)
+     |> assign(:loop_notice, nil)
      |> assign(:sessions, list_sessions())
      |> assign(:sidebar_open?, true)
      |> assign(:memory_open?, true)}
   end
 
   @impl true
+  def handle_event("dismiss_notice", _, socket), do: {:noreply, assign(socket, :loop_notice, nil)}
+
   def handle_event("submit", %{"input" => text}, socket) do
     case String.trim(text) do
       "" ->
@@ -44,6 +47,7 @@ defmodule LongWeb.AgentLive.Chat do
         {:noreply,
          socket
          |> assign(:loop_running?, true)
+         |> assign(:loop_notice, nil)
          |> assign(:streaming, %{text: "", thinking: "", tool_runs: []})
          |> push_event("agent:clear-composer", %{})}
     end
@@ -158,10 +162,16 @@ defmodule LongWeb.AgentLive.Chat do
   def handle_info({:ask_user, payload}, socket),
     do: {:noreply, assign(socket, :ask_user, payload)}
 
-  def handle_info({:done, _reason}, socket), do: {:noreply, socket}
+  def handle_info({:done, reason}, socket) do
+    {:noreply, assign(socket, :loop_notice, SessionRunner.done_notice(reason))}
+  end
 
-  def handle_info({:loop_error, _msg}, socket),
-    do: {:noreply, assign(socket, :loop_running?, false)}
+  def handle_info({:loop_error, msg}, socket) do
+    {:noreply,
+     socket
+     |> assign(:loop_running?, false)
+     |> assign(:loop_notice, %{kind: :error, text: "Agent error: " <> to_string(msg)})}
+  end
 
   def handle_info(_, socket), do: {:noreply, socket}
 
@@ -354,6 +364,7 @@ defmodule LongWeb.AgentLive.Chat do
           <.streaming_bubble :if={@streaming != nil} streaming={@streaming} />
 
           <.ask_user_card :if={@ask_user} ask={@ask_user} />
+          <.loop_notice :if={@loop_notice} notice={@loop_notice} />
         </div>
 
         <.composer loop_running?={@loop_running?} />
@@ -610,6 +621,25 @@ defmodule LongWeb.AgentLive.Chat do
         <pre class="mt-1 bg-white border border-zinc-200 rounded p-2 overflow-x-auto leading-snug font-mono text-zinc-700">{format_data(@run.data)}</pre>
       </details>
     </div>
+    """
+  end
+
+  attr :notice, :map, required: true
+
+  defp loop_notice(assigns) do
+    ~H"""
+    <article class={[
+      "max-w-2xl mx-auto rounded-2xl p-3 text-sm flex items-start gap-3",
+      @notice.kind == :warning && "border border-amber-300 bg-amber-50 text-amber-900",
+      @notice.kind == :error && "border border-red-300 bg-red-50 text-red-900"
+    ]}>
+      <div class="flex-1">{@notice.text}</div>
+      <button
+        type="button"
+        phx-click="dismiss_notice"
+        class="text-xs underline opacity-70 hover:opacity-100"
+      >dismiss</button>
+    </article>
     """
   end
 

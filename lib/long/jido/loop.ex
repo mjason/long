@@ -85,7 +85,11 @@ defmodule Long.Jido.Loop do
   scheduled times are UTC — convert local times before calling.
   """
 
-  @default_max_turns 8
+  # Higher than feels necessary because long ReAct tasks (e.g. "open
+  # every link in this newsletter") burn one turn per batch of 4 tool
+  # calls; 8 was hitting :max_turns silently halfway through realistic
+  # workflows.
+  @default_max_turns 20
 
   # Hard cap on tool_calls the LLM can issue in a single turn. Beyond
   # this, the excess get synthetic "skipped" tool_results telling the

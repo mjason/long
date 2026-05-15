@@ -20,6 +20,26 @@ defmodule Long.SessionRunner do
   def send_user_message(session_id, text, opts \\ []),
     do: impl().send_user_message(session_id, text, opts)
 
+  @doc """
+  Translate the reason payload broadcast on `{:done, reason}` into a
+  user-facing notice, or `nil` for reasons that don't warrant one.
+  Both runners broadcast the same shape, so the mapping lives here
+  rather than per-implementation.
+  """
+  def done_notice(%{reason: :max_turns}) do
+    %{
+      kind: :warning,
+      text:
+        "Agent stopped after hitting the max-turn limit. The task wasn't finished — " <>
+          "send a follow-up like \"continue\" to resume."
+    }
+  end
+
+  def done_notice(%{reason: :error, error: e}),
+    do: %{kind: :error, text: "Agent error: " <> Exception.message(e)}
+
+  def done_notice(_), do: nil
+
   defp impl,
     do: Application.get_env(:long, :session_runner, Long.Agent.SessionRunner)
 end

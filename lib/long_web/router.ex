@@ -2,6 +2,7 @@ defmodule LongWeb.Router do
   use LongWeb, :router
 
   import Oban.Web.Router
+  import ErrorTracker.Web.Router
 
   pipeline :browser do
     plug :accepts, ["html"]
@@ -51,6 +52,7 @@ defmodule LongWeb.Router do
       pipe_through :browser
 
       oban_dashboard("/oban")
+      error_tracker_dashboard("/errors")
     end
   end
 

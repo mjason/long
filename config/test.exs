@@ -7,6 +7,9 @@ config :ash, policies: [show_policy_breakdowns?: true], disable_async?: true
 # and the browser-backed tools return `{:error, :not_installed}`.
 config :long, Long.Agent.Browser, auto_install: false
 
+# Don't pollute the test sandbox with captured errors.
+config :error_tracker, enabled: false
+
 # Configure your database
 #
 # The MIX_TEST_PARTITION environment variable can be used

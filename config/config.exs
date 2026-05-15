@@ -72,6 +72,12 @@ config :long, Long.Agent,
   temp_root: Path.expand("../priv/agent/workspace", __DIR__),
   workspace_root: Path.expand("../priv/agent/workspace", __DIR__)
 
+# Dashboard mounted at `/errors` in dev (see router.ex's dev_routes scope).
+config :error_tracker,
+  repo: Long.Repo,
+  otp_app: :long,
+  enabled: true
+
 # Headless browser for `web_scan` / `web_execute_js` / `Search.Cdp`.
 # Backed by Obscura's CLI mode (`obscura fetch URL …`) — no CDP server
 # is launched. The Engine just ensures the binary is on disk.

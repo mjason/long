@@ -113,15 +113,24 @@ defmodule Long.Jido.SessionRunner do
           system_addendum: addendum,
           tool_context: %{session_id: session_id, workspace_root: workspace_root},
           on_event: event_handler(session_id),
-          on_message: message_handler(session_id, turn_counter),
-          max_turns: 8
+          on_message: message_handler(session_id, turn_counter)
         )
       rescue
         e ->
+          stacktrace = __STACKTRACE__
+
           Logger.error(
             "Long.Jido.SessionRunner loop crashed: " <>
-              Exception.format(:error, e, __STACKTRACE__)
+              Exception.format(:error, e, stacktrace)
           )
+
+          case ErrorTracker.report(e, stacktrace, %{session_id: session_id, source: "jido.loop"}) do
+            {:error, reason} ->
+              Logger.warning("ErrorTracker drop: #{inspect(reason)}")
+
+            _ ->
+              :ok
+          end
 
           broadcast(session_id, {:loop_error, Exception.message(e)})
           %{result: :error, error: e}
