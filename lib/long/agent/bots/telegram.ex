@@ -48,6 +48,35 @@ defmodule Long.Agent.Bots.Telegram do
   end
 
   @doc """
+  Push a collected `result` map (final assistant text + optional ask) to
+  a Telegram chat. Used by `Long.Agent.Bots.Outbound` for proactive
+  pushes from the scheduler. No attachment support — Telegram media
+  uploads aren't wired yet, so attachments are dropped (a future
+  enhancement can route them through `sendPhoto` / `sendDocument`).
+  """
+  @spec push(String.t() | integer(), map(), keyword()) :: :ok | {:error, term()}
+  def push(chat_id, %{} = result, opts \\ []) do
+    server = Keyword.get(opts, :server, __MODULE__)
+    text = Map.get(result, :text, "") || ""
+    ask = Map.get(result, :ask)
+    body = render_reply(text, [], ask)
+
+    cond do
+      body == "" ->
+        :ok
+
+      is_nil(Process.whereis(server)) ->
+        {:error, :telegram_worker_not_running}
+
+      true ->
+        case send_message(server, chat_id, body) do
+          {:ok, _} -> :ok
+          err -> {:error, err}
+        end
+    end
+  end
+
+  @doc """
   Pure function: walk one Telegram update payload and return the structured
   message it contains, or `nil`. Exposed for tests.
   """

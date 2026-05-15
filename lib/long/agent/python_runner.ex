@@ -77,12 +77,8 @@ defmodule Long.Agent.PythonRunner do
   Truncate an output string to `max` bytes by keeping the head and tail
   with a marker in the middle. Useful for long stdout/stderr captures.
   """
-  def truncate(s, max) when byte_size(s) > max do
-    half = div(max, 2)
-    binary_part(s, 0, half) <>
-      "\n\n[omitted long output]\n\n" <>
-      binary_part(s, byte_size(s) - half, half)
-  end
+  def truncate(s, max) when is_binary(s) and byte_size(s) > max,
+    do: Long.Util.Utf8.head_tail(s, max, "\n\n[omitted long output]\n\n")
 
   def truncate(s, _), do: s
 end

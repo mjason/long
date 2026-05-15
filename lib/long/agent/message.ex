@@ -10,6 +10,9 @@ defmodule Long.Agent.Message do
     domain: Long.Agent,
     data_layer: AshSqlite.DataLayer
 
+  require Ash.Query
+  import Ash.Expr
+
   sqlite do
     table "agent_messages"
     repo Long.Repo
@@ -21,6 +24,12 @@ defmodule Long.Agent.Message do
 
   actions do
     defaults [:read, :destroy]
+
+    read :by_session do
+      argument :session_id, :uuid, allow_nil?: false
+      filter expr(session_id == ^arg(:session_id))
+      prepare build(sort: [inserted_at: :asc])
+    end
 
     create :append do
       accept [:role, :content, :blocks, :tool_calls, :tool_results, :turn, :session_id]

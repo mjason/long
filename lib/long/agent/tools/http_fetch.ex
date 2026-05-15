@@ -14,6 +14,7 @@ defmodule Long.Agent.Tools.HttpFetch do
 
   alias Long.Agent.{StepOutcome, Tool, ToolContext}
   alias Long.Agent.Browser.SimpHtml
+  alias Long.Util.Utf8
 
   @default_timeout 15_000
   @max_body_bytes 2_000_000
@@ -162,7 +163,7 @@ defmodule Long.Agent.Tools.HttpFetch do
   defp looks_like_html?(_), do: false
 
   defp to_text(b, max) when is_binary(b) and byte_size(b) > max do
-    binary_part(b, 0, max) <> "\n\n[…truncated…]"
+    Utf8.safe_truncate(b, max) <> "\n\n[…truncated…]"
   end
 
   defp to_text(b, _) when is_binary(b), do: b

@@ -25,6 +25,7 @@ defmodule Long.Agent do
     end
 
     resource Long.Agent.Message do
+      define :list_messages_for_session, action: :by_session, args: [:session_id]
       define :append_message, action: :append
       define :list_messages, action: :read
     end
@@ -38,6 +39,15 @@ defmodule Long.Agent do
       define :put_global_memory, action: :upsert
       define :list_global_memory, action: :read
       define :delete_global_memory, action: :destroy
+      define :bump_global_memory_usage, action: :bump_usage
+    end
+
+    resource Long.Agent.SessionMemory do
+      define :put_session_memory, action: :upsert
+      define :list_session_memory, action: :read
+      define :list_session_memory_for, action: :by_session, args: [:session_id]
+      define :bump_session_memory_usage, action: :bump_usage
+      define :delete_session_memory, action: :destroy
     end
 
     resource Long.Agent.Skill do
@@ -60,9 +70,18 @@ defmodule Long.Agent do
       define :destroy_llm, action: :destroy
     end
 
+    resource Long.Agent.SearchConfig do
+      define :register_search_config, action: :register
+      define :list_search_configs, action: :read
+      define :get_search_config, action: :read, get_by: [:alias]
+      define :update_search_config, action: :update
+      define :destroy_search_config, action: :destroy
+    end
+
     resource Long.Agent.ScheduledTask do
       define :create_scheduled_task, action: :create
       define :list_scheduled_tasks, action: :read
+      define :list_scheduled_tasks_for_session, action: :by_session, args: [:session_id]
       define :get_scheduled_task, action: :read, get_by: [:id]
       define :get_scheduled_task_by_name, action: :read, get_by: [:name]
       define :update_scheduled_task, action: :update
@@ -77,6 +96,14 @@ defmodule Long.Agent do
       define :update_bot_user, action: :update
       define :rotate_bot_session, action: :rotate_session
       define :destroy_bot_user, action: :destroy
+      define :get_bot_user_for_session, action: :by_session, args: [:session_id]
+    end
+
+    resource Long.Agent.WechatCredential do
+      define :upsert_wechat_credential, action: :upsert
+      define :get_wechat_credential, action: :read, get_by: [:name]
+      define :update_wechat_credential_buf, action: :update_buf
+      define :destroy_wechat_credential, action: :destroy
     end
   end
 end

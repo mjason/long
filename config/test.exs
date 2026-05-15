@@ -2,6 +2,11 @@ import Config
 config :long, Oban, testing: :manual
 config :ash, policies: [show_policy_breakdowns?: true], disable_async?: true
 
+# Tests don't auto-install Obscura — we don't want a 50 MB download
+# kicking off in CI. The Engine GenServer will report :failed status
+# and the browser-backed tools return `{:error, :not_installed}`.
+config :long, Long.Agent.Browser, auto_install: false
+
 # Configure your database
 #
 # The MIX_TEST_PARTITION environment variable can be used

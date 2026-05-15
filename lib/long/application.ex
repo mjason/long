@@ -18,7 +18,10 @@ defmodule Long.Application do
          Application.fetch_env!(:long, Oban)
        )},
       {Task.Supervisor, name: Long.Agent.TaskSup},
+      Long.Agent.Browser.Cli.Limiter,
+      Long.Agent.Browser.Engine,
       Long.Agent.Bots.Telegram,
+      Long.Agent.Bots.Wechat.Worker,
       # Start to serve requests, typically the last entry
       {DNSCluster, query: Application.get_env(:long, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Long.PubSub},

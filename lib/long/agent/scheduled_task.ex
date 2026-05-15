@@ -16,6 +16,9 @@ defmodule Long.Agent.ScheduledTask do
     domain: Long.Agent,
     data_layer: AshSqlite.DataLayer
 
+  require Ash.Query
+  import Ash.Expr
+
   sqlite do
     table "agent_scheduled_tasks"
     repo Long.Repo
@@ -27,6 +30,12 @@ defmodule Long.Agent.ScheduledTask do
 
   actions do
     defaults [:read, :destroy]
+
+    read :by_session do
+      argument :session_id, :uuid, allow_nil?: false
+      filter expr(session_id == ^arg(:session_id))
+      prepare build(sort: [next_run_at: :asc])
+    end
 
     create :create do
       accept [

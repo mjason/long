@@ -82,6 +82,7 @@ defmodule Long.MixProject do
       {:mint_web_socket, "~> 1.0"},
       {:jido, "~> 2.2"},
       {:jido_ai, "~> 2.1"},
+      {:eqrcode, "~> 0.2"},
       {:dns_cluster, "~> 0.2.0"},
       {:bandit, "~> 1.5"}
     ]

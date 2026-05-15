@@ -21,7 +21,15 @@ defmodule Long.Agent.Session do
     end
 
     update :update do
-      accept [:title, :status, :llm_alias, :summary, :token_usage, :ended_at]
+      accept [
+        :title,
+        :status,
+        :llm_alias,
+        :summary,
+        :summary_through_inserted_at,
+        :token_usage,
+        :ended_at
+      ]
     end
 
     update :archive do
@@ -50,6 +58,12 @@ defmodule Long.Agent.Session do
     end
 
     attribute :summary, :string do
+      description "LLM-generated condensation of the conversation prefix that no longer fits in the context window."
+      public? true
+    end
+
+    attribute :summary_through_inserted_at, :utc_datetime_usec do
+      description "All messages with inserted_at <= this timestamp are covered by `:summary`. Subsequent messages stay in raw context."
       public? true
     end
 

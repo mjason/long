@@ -72,6 +72,16 @@ config :long, Long.Agent,
   temp_root: Path.expand("../priv/agent/workspace", __DIR__),
   workspace_root: Path.expand("../priv/agent/workspace", __DIR__)
 
+# Headless browser for `web_scan` / `web_execute_js` / `Search.Cdp`.
+# Backed by Obscura's CLI mode (`obscura fetch URL …`) — no CDP server
+# is launched. The Engine just ensures the binary is on disk.
+#
+# Set `auto_install: false` if you'd rather install Obscura yourself
+# (then drop the binary in `priv/agent/bin/` or anywhere on PATH).
+config :long, Long.Agent.Browser,
+  obscura_bin: "obscura",
+  auto_install: true
+
 # Configure the endpoint
 config :long, LongWeb.Endpoint,
   url: [host: "localhost"],

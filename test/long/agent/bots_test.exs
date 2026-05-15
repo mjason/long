@@ -3,7 +3,7 @@ defmodule Long.Agent.BotsTest do
 
   alias Long.Agent
   alias Long.Agent.Bots
-  alias Long.Agent.Bots.{Feishu, Telegram}
+  alias Long.Agent.Bots.{Feishu, Outbound, Telegram}
 
   describe "BotUser CRUD" do
     test "create + lookup by (platform, external_id) identity" do
@@ -74,6 +74,106 @@ defmodule Long.Agent.BotsTest do
       {:ok, all} = Long.Agent.list_bot_users()
       user = Enum.find(all, &(&1.external_id == "stream-user"))
       assert user.chat_id == "12345"
+    end
+  end
+
+  describe "Agent.get_bot_user_for_session/1" do
+    test "returns the BotUser tied to a session_id" do
+      {:ok, %{bot_user: u, session_id: sid}} =
+        Bots.ensure_session(:telegram, "lookup-1", chat_id: "100")
+
+      assert {:ok, found} = Agent.get_bot_user_for_session(sid)
+      assert found.id == u.id
+      assert found.external_id == "lookup-1"
+    end
+
+    test "errors when no BotUser owns the session" do
+      {:ok, sess} = Agent.start_session(%{title: "orphan"})
+      assert {:error, _} = Agent.get_bot_user_for_session(sess.id)
+    end
+  end
+
+  describe "Outbound.push/3 routing" do
+    test "unsupported platform returns {:error, {:unsupported_platform, _}}" do
+      assert {:error, {:unsupported_platform, :discord}} =
+               Outbound.push(%{platform: :discord, external_id: "x"}, %{text: "hi"})
+    end
+
+    test "telegram with no chat_id/external_id returns :no_chat_id" do
+      assert {:error, :no_chat_id} =
+               Outbound.push(
+                 %{platform: :telegram, chat_id: nil, external_id: nil},
+                 %{text: "hi"}
+               )
+
+      assert {:error, :no_chat_id} =
+               Outbound.push(
+                 %{platform: :telegram, chat_id: "", external_id: ""},
+                 %{text: "hi"}
+               )
+    end
+
+    test "telegram falls back to external_id when chat_id is missing" do
+      this = self()
+
+      get_response = fn _opts ->
+        {:ok, %Req.Response{status: 200, body: %{"ok" => true, "result" => []}}}
+      end
+
+      http = fn opts ->
+        case Keyword.fetch!(opts, :method) do
+          :get ->
+            get_response.(opts)
+
+          :post ->
+            send(this, {:tg_send, opts})
+            {:ok, %Req.Response{status: 200, body: %{"ok" => true, "result" => %{}}}}
+        end
+      end
+
+      {:ok, pid} =
+        Telegram.start_link(
+          name: :tg_outbound_test,
+          token: "test-token",
+          http: http,
+          poll_interval_ms: 50,
+          long_poll_timeout: 1
+        )
+
+      assert :ok =
+               Outbound.push(
+                 %{platform: :telegram, chat_id: nil, external_id: "42"},
+                 %{text: "ping"},
+                 server: :tg_outbound_test
+               )
+
+      assert_receive {:tg_send, opts}, 2_000
+      body = Keyword.fetch!(opts, :json)
+      assert body[:chat_id] == "42"
+      assert body[:text] == "ping"
+
+      GenServer.stop(pid)
+    end
+
+    test "wechat without external_id returns :no_uid" do
+      assert {:error, :no_uid} =
+               Outbound.push(%{platform: :wechat, external_id: nil}, %{text: "hi"})
+    end
+
+    test "feishu without external_id returns :no_open_id" do
+      assert {:error, :no_open_id} =
+               Outbound.push(%{platform: :feishu, external_id: nil}, %{text: "hi"})
+    end
+  end
+
+  describe "Telegram.push/3" do
+    test "skips empty bodies" do
+      assert :ok = Telegram.push("1", %{text: "", ask: nil}, server: :nonexistent_server)
+    end
+
+    test "returns {:error, :telegram_worker_not_running} when server is down" do
+      assert {:error, :telegram_worker_not_running} =
+               Telegram.push("1", %{text: "hello"}, server: :nonexistent_server)
     end
   end
 
@@ -184,6 +284,71 @@ defmodule Long.Agent.BotsTest do
     test "handle_event ignores non-message events" do
       assert {:ok, :ignored} = Feishu.handle_event(%{"header" => %{"event_type" => "other"}})
       assert {:ok, :ignored} = Feishu.handle_event(%{})
+    end
+
+    test "send/3 posts to im/v1/messages with receive_id_type=open_id" do
+      this = self()
+
+      http = fn opts ->
+        case Keyword.fetch!(opts, :url) do
+          "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal" ->
+            {:ok,
+             %Req.Response{
+               status: 200,
+               body: %{"code" => 0, "tenant_access_token" => "fake-token"}
+             }}
+
+          "https://open.feishu.cn/open-apis/im/v1/messages" ->
+            send(this, {:feishu_send, opts})
+            {:ok, %Req.Response{status: 200, body: %{"code" => 0}}}
+        end
+      end
+
+      System.put_env("FEISHU_APP_ID", "id")
+      System.put_env("FEISHU_APP_SECRET", "secret")
+
+      on_exit(fn ->
+        System.delete_env("FEISHU_APP_ID")
+        System.delete_env("FEISHU_APP_SECRET")
+      end)
+
+      assert {:ok, :sent} = Feishu.send("ou_test", "hello from scheduler", http: http)
+      assert_received {:feishu_send, opts}
+      assert opts[:params] == %{receive_id_type: "open_id"}
+      body = Keyword.fetch!(opts, :json)
+      assert body["receive_id"] == "ou_test"
+      assert body["msg_type"] == "text"
+      assert {:ok, %{"text" => "hello from scheduler"}} = Jason.decode(body["content"])
+    end
+
+    test "push/3 delegates to send with the user's open_id" do
+      this = self()
+
+      http = fn opts ->
+        case Keyword.fetch!(opts, :url) do
+          "https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal" ->
+            {:ok,
+             %Req.Response{
+               status: 200,
+               body: %{"code" => 0, "tenant_access_token" => "fake-token"}
+             }}
+
+          "https://open.feishu.cn/open-apis/im/v1/messages" ->
+            send(this, {:feishu_send, opts})
+            {:ok, %Req.Response{status: 200, body: %{"code" => 0}}}
+        end
+      end
+
+      System.put_env("FEISHU_APP_ID", "id")
+      System.put_env("FEISHU_APP_SECRET", "secret")
+
+      on_exit(fn ->
+        System.delete_env("FEISHU_APP_ID")
+        System.delete_env("FEISHU_APP_SECRET")
+      end)
+
+      assert :ok = Feishu.push("ou_test", %{text: "reminder", ask: nil}, http: http)
+      assert_received {:feishu_send, _}
     end
 
     test "handle_event drives the loop, calls reply with rendered text" do

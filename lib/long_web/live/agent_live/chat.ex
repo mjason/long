@@ -306,7 +306,7 @@ defmodule LongWeb.AgentLive.Chat do
   end
 
   defp short_args(args) when is_map(args) do
-    args |> Jason.encode!() |> truncate(80)
+    args |> Long.Util.Utf8.sanitize() |> Jason.encode!() |> truncate(80)
   end
 
   defp short_args(_), do: ""
@@ -324,7 +324,7 @@ defmodule LongWeb.AgentLive.Chat do
 
   defp format_data(nil), do: nil
   defp format_data(d) when is_binary(d), do: d
-  defp format_data(d), do: Jason.encode!(d, pretty: true)
+  defp format_data(d), do: d |> Long.Util.Utf8.sanitize() |> Jason.encode!(pretty: true)
 
   # ── Template ─────────────────────────────────────────────────────────────
 
@@ -543,7 +543,7 @@ defmodule LongWeb.AgentLive.Chat do
           <span class="font-mono">🛠 {tc["name"]}</span>
           <span class="text-zinc-400">({short_args(tc["input"] || %{})})</span>
         </summary>
-        <pre class="mt-1.5 text-[11px] bg-zinc-50 border border-zinc-200 rounded p-2 overflow-x-auto leading-snug font-mono">{Jason.encode!(tc["input"] || %{}, pretty: true)}</pre>
+        <pre class="mt-1.5 text-[11px] bg-zinc-50 border border-zinc-200 rounded p-2 overflow-x-auto leading-snug font-mono">{format_data(tc["input"] || %{})}</pre>
       </details>
     </div>
     """
@@ -599,7 +599,7 @@ defmodule LongWeb.AgentLive.Chat do
       </div>
       <details class="px-3 pb-2 text-[11px] text-zinc-500">
         <summary class="cursor-pointer">args</summary>
-        <pre class="mt-1 bg-white border border-zinc-200 rounded p-2 overflow-x-auto leading-snug font-mono text-zinc-700">{Jason.encode!(@run.args || %{}, pretty: true)}</pre>
+        <pre class="mt-1 bg-white border border-zinc-200 rounded p-2 overflow-x-auto leading-snug font-mono text-zinc-700">{format_data(@run.args || %{})}</pre>
       </details>
       <pre
         :if={@run.output != ""}

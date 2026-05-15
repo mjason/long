@@ -86,7 +86,66 @@ defmodule Long.Agent.Bots.Feishu do
     if ask, do: base <> "\n\n❓ " <> (ask["question"] || ""), else: base
   end
 
+  @doc """
+  Push a collected `result` map to a Feishu user proactively (no
+  inbound `message_id` to reply to). Used by
+  `Long.Agent.Bots.Outbound` for scheduler-driven pushes.
+
+  Routes through `POST /im/v1/messages?receive_id_type=open_id` with the
+  user's `open_id` as the receive_id. Attachments aren't wired (Feishu
+  uploads need a separate `im/v1/files` round-trip we haven't built),
+  so only the text+ask portion is delivered.
+  """
+  @spec push(String.t(), map(), keyword()) :: :ok | {:error, term()}
+  def push(open_id, %{} = result, opts \\ []) when is_binary(open_id) do
+    text = Map.get(result, :text, "") || ""
+    ask = Map.get(result, :ask)
+    body = render_reply(text, [], ask)
+
+    if body == "" do
+      :ok
+    else
+      case send(open_id, body, opts) do
+        {:ok, _} -> :ok
+        {:error, _} = e -> e
+      end
+    end
+  end
+
   # ── HTTP ──────────────────────────────────────────────────────────────────
+
+  @doc """
+  POST a proactive text message to a Feishu user/chat. `receive_id_type`
+  defaults to `open_id` but can be overridden via `opts[:receive_id_type]`
+  (e.g. `"chat_id"` for group push).
+  """
+  @spec send(String.t(), String.t(), keyword()) ::
+          {:ok, :sent} | {:error, term()}
+  def send(receive_id, text, opts \\ []) do
+    http = Keyword.get(opts, :http, &Req.request/1)
+    receive_id_type = Keyword.get(opts, :receive_id_type, "open_id")
+
+    with {:ok, token} <- tenant_token(http) do
+      response =
+        http.(
+          method: :post,
+          url: "#{@api_base}/im/v1/messages",
+          params: %{receive_id_type: receive_id_type},
+          headers: [{"authorization", "Bearer #{token}"}, {"content-type", "application/json"}],
+          json: %{
+            "receive_id" => receive_id,
+            "msg_type" => "text",
+            "content" => Jason.encode!(%{"text" => text})
+          }
+        )
+
+      case response do
+        {:ok, %Req.Response{status: 200, body: %{"code" => 0}}} -> {:ok, :sent}
+        {:ok, %Req.Response{body: body}} -> {:error, {:feishu, body}}
+        other -> {:error, other}
+      end
+    end
+  end
 
   @doc "POST a reply to a specific Feishu message_id."
   def reply(message_id, text, opts \\ []) do

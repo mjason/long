@@ -24,7 +24,8 @@ defmodule Long.Jido.SessionRunner do
   require Logger
 
   alias Long.Agent
-  alias Long.Jido.Loop
+  alias Long.Agent.Memory.Recall
+  alias Long.Jido.{History, Loop}
 
   @topic_prefix "agent_session:"
   @task_sup Long.Agent.TaskSup
@@ -36,11 +37,17 @@ defmodule Long.Jido.SessionRunner do
     Long.Jido.Tools.FilePatch,
     Long.Jido.Tools.HttpFetch,
     Long.Jido.Tools.UpdateWorkingCheckpoint,
+    Long.Jido.Tools.MemoryRemember,
+    Long.Jido.Tools.MemoryRecall,
     Long.Jido.Tools.MemorySearch,
-    Long.Jido.Tools.MemoryUpsert,
     Long.Jido.Tools.StartLongTermUpdate,
+    Long.Jido.Tools.WebSearch,
     Long.Jido.Tools.WebScan,
     Long.Jido.Tools.WebExecuteJs,
+    Long.Jido.Tools.ScheduleTask,
+    Long.Jido.Tools.ListScheduledTasks,
+    Long.Jido.Tools.CancelScheduledTask,
+    Long.Jido.Tools.SendMedia,
     Long.Jido.Tools.AskUser
   ]
 
@@ -64,7 +71,7 @@ defmodule Long.Jido.SessionRunner do
     Long.Agent.SessionRunner.send_user_message(session_id, text, opts)
   end
 
-  defp execute(session_id, %{llm_alias: alias_name}, text, _opts) do
+  defp execute(session_id, %{llm_alias: alias_name}, text, opts) do
     broadcast(session_id, :loop_started)
 
     # An atomic counter scoped to this task replaces the previous
@@ -77,11 +84,33 @@ defmodule Long.Jido.SessionRunner do
       Application.get_env(:long, Long.Agent, [])[:workspace_root] ||
         Path.expand("priv/agent/workspace", File.cwd!())
 
+    # Load prior turns + (when context blows the budget) ask the LLM
+    # to compress the oldest portion into `session.summary`. History
+    # is loaded BEFORE we persist the current user message via
+    # `on_message` (Loop fires that callback as its first act), so no
+    # exclude_id is needed yet.
+    %{system_addendum: summary_addendum, messages: history} =
+      History.load_or_compress(session_id, alias_name)
+
+    # Pull keyword-relevant session + global memories so the agent
+    # has stable facts at hand without having to explicitly call
+    # `memory_recall` every turn. `bump: false` — we'd lose signal if
+    # auto-recall counted; only the explicit tool call bumps usage.
+    memory_addendum =
+      text
+      |> Recall.recall(session_id: session_id, limit: 8, bump: false)
+      |> Recall.format_for_prompt()
+
+    addendum = merge_addenda(summary_addendum, memory_addendum)
+
     result =
       try do
         Loop.run(text,
           tools: @default_tools,
           llm_alias: alias_name,
+          attachments: Keyword.get(opts, :attachments, []),
+          history: history,
+          system_addendum: addendum,
           tool_context: %{session_id: session_id, workspace_root: workspace_root},
           on_event: event_handler(session_id),
           on_message: message_handler(session_id, turn_counter),
@@ -107,6 +136,14 @@ defmodule Long.Jido.SessionRunner do
   defp done_reason(%{result: :max_turns}), do: %{reason: :max_turns}
   defp done_reason(%{result: :error, error: e}), do: %{reason: :error, error: e}
   defp done_reason(_), do: %{reason: :unknown}
+
+  # Combine the conversation-summary section (from History) and the
+  # memory section (from Recall) into a single system-prompt
+  # addendum. Either may be nil/empty.
+  defp merge_addenda(nil, ""), do: nil
+  defp merge_addenda(summary, ""), do: summary
+  defp merge_addenda(nil, memory), do: memory
+  defp merge_addenda(summary, memory), do: summary <> "\n\n" <> memory
 
   # ── Event → PubSub translation ───────────────────────────────────────────
 
@@ -158,8 +195,15 @@ defmodule Long.Jido.SessionRunner do
           {:ok, row} ->
             broadcast(session_id, {:message_persisted, %{message: row}})
 
-          _ ->
-            :skip
+          other ->
+            # Silently dropping a tool_result here used to corrupt the
+            # next turn's history (the LLM API rejects an
+            # assistant.tool_calls without a matching tool_result).
+            Logger.error(
+              "Long.Jido.SessionRunner failed to persist message " <>
+                "(session_id=#{session_id}, role=#{inspect(attrs[:role])}, " <>
+                "turn=#{inspect(attrs[:turn])}): #{inspect(other)}"
+            )
         end
       end
     end

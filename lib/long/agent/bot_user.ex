@@ -20,6 +20,9 @@ defmodule Long.Agent.BotUser do
     domain: Long.Agent,
     data_layer: AshSqlite.DataLayer
 
+  require Ash.Query
+  import Ash.Expr
+
   sqlite do
     table "agent_bot_users"
     repo Long.Repo
@@ -31,6 +34,12 @@ defmodule Long.Agent.BotUser do
 
   actions do
     defaults [:read, :destroy]
+
+    read :by_session do
+      argument :session_id, :uuid, allow_nil?: false
+      filter expr(session_id == ^arg(:session_id))
+      get? true
+    end
 
     create :create do
       accept [:platform, :external_id, :chat_id, :display_name, :session_id, :metadata]

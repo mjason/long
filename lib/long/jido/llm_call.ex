@@ -55,6 +55,17 @@ defmodule Long.Jido.LLMCall do
 
     with {:ok, %ReqLLM.StreamResponse{} = sr} <-
            ReqLLM.Generation.stream_text(cfg.model, messages, req_opts) do
+      classify_stream(sr)
+    end
+  end
+
+  # `ReqLLM.StreamResponse.classify/1` drains the SSE stream lazily and
+  # raises on transport errors mid-flight (e.g. relay returning 500 after
+  # the connection upgrade). Normalize that into `{:error, _}` so callers
+  # — Summarizer, Loop, History.maybe_compress — can pattern-match
+  # instead of crashing the whole session task.
+  defp classify_stream(sr) do
+    try do
       classification = ReqLLM.StreamResponse.classify(sr)
 
       {:ok,
@@ -66,6 +77,8 @@ defmodule Long.Jido.LLMCall do
          finish_reason: classification.finish_reason,
          usage: ReqLLM.StreamResponse.usage(sr)
        }}
+    rescue
+      e -> {:error, e}
     end
   end
 

@@ -23,6 +23,7 @@ defmodule LongWeb.Router do
 
     live "/chat", AgentLive.Chat
     live "/chat/:session_id", AgentLive.Chat
+    live "/wechat", WechatLive.Login
   end
 
   scope "/webhooks/feishu", LongWeb do

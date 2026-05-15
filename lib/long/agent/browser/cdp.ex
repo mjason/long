@@ -24,8 +24,20 @@ defmodule Long.Agent.Browser.CDP do
   - `navigate/3` — navigate a target to a URL
   """
 
-  @default_endpoint System.get_env("CHROME_DEBUG_URL") || "http://127.0.0.1:9222"
   @default_recv_timeout 15_000
+
+  @doc """
+  Resolve the CDP HTTP endpoint. Precedence: explicit `:endpoint` opt
+  on each call → app config `:long, Long.Agent.Browser, :endpoint` →
+  `CHROME_DEBUG_URL` env var → `http://127.0.0.1:9222`.
+  """
+  def default_endpoint do
+    cfg = Application.get_env(:long, Long.Agent.Browser, [])
+
+    Keyword.get(cfg, :endpoint) ||
+      System.get_env("CHROME_DEBUG_URL") ||
+      "http://127.0.0.1:9222"
+  end
 
   defmodule Target do
     @moduledoc false
@@ -44,14 +56,16 @@ defmodule Long.Agent.Browser.CDP do
   def unreachable?(_), do: false
 
   @doc """
-  Hint string to show the model when Chrome can't be reached. Same wording
-  for both web tools so the model learns one recovery path.
+  Hint string for the model when the Obscura binary isn't installed
+  (yet). Tools `web_scan` / `web_execute_js` shell out to `obscura fetch`;
+  if the binary isn't on disk, they surface this hint via their error
+  payload.
   """
   def unreachable_hint do
-    "Chrome doesn't appear to be running with remote debugging enabled. " <>
-      "Start it with `google-chrome --remote-debugging-port=9222` (or set " <>
-      "`CHROME_DEBUG_URL` to a custom host). For plain HTTP scraping that " <>
-      "doesn't need a real browser, use the `http_fetch` tool instead."
+    "Obscura headless browser isn't installed yet. The supervisor " <>
+      "may still be downloading it in the background (~50 MB, one-time) — " <>
+      "retry in a few seconds. For machine endpoints (JSON/RSS/sitemaps) " <>
+      "use `http_fetch` instead; for search use `web_search`."
   end
 
   @doc """
@@ -64,7 +78,7 @@ defmodule Long.Agent.Browser.CDP do
   end
 
   def targets(opts \\ []) do
-    base = Keyword.get(opts, :endpoint, @default_endpoint)
+    base = Keyword.get(opts, :endpoint) || default_endpoint()
     http = Keyword.get(opts, :http, &Req.request/1)
 
     case http.(method: :get, url: base <> "/json", retry: false) do

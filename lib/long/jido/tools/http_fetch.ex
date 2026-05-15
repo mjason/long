@@ -8,10 +8,15 @@ defmodule Long.Jido.Tools.HttpFetch do
   use Jido.Action,
     name: "http_fetch",
     description:
-      "GET an HTTP URL. Returns simplified text + clickable element list when " <>
-        "the response is HTML; raw body otherwise.",
+      "Raw HTTP request — NO browser, NO JS execution. Use this ONLY for " <>
+        "machine endpoints: JSON / XML / RSS / sitemaps / robots.txt / plain " <>
+        "API responses. " <>
+        "DO NOT use this to read user-facing webpages (news articles, blogs, " <>
+        "SPAs, search-result links). Modern content sites either return 401/403, " <>
+        "JS-only shells, or paywall placeholders to non-browser requests. " <>
+        "For any URL meant to be viewed in a browser, use `web_scan` instead.",
     category: "web",
-    tags: ["http", "fetch"],
+    tags: ["http", "api", "fetch"],
     vsn: "1.0.0",
     schema:
       Zoi.object(%{
@@ -23,6 +28,7 @@ defmodule Long.Jido.Tools.HttpFetch do
       })
 
   alias Long.Agent.Browser.SimpHtml
+  alias Long.Util.Utf8
 
   @default_timeout 15_000
   @max_body_bytes 1_500_000
@@ -82,7 +88,7 @@ defmodule Long.Jido.Tools.HttpFetch do
   defp parse_method(m) when is_binary(m), do: Map.get(@method_map, String.upcase(m), :get)
 
   defp to_text(b) when is_binary(b) and byte_size(b) > @max_body_bytes do
-    binary_part(b, 0, @max_body_bytes) <> "\n\n[…truncated…]"
+    Utf8.safe_truncate(b, @max_body_bytes) <> "\n\n[…truncated…]"
   end
 
   defp to_text(b) when is_binary(b), do: b

@@ -33,19 +33,35 @@ defmodule Long.Agent.Bots do
   @default_timeout 120_000
 
   def run_and_collect(platform, external_id, text, opts \\ []) do
-    case ensure_session(platform, external_id, opts) do
-      {:ok, %{session_id: session_id}} ->
-        :ok = SessionRunner.subscribe(session_id)
+    with {:ok, %{session_id: session_id}} <- ensure_session(platform, external_id, opts) do
+      run_on_session(session_id, text, opts)
+    end
+  end
 
-        try do
-          {:ok, _pid} = SessionRunner.send_user_message(session_id, text)
-          collect(session_id, opts)
-        after
-          SessionRunner.unsubscribe(session_id)
-        end
+  @doc """
+  Drive an existing session synchronously: subscribe to its PubSub topic,
+  fire `text` as a user message, accumulate the loop's events, and return
+  `{:ok, %{text, tool_calls, attachments, ask, error}}` once `:loop_ended`
+  arrives.
 
-      {:error, e} ->
-        {:error, e}
+  Use this when you already know the `session_id` (e.g. a scheduled
+  task triggering its own session) and don't need the
+  platform/external_id lookup in `run_and_collect/4`.
+  """
+  def run_on_session(session_id, text, opts \\ []) when is_binary(session_id) do
+    :ok = SessionRunner.subscribe(session_id)
+
+    try do
+      {:ok, _pid} =
+        SessionRunner.send_user_message(
+          session_id,
+          text,
+          Keyword.take(opts, [:attachments])
+        )
+
+      collect(session_id, opts)
+    after
+      SessionRunner.unsubscribe(session_id)
     end
   end
 
@@ -73,8 +89,9 @@ defmodule Long.Agent.Bots do
 
   defp create_bot_user_and_session(platform, external_id, opts) do
     title = Keyword.get(opts, :session_title, "#{platform}:#{external_id}")
+    llm_alias = Keyword.get(opts, :llm_alias) || default_llm_alias()
 
-    with {:ok, session} <- Agent.start_session(%{title: title}),
+    with {:ok, session} <- Agent.start_session(%{title: title, llm_alias: llm_alias}),
          {:ok, user} <-
            Agent.create_bot_user(%{
              platform: platform,
@@ -85,6 +102,16 @@ defmodule Long.Agent.Bots do
              metadata: Keyword.get(opts, :metadata, %{})
            }) do
       {:ok, %{bot_user: user, session_id: session.id}}
+    end
+  end
+
+  # Bot-created sessions have no human in the loop to pick an LLM; fall
+  # back to whichever LLMConfig row was registered first so we don't
+  # land in the Echo-fallback path the dispatcher uses for nil aliases.
+  defp default_llm_alias do
+    case Agent.list_llms() do
+      {:ok, [%{alias: a} | _]} -> a
+      _ -> nil
     end
   end
 
@@ -140,6 +167,7 @@ defmodule Long.Agent.Bots do
         on_tool_done: Keyword.get(opts, :on_tool_done),
         text: "",
         tool_calls: [],
+        attachments: [],
         ask: nil,
         error: nil
       },
@@ -152,11 +180,24 @@ defmodule Long.Agent.Bots do
 
     receive do
       :loop_ended ->
-        {:ok, Map.take(state, [:text, :tool_calls, :ask, :error])}
+        {:ok, Map.take(state, [:text, :tool_calls, :attachments, :ask, :error])}
+
+      {:bot_send_media, payload} ->
+        do_collect(%{state | attachments: state.attachments ++ [payload]}, deadline)
 
       {:llm_chunk, t} ->
         if state.on_delta, do: state.on_delta.(t)
         do_collect(%{state | text: state.text <> t}, deadline)
+
+      # The jido runner doesn't emit `:llm_chunk` (its ReqLLM stream is
+      # drained with `classify/1` in one shot). It only emits the final
+      # assistant message via `:message_persisted`. Take the last
+      # non-empty assistant content as the reply; intermediate
+      # assistant rows with only tool_calls have empty content and are
+      # skipped.
+      {:message_persisted, %{message: %{role: :assistant, content: c}}}
+      when is_binary(c) and c != "" ->
+        do_collect(%{state | text: c}, deadline)
 
       {:tool_start, %{id: id, name: name, args: args}} ->
         if state.on_tool_start, do: state.on_tool_start.(%{id: id, name: name, args: args})
