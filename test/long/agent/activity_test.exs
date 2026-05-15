@@ -7,135 +7,136 @@ defmodule Long.Agent.ActivityTest do
 
   setup do
     sid = "test_session_#{System.unique_integer([:positive])}"
-    on_exit(fn -> Activity.unregister(sid) end)
+    on_exit(fn -> Activity.release(sid) end)
     %{sid: sid}
   end
 
-  describe "register/1" do
-    test "always succeeds, returns the inserted info", %{sid: sid} do
-      assert {:ok, info} = Activity.register(sid)
-      assert info.session_id == sid
-      assert info.watcher_pid == self()
-      assert is_integer(info.since)
+  describe "try_acquire_or_enqueue/2" do
+    test "first caller acquires the slot", %{sid: sid} do
+      assert :acquired = Activity.try_acquire_or_enqueue(sid, :payload)
+      assert %{watcher_pid: pid} = Activity.lookup(sid)
+      assert pid == self()
     end
 
-    test "two callers can both register against the same session", %{sid: sid} do
+    test "second caller enqueues; FIFO order preserved on dequeue", %{sid: sid} do
       this = self()
 
-      first =
+      owner =
         spawn(fn ->
-          {:ok, _} = Activity.register(sid)
-          send(this, :registered_1)
-          receive do: (:release -> :ok)
+          :acquired = Activity.try_acquire_or_enqueue(sid, :first_payload)
+          send(this, :acquired)
+          receive do: (:release -> Activity.release(sid))
         end)
 
-      second =
-        spawn(fn ->
-          {:ok, _} = Activity.register(sid)
-          send(this, :registered_2)
-          receive do: (:release -> :ok)
-        end)
+      assert_receive :acquired, 500
 
-      assert_receive :registered_1, 500
-      assert_receive :registered_2, 500
+      assert :enqueued = Activity.try_acquire_or_enqueue(sid, :payload_a)
+      assert :enqueued = Activity.try_acquire_or_enqueue(sid, :payload_b)
 
-      pids = Activity.lookup(sid) |> Enum.map(& &1.watcher_pid) |> Enum.sort()
-      assert Enum.sort([first, second]) == pids
+      assert :payload_a = Activity.dequeue(sid)
+      assert :payload_b = Activity.dequeue(sid)
+      assert nil == Activity.dequeue(sid)
 
-      send(first, :release)
-      send(second, :release)
+      send(owner, :release)
     end
 
     test "different sessions stay isolated", %{sid: sid} do
       other = sid <> "_other"
-      on_exit(fn -> Activity.unregister(other) end)
+      on_exit(fn -> Activity.release(other) end)
 
-      assert {:ok, _} = Activity.register(sid)
-      assert {:ok, _} = Activity.register(other)
-      assert length(Activity.lookup(sid)) == 1
-      assert length(Activity.lookup(other)) == 1
+      assert :acquired = Activity.try_acquire_or_enqueue(sid, :p1)
+      assert :acquired = Activity.try_acquire_or_enqueue(other, :p2)
     end
   end
 
-  describe "update/2" do
-    test "merges fields into the caller's own entry", %{sid: sid} do
-      {:ok, _} = Activity.register(sid)
-
-      :ok = Activity.update(sid, %{turn: 3, tool: "web_scan"})
-
-      assert [%{turn: 3, tool: "web_scan", watcher_pid: pid}] = Activity.lookup(sid)
-      assert pid == self()
+  describe "release/1" do
+    test "frees the slot for the next acquirer", %{sid: sid} do
+      :acquired = Activity.try_acquire_or_enqueue(sid, :p)
+      Activity.release(sid)
+      eventually(fn -> Activity.lookup(sid) == nil end)
+      assert :acquired = Activity.try_acquire_or_enqueue(sid, :p2)
     end
 
-    test "no-op on a session this process hasn't registered against", %{sid: sid} do
-      assert :ok = Activity.update(sid, %{turn: 9})
-      assert Activity.lookup(sid) == []
-    end
-
-    test "only updates the calling pid's row, not others", %{sid: sid} do
+    test "DOWN auto-cleans when owner dies without releasing", %{sid: sid} do
       this = self()
-
-      other =
-        spawn(fn ->
-          {:ok, _} = Activity.register(sid)
-          send(this, :ready)
-          receive do: (:release -> :ok)
-        end)
-
-      assert_receive :ready, 500
-      {:ok, _} = Activity.register(sid)
-
-      :ok = Activity.update(sid, %{turn: 7})
-      rows = Activity.lookup(sid)
-      assert Enum.find(rows, &(&1.watcher_pid == self())).turn == 7
-      assert Enum.find(rows, &(&1.watcher_pid == other)).turn == nil
-
-      send(other, :release)
-    end
-  end
-
-  describe "auto-cleanup on watcher death" do
-    test "DOWN monitor removes the dead pid's row only", %{sid: sid} do
-      this = self()
-      {:ok, _} = Activity.register(sid)
 
       doomed =
         spawn(fn ->
-          {:ok, _} = Activity.register(sid)
+          :acquired = Activity.try_acquire_or_enqueue(sid, :p)
           send(this, :ready)
           receive do: (:stop -> :ok)
         end)
 
       assert_receive :ready, 500
-      assert length(Activity.lookup(sid)) == 2
+      assert %{watcher_pid: ^doomed} = Activity.lookup(sid)
 
       ref = Process.monitor(doomed)
       send(doomed, :stop)
       assert_receive {:DOWN, ^ref, :process, ^doomed, _}, 500
 
-      eventually(fn -> length(Activity.lookup(sid)) == 1 end)
-      assert [%{watcher_pid: pid}] = Activity.lookup(sid)
-      assert pid == self()
+      eventually(fn -> Activity.lookup(sid) == nil end)
+    end
+  end
+
+  describe "update/2" do
+    test "merges fields into the owner's row", %{sid: sid} do
+      :acquired = Activity.try_acquire_or_enqueue(sid, :p)
+      Activity.update(sid, %{turn: 3, tool: "web_scan"})
+      assert %{turn: 3, tool: "web_scan"} = Activity.lookup(sid)
+    end
+
+    test "no-op when caller doesn't own the slot", %{sid: sid} do
+      :ok = Activity.update(sid, %{turn: 9})
+      assert Activity.lookup(sid) == nil
+    end
+  end
+
+  describe "clear/1" do
+    test "wipes owner + queue + btws atomically, returns prior owner pid", %{sid: sid} do
+      :acquired = Activity.try_acquire_or_enqueue(sid, :owned)
+      :enqueued = Activity.try_acquire_or_enqueue(sid, :q1)
+      :ok = Activity.add_btw(sid, "note 1")
+
+      assert Activity.lookup(sid) != nil
+
+      assert {prior_pid, :ok} = Activity.clear(sid)
+      assert prior_pid == self()
+
+      assert Activity.lookup(sid) == nil
+      assert nil == Activity.dequeue(sid)
+      assert [] == Activity.take_btws(sid)
+    end
+
+    test "no-op on a session that was never touched, owner pid nil", %{sid: sid} do
+      assert {nil, :ok} = Activity.clear(sid)
+    end
+  end
+
+  describe "btw notes" do
+    test "add_btw + take_btws round-trip, FIFO", %{sid: sid} do
+      :acquired = Activity.try_acquire_or_enqueue(sid, :p)
+      :ok = Activity.add_btw(sid, "PG-13 only")
+      :ok = Activity.add_btw(sid, "also include 1990s posters")
+
+      assert ["PG-13 only", "also include 1990s posters"] = Activity.take_btws(sid)
+      assert [] = Activity.take_btws(sid)
+    end
+
+    test "take_btws empty for sessions with no notes", %{sid: sid} do
+      assert [] = Activity.take_btws(sid)
     end
   end
 
   describe "describe/1" do
-    test "renders a status sentence with duration + turn + tool", %{sid: sid} do
-      {:ok, _} = Activity.register(sid)
-      :ok = Activity.update(sid, %{turn: 4, tool: "web_scan"})
-      [info] = Activity.lookup(sid)
+    test "renders runtime + turn + tool", %{sid: sid} do
+      :acquired = Activity.try_acquire_or_enqueue(sid, :p)
+      Activity.update(sid, %{turn: 4, tool: "web_scan"})
+      info = Activity.lookup(sid)
 
       text = Activity.describe(info)
       assert text =~ "运行中"
-      assert text =~ "web_scan"
       assert text =~ "第 4 轮"
-    end
-
-    test "drops missing fields gracefully", %{sid: sid} do
-      {:ok, _} = Activity.register(sid)
-      [info] = Activity.lookup(sid)
-      assert Activity.describe(info) =~ "运行中"
+      assert text =~ "web_scan"
     end
   end
-
 end

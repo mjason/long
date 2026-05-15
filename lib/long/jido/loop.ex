@@ -171,6 +171,8 @@ defmodule Long.Jido.Loop do
   defp loop(state) do
     state.on_event.({:turn_start, state.turn})
 
+    state = inject_btws(state)
+
     case LLMCall.call(state.messages, state.tools, state.llm_opts) do
       {:ok, %{type: :final_answer, text: text, usage: usage} = resp} ->
         msg = ReqLLM.Context.assistant(text)
@@ -404,5 +406,25 @@ defmodule Long.Jido.Loop do
   defp mime_for(path) do
     ext = path |> Path.extname() |> String.downcase()
     Map.get(@mime_by_ext, ext, "application/octet-stream")
+  end
+
+  # Consume any `/btw` notes the user queued while this loop was
+  # mid-flight (see `Long.Agent.Activity.add_btw/2`) and append them as
+  # user-role messages so the LLM picks them up on the next call.
+  defp inject_btws(state) do
+    sid = state.tool_ctx[:session_id]
+
+    if is_binary(sid) do
+      case Long.Agent.Activity.take_btws(sid) do
+        [] ->
+          state
+
+        notes ->
+          extras = Enum.map(notes, &ReqLLM.Context.user("[补充] " <> &1))
+          %{state | messages: state.messages ++ extras}
+      end
+    else
+      state
+    end
   end
 end

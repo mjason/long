@@ -78,6 +78,21 @@ config :error_tracker,
   otp_app: :long,
   enabled: true
 
+# ReqLLM's default Finch pool is 8 connections total (size: 1 × count: 8),
+# which gets exhausted by concurrent agent loops (each holds a streaming
+# connection for the duration of an LLM turn). Bump generously — pools
+# are cheap (one TCP socket each, idle pools cost ~nothing), and we'd
+# rather waste a few file descriptors than drop replies under bursty
+# multi-user load (bot fan-out + scheduled-task fires + parallel tool
+# dispatches inside each loop).
+config :req_llm,
+  finch: [
+    name: ReqLLM.Finch,
+    pools: %{
+      :default => [protocols: [:http1], size: 1, count: 128]
+    }
+  ]
+
 # Headless browser for `web_scan` / `web_execute_js` / `Search.Cdp`.
 # Backed by Obscura's CLI mode (`obscura fetch URL …`) — no CDP server
 # is launched. The Engine just ensures the binary is on disk.

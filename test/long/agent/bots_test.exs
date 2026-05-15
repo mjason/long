@@ -1,6 +1,8 @@
 defmodule Long.Agent.BotsTest do
   use Long.DataCase, async: false
 
+  import Long.AsyncHelpers, only: [eventually: 1]
+
   alias Long.Agent
   alias Long.Agent.Bots
   alias Long.Agent.Bots.{Feishu, Outbound, Telegram}
@@ -74,6 +76,102 @@ defmodule Long.Agent.BotsTest do
       {:ok, all} = Long.Agent.list_bot_users()
       user = Enum.find(all, &(&1.external_id == "stream-user"))
       assert user.chat_id == "12345"
+    end
+  end
+
+  describe "Bots.run_async/4 magic commands" do
+    test "`/clear` wipes the session's messages + ack" do
+      this = self()
+
+      # Seed two messages on a session via the regular sync path
+      {:ok, %{session_id: sid}} =
+        Bots.ensure_session(:telegram, "clear-user", chat_id: "1")
+
+      {:ok, _} = Bots.run_and_collect(:telegram, "clear-user", "hello", timeout: 5_000)
+
+      {:ok, before} = Long.Agent.list_messages_for_session(sid)
+      assert length(before) >= 2
+
+      # Now fire /clear via run_async
+      {:ok, %{mode: :cleared}} =
+        Bots.run_async(:telegram, "clear-user", "/clear",
+          on_complete: fn _user, result -> send(this, {:cleared_ack, result}) end
+        )
+
+      assert_receive {:cleared_ack, {:ok, %{text: text}}}, 1_000
+      assert text =~ "已清空"
+
+      # Wipe runs on a background task so the ack isn't blocked by DB
+      # work; poll until the messages table is empty.
+      eventually(fn ->
+        {:ok, msgs} = Long.Agent.list_messages_for_session(sid)
+        msgs == []
+      end)
+    end
+
+    test "`/status` reports idle state when no agent is running" do
+      this = self()
+
+      {:ok, _} = Bots.ensure_session(:telegram, "status-user-idle", chat_id: "1")
+
+      {:ok, %{mode: :status}} =
+        Bots.run_async(:telegram, "status-user-idle", "/status",
+          on_complete: fn _user, result -> send(this, {:status_ack, result}) end
+        )
+
+      assert_receive {:status_ack, {:ok, %{text: text}}}, 1_000
+      assert text =~ "空闲"
+    end
+
+    test "`/status` reports owner + queue + btws when busy" do
+      this = self()
+
+      {:ok, %{session_id: sid}} =
+        Bots.ensure_session(:telegram, "status-user-busy", chat_id: "1")
+
+      # Simulate a held slot from another process so /status sees `running`
+      owner =
+        spawn(fn ->
+          :acquired = Long.Agent.Activity.try_acquire_or_enqueue(sid, :held)
+          Long.Agent.Activity.update(sid, %{turn: 3, tool: "web_scan"})
+          send(this, :ready)
+          receive do: (:release -> Long.Agent.Activity.release(sid))
+        end)
+
+      assert_receive :ready, 500
+      :ok = Long.Agent.Activity.add_btw(sid, "note")
+
+      {:ok, %{mode: :status}} =
+        Bots.run_async(:telegram, "status-user-busy", "/status",
+          on_complete: fn _user, result -> send(this, {:status_ack, result}) end
+        )
+
+      assert_receive {:status_ack, {:ok, %{text: text}}}, 1_000
+      assert text =~ "运行中"
+      assert text =~ "web_scan"
+      assert text =~ "第 3 轮"
+      assert text =~ "补充 1 条"
+
+      send(owner, :release)
+    end
+
+    test "`/btw <note>` adds to btws + ack without spawning a new loop" do
+      this = self()
+
+      {:ok, %{session_id: sid}} =
+        Bots.ensure_session(:telegram, "btw-user", chat_id: "1")
+
+      # No active watcher — but /btw still acks (it's idempotent for
+      # idle sessions; the next loop will pick up the note).
+      {:ok, %{mode: :btw}} =
+        Bots.run_async(:telegram, "btw-user", "/btw 注意要 PG-13",
+          on_complete: fn _user, result -> send(this, {:btw_ack, result}) end
+        )
+
+      assert_receive {:btw_ack, {:ok, %{text: ack}}}, 1_000
+      assert ack =~ "已经加入"
+
+      assert ["注意要 PG-13"] = Long.Agent.Activity.take_btws(sid)
     end
   end
 

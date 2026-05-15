@@ -32,6 +32,7 @@ defmodule Long.Agent.Bots do
   """
 
   require Logger
+  require Ash.Query
 
   alias Long.Agent
   alias Long.Agent.Activity
@@ -54,19 +55,22 @@ defmodule Long.Agent.Bots do
   end
 
   @doc """
-  Fire-and-forget version of `run_and_collect/4` — drives the agent on
-  a background `Task.Supervisor` task, then invokes the `:on_complete`
-  callback (required) with the bot_user struct and the collected
-  result. The caller (a platform Worker handling an inbound message)
-  is no longer blocked on agent runtime, so it can keep processing
-  other inbound messages while the agent works.
+  Fire-and-forget version of `run_and_collect/4`. The caller (a
+  platform Worker handling an inbound message) isn't blocked on agent
+  runtime; `:on_complete` (required) is called exactly once, even on
+  `:loop_error` / `:timeout`, so platforms can always push something
+  back.
 
-  Returns `{:ok, %{bot_user, session_id, watcher_pid}}` once the watcher
-  task is spawned, or `{:error, reason}` if session resolution failed.
+  Three inline magic commands short-circuit the agent loop entirely:
 
-  The callback is called exactly once, even on `:loop_error` /
-  `:timeout` results, so platforms can always push *something* back to
-  the user.
+    * `/clear` — wipe history + summary + checkpoint + session memories
+    * `/status` — render the current `Activity.snapshot/1`
+    * `/btw <note>` — append a mid-flight context note for the running
+      agent (picked up via `Long.Jido.Loop`'s `inject_btws/1`)
+
+  Returns `{:ok, %{bot_user, session_id, mode}}` where `mode` is one of
+  `:cleared | :status | :btw | :acquired | :enqueued`, or
+  `{:error, reason}` if session resolution / task spawn failed.
   """
   def run_async(platform, external_id, text, opts \\ []) do
     on_complete = Keyword.fetch!(opts, :on_complete)
@@ -74,21 +78,126 @@ defmodule Long.Agent.Bots do
 
     with {:ok, %{session_id: session_id, bot_user: user}} <-
            ensure_session(platform, external_id, opts) do
-      case Task.Supervisor.start_child(@task_sup, fn ->
-             watcher_run(user, session_id, text, watcher_opts, on_complete)
-           end) do
-        {:ok, _pid} -> {:ok, %{bot_user: user, session_id: session_id}}
-        {:error, reason} -> {:error, {:task_start_failed, reason}}
+      case parse_magic(text) do
+        :clear ->
+          clear_session(session_id)
+          on_complete.(user, {:ok, ack("已清空这条会话的历史、摘要、检查点和 session 记忆。可以重新开始了。")})
+          {:ok, %{bot_user: user, session_id: session_id, mode: :cleared}}
+
+        :status ->
+          on_complete.(user, {:ok, ack(render_status(Activity.snapshot(session_id)))})
+          {:ok, %{bot_user: user, session_id: session_id, mode: :status}}
+
+        {:btw, note} ->
+          Activity.add_btw(session_id, note)
+          on_complete.(user, {:ok, ack("好的,已经加入到当前任务的上下文里。")})
+          {:ok, %{bot_user: user, session_id: session_id, mode: :btw}}
+
+        :normal ->
+          dispatch_message(user, session_id, text, watcher_opts, on_complete)
       end
     end
   end
 
-  defp watcher_run(user, session_id, text, watcher_opts, on_complete) do
-    Activity.register(session_id)
+  # Recognised inline commands. `/clear` and `/status` are nullary
+  # (exact match after trim); `/btw <note>` carries a payload.
+  defp parse_magic(text) when is_binary(text) do
+    case String.trim(text) do
+      "/clear" -> :clear
+      "/status" -> :status
+      "/btw " <> note -> {:btw, String.trim(note)}
+      _ -> :normal
+    end
+  end
 
+  defp parse_magic(_), do: :normal
+
+  defp ack(text) do
+    %{text: text, tool_calls: [], attachments: [], ask: nil, error: nil}
+  end
+
+  # Kill the watcher + wipe DB on a background task so the user gets
+  # the ack immediately. `Task.Supervisor.terminate_child` is
+  # synchronous and can block up to 5s waiting for the child to honor
+  # `:shutdown` (e.g. blocked on Finch); we don't want that on the ack
+  # path. Activity is cleared *synchronously* before backgrounding so
+  # any racing inbound after the ack sees an idle session. `session_id`
+  # stays the same — same WeChat thread / chat URL — just empty.
+  defp clear_session(session_id) do
+    {prior_owner_pid, _} = Activity.clear(session_id)
+
+    Task.Supervisor.start_child(@task_sup, fn ->
+      if is_pid(prior_owner_pid) do
+        _ = Task.Supervisor.terminate_child(@task_sup, prior_owner_pid)
+      end
+
+      wipe_session_rows(session_id)
+    end)
+
+    :ok
+  end
+
+  defp wipe_session_rows(session_id) do
+    _ =
+      Long.Agent.Message
+      |> Ash.Query.filter(session_id == ^session_id)
+      |> Ash.bulk_destroy(:destroy, %{}, strategy: :stream, return_errors?: false)
+
+    _ =
+      Long.Agent.SessionMemory
+      |> Ash.Query.filter(session_id == ^session_id)
+      |> Ash.bulk_destroy(:destroy, %{}, strategy: :stream, return_errors?: false)
+
+    case Agent.get_checkpoint(session_id) do
+      {:ok, checkpoint} -> Ash.destroy(checkpoint)
+      _ -> :ok
+    end
+
+    with {:ok, session} <- Agent.get_session(session_id) do
+      Agent.update_session(session, %{summary: nil, summary_through_inserted_at: nil})
+    end
+  end
+
+  defp render_status(%{owner: nil, queue_length: 0, pending_btws: 0}),
+    do: "空闲,没有任务在跑。"
+
+  defp render_status(%{owner: nil, queue_length: q, pending_btws: b}),
+    do: "空闲,但还有 #{q} 条排队消息和 #{b} 条补充。(异常状态,通常 watcher 会立刻接力)"
+
+  defp render_status(%{owner: info, queue_length: q, pending_btws: b}) do
+    base = Activity.describe(info)
+    extras = [
+      q > 0 && "排队中 #{q} 条",
+      b > 0 && "补充 #{b} 条"
+    ] |> Enum.filter(& &1) |> Enum.join(" · ")
+
+    if extras == "", do: base, else: base <> " · " <> extras
+  end
+
+  defp dispatch_message(user, session_id, text, watcher_opts, on_complete) do
+    payload = {user, text, on_complete}
+
+    case Activity.try_acquire_or_enqueue(session_id, payload) do
+      :acquired ->
+        case Task.Supervisor.start_child(@task_sup, fn ->
+               watcher_run(user, session_id, text, watcher_opts, on_complete)
+             end) do
+          {:ok, _pid} -> {:ok, %{bot_user: user, session_id: session_id, mode: :acquired}}
+          {:error, reason} -> {:error, {:task_start_failed, reason}}
+        end
+
+      :enqueued ->
+        on_complete.(user, {:ok, ack("收到,前一条还在处理中,跑完后立刻处理你这条。")})
+        {:ok, %{bot_user: user, session_id: session_id, mode: :enqueued}}
+    end
+  end
+
+  # Watcher owns the slot. Processes the first message, then drains the
+  # queue (still under the same slot) until empty before releasing.
+  defp watcher_run(user, session_id, text, watcher_opts, on_complete) do
     try do
-      result = run_on_session(session_id, text, watcher_opts)
-      on_complete.(user, result)
+      process_one(user, session_id, text, watcher_opts, on_complete)
+      drain_queue(session_id, watcher_opts)
     rescue
       e ->
         report_crash(e, __STACKTRACE__, session_id)
@@ -98,8 +207,24 @@ defmodule Long.Agent.Bots do
         report_crash({kind, reason}, __STACKTRACE__, session_id)
         on_complete.(user, {:error, {kind, reason}})
     after
-      Activity.unregister(session_id)
+      Activity.release(session_id)
     end
+  end
+
+  defp drain_queue(session_id, watcher_opts) do
+    case Activity.dequeue(session_id) do
+      nil ->
+        :ok
+
+      {next_user, next_text, next_on_complete} ->
+        process_one(next_user, session_id, next_text, watcher_opts, next_on_complete)
+        drain_queue(session_id, watcher_opts)
+    end
+  end
+
+  defp process_one(user, session_id, text, watcher_opts, on_complete) do
+    result = run_on_session(session_id, text, watcher_opts)
+    on_complete.(user, result)
   end
 
   defp report_crash(error, stacktrace, session_id) do
