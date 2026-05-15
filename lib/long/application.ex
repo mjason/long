@@ -21,6 +21,7 @@ defmodule Long.Application do
        )},
       {Task.Supervisor, name: Long.Agent.TaskSup},
       Long.Agent.Activity,
+      Long.Agent.Skill.Store,
       Long.Agent.Browser.Cli.Limiter,
       Long.Agent.Browser.Engine,
       Long.Agent.Bots.Telegram,

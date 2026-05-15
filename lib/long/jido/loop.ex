@@ -76,6 +76,41 @@ defmodule Long.Jido.Loop do
   Save proactively when the user states a preference, a goal, or a
   decision worth remembering — but don't echo every passing comment.
 
+  ## Skills (Anthropic-compatible SKILL.md format)
+
+  Skills are pre-curated capability packages (a `SKILL.md` manual plus
+  optional `scripts/`, `references/`, `assets/`) living under
+  `priv/agent/skills/<name>/` on disk. The filesystem is the source of
+  truth — there is no database; an in-memory index is rebuilt from
+  disk and kept in sync via a file watcher. Discovery is three-tiered:
+
+    - **L0 — names** are listed above under "# Available skills" every
+      turn. Scan them first; a recognisable name is usually enough to
+      decide whether to dig further.
+    - **L1 — `skill_search(query)`** returns `name + description` for
+      skills matching a free-text query. Call this when a name looks
+      promising but the description would help confirm.
+    - **L2 — `skill_read(name)`** returns the full SKILL.md
+      instructions plus `resources_dir` (an absolute path to the
+      skill folder). Read the body like a manual page, then **invoke
+      the companion scripts yourself with `code_run`** (e.g.
+      `python {resources_dir}/scripts/foo.py …`). The runtime does
+      not execute skills for you — SKILL.md tells you how.
+
+  ### Installing a new skill mid-conversation
+
+  When you notice a workflow you'll want to reuse, install it as a
+  skill on the spot:
+
+    1. `file_write` the SKILL.md to `priv/agent/skills/<kebab-name>/SKILL.md`.
+       Required frontmatter: `name` and `description`. Body is plain
+       markdown — write it for **future-you** reading it cold.
+    2. `file_write` any companion scripts under
+       `priv/agent/skills/<kebab-name>/scripts/`.
+    3. Call `skill_reindex` to make the new skill visible immediately.
+       (The watcher usually picks it up automatically, but `skill_reindex`
+       is the safe bet, especially in WSL or under file bursts.)
+
   ## Scheduling
 
   You can schedule future work for yourself: `schedule_task` creates a

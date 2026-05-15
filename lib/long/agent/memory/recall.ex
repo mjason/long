@@ -5,10 +5,8 @@ defmodule Long.Agent.Memory.Recall do
   merged ranked list shaped for either the `memory_recall` tool
   response or the system-prompt auto-injection at Loop entry.
 
-  The scoring matches the existing `Long.Agent.Memory.search_skills/2`
-  shape (case-insensitive substring overlap on `key`/`value`, with
-  importance + recency boosts) so the UX is consistent across all
-  memory-style searches.
+  Scoring is case-insensitive substring overlap on `key`/`value` plus
+  importance + recency boosts.
 
   Side effect: when memories are surfaced, callers can opt into
   bumping `hit_count` + `last_used_at` so future ranking can favour
@@ -90,12 +88,7 @@ defmodule Long.Agent.Memory.Recall do
 
   # ── ranking ──────────────────────────────────────────────────────────
 
-  defp normalize(query) do
-    query
-    |> String.downcase()
-    |> String.split(~r/[\s,;。，；]+/u, trim: true)
-    |> Enum.reject(&(&1 == "" or String.length(&1) < 2))
-  end
+  defp normalize(query), do: Long.Util.Search.normalize(query)
 
   defp score_each(rows, needles, type) do
     Enum.map(rows, fn r ->
@@ -123,12 +116,7 @@ defmodule Long.Agent.Memory.Recall do
   defp importance_boost(n) when is_integer(n) and n >= 1 and n <= 5, do: (n - 3) * 0.5
   defp importance_boost(_), do: 0.0
 
-  defp recency_boost(nil), do: 0.0
-
-  defp recency_boost(%DateTime{} = ts) do
-    days_ago = DateTime.diff(DateTime.utc_now(), ts, :second) / 86_400.0
-    if days_ago < 0, do: 0.0, else: max(0.0, 0.3 * :math.exp(-days_ago / 30.0))
-  end
+  defp recency_boost(ts), do: Long.Util.Search.recency_boost(ts)
 
   # ── data access ─────────────────────────────────────────────────────
 

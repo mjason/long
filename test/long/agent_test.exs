@@ -84,28 +84,6 @@ defmodule Long.AgentTest do
     end
   end
 
-  describe "skills" do
-    test "register and touch increments use_count" do
-      {:ok, s} =
-        Agent.register_skill(%{
-          name: "vue3_component_sop",
-          kind: :sop_md,
-          relative_path: "vue3_component_sop.md",
-          description: "How to build vue3 components"
-        })
-
-      assert s.use_count == 0
-      assert is_nil(s.last_used_at)
-
-      {:ok, t} = Agent.touch_skill(s.name)
-      assert t.use_count == 1
-      assert not is_nil(t.last_used_at)
-
-      {:ok, t2} = Agent.touch_skill(s.name)
-      assert t2.use_count == 2
-    end
-  end
-
   describe "session archive" do
     test "store payload independent of source session lifecycle" do
       {:ok, s} = Agent.start_session(%{title: "to-archive"})

@@ -69,6 +69,7 @@ config :long,
 
 config :long, Long.Agent,
   memory_root: Path.expand("../priv/agent/memory", __DIR__),
+  skill_root: Path.expand("../priv/agent/skills", __DIR__),
   temp_root: Path.expand("../priv/agent/workspace", __DIR__),
   workspace_root: Path.expand("../priv/agent/workspace", __DIR__)
 

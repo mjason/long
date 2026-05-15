@@ -85,7 +85,9 @@ defmodule Long.MixProject do
       {:eqrcode, "~> 0.2"},
       {:dns_cluster, "~> 0.2.0"},
       {:bandit, "~> 1.5"},
-      {:error_tracker, "~> 0.9"}
+      {:error_tracker, "~> 0.9"},
+      {:yaml_elixir, "~> 2.12"},
+      {:file_system, "~> 1.0"}
     ]
   end
 

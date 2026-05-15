@@ -20,7 +20,6 @@ defmodule Long.Agent.MemoryTest do
   alias Long.Agent.LLM.Response
 
   alias Long.Agent.Tools.{
-    MemorySearch,
     MemoryUpsert,
     StartLongTermUpdate
   }
@@ -51,66 +50,10 @@ defmodule Long.Agent.MemoryTest do
       assert prompt =~ "remember: foo"
     end
 
-    test "honors :prefix and :top_skills options" do
-      {:ok, _} =
-        Agent.register_skill(%{
-          name: "alpha",
-          kind: :script_py,
-          relative_path: "alpha.py",
-          description: "do alpha",
-          tags: ["a"]
-        })
-
-      prompt =
-        Memory.build_system_prompt(nil, prefix: "## Goal\nbe helpful.", top_skills: 5)
+    test "honors :prefix option" do
+      prompt = Memory.build_system_prompt(nil, prefix: "## Goal\nbe helpful.")
 
       assert prompt =~ "## Goal\nbe helpful."
-      assert prompt =~ "[Skill index — L3 · top]"
-      assert prompt =~ "alpha"
-    end
-  end
-
-  describe "search_skills/2" do
-    setup do
-      {:ok, a} =
-        Agent.register_skill(%{
-          name: "vue3",
-          kind: :sop_md,
-          relative_path: "vue3_sop.md",
-          description: "Vue 3 component playbook",
-          tags: ["frontend", "vue"]
-        })
-
-      {:ok, b} =
-        Agent.register_skill(%{
-          name: "ocr",
-          kind: :script_py,
-          relative_path: "ocr_utils.py",
-          description: "OCR helpers for screenshots",
-          tags: ["vision"]
-        })
-
-      {:ok, %{vue: a, ocr: b}}
-    end
-
-    test "name match outranks description match" do
-      results = Memory.search_skills("vue")
-      assert hd(results).skill.name == "vue3"
-    end
-
-    test "tag match ranks above description match" do
-      results = Memory.search_skills("vision")
-      assert hd(results).skill.name == "ocr"
-      assert "tag=vision" in hd(results).reasons
-    end
-
-    test "kind filter restricts results" do
-      results = Memory.search_skills("vue", kind: :script_py)
-      assert results == []
-    end
-
-    test "returns empty for no-hit queries" do
-      assert [] = Memory.search_skills("zzz_no_match")
     end
   end
 
@@ -141,24 +84,6 @@ defmodule Long.Agent.MemoryTest do
       assert arch.title == "T"
       assert arch.summary == "S"
       assert arch.insights == "I"
-    end
-  end
-
-  describe "MemorySearch tool" do
-    test "returns ranked matches" do
-      {:ok, _} =
-        Agent.register_skill(%{
-          name: "telemetry",
-          kind: :sop_md,
-          relative_path: "telemetry_sop.md",
-          description: "Trace and metric setup",
-          tags: ["observability"]
-        })
-
-      [_, {:outcome, %StepOutcome{data: %{"matches" => matches}}}] =
-        MemorySearch.run(%{"query" => "telemetry"}, %ToolContext{}) |> Enum.to_list()
-
-      assert [%{"name" => "telemetry"}] = matches
     end
   end
 

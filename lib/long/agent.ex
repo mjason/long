@@ -50,13 +50,6 @@ defmodule Long.Agent do
       define :delete_session_memory, action: :destroy
     end
 
-    resource Long.Agent.Skill do
-      define :register_skill, action: :register
-      define :list_skills, action: :read
-      define :get_skill, action: :read, get_by: [:name]
-      define :touch_skill, action: :touch, get_by: [:name]
-    end
-
     resource Long.Agent.SessionArchive do
       define :archive_payload, action: :create
       define :list_archives, action: :read

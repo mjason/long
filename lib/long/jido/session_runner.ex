@@ -25,6 +25,7 @@ defmodule Long.Jido.SessionRunner do
 
   alias Long.Agent
   alias Long.Agent.Memory.Recall
+  alias Long.Agent.Skill.Store, as: SkillStore
   alias Long.Jido.{History, Loop}
 
   @topic_prefix "agent_session:"
@@ -39,7 +40,6 @@ defmodule Long.Jido.SessionRunner do
     Long.Jido.Tools.UpdateWorkingCheckpoint,
     Long.Jido.Tools.MemoryRemember,
     Long.Jido.Tools.MemoryRecall,
-    Long.Jido.Tools.MemorySearch,
     Long.Jido.Tools.StartLongTermUpdate,
     Long.Jido.Tools.WebSearch,
     Long.Jido.Tools.WebScan,
@@ -49,7 +49,10 @@ defmodule Long.Jido.SessionRunner do
     Long.Jido.Tools.CancelScheduledTask,
     Long.Jido.Tools.SendMedia,
     Long.Jido.Tools.AskUser,
-    Long.Jido.Tools.AgentStatus
+    Long.Jido.Tools.AgentStatus,
+    Long.Jido.Tools.SkillSearch,
+    Long.Jido.Tools.SkillRead,
+    Long.Jido.Tools.SkillReindex
   ]
 
   def topic(session_id), do: @topic_prefix <> session_id
@@ -102,7 +105,12 @@ defmodule Long.Jido.SessionRunner do
       |> Recall.recall(session_id: session_id, limit: 8, bump: false)
       |> Recall.format_for_prompt()
 
-    addendum = merge_addenda(summary_addendum, memory_addendum)
+    # Full skill-name list goes into the addendum every turn (Anthropic
+    # Skills L0). Descriptions are fetched on demand via `skill_search`,
+    # bodies via `skill_read`.
+    skill_addendum = SkillStore.list_names_for_prompt()
+
+    addendum = merge_addenda([summary_addendum, memory_addendum, skill_addendum])
 
     result =
       try do
@@ -140,13 +148,17 @@ defmodule Long.Jido.SessionRunner do
   defp done_reason(%{result: :error, error: e}), do: %{reason: :error, error: e}
   defp done_reason(_), do: %{reason: :unknown}
 
-  # Combine the conversation-summary section (from History) and the
-  # memory section (from Recall) into a single system-prompt
-  # addendum. Either may be nil/empty.
-  defp merge_addenda(nil, ""), do: nil
-  defp merge_addenda(summary, ""), do: summary
-  defp merge_addenda(nil, memory), do: memory
-  defp merge_addenda(summary, memory), do: summary <> "\n\n" <> memory
+  # Combine zero or more system-prompt addendum sections (summary,
+  # memory recall, skill recall). Drops nils and empty strings; returns
+  # nil when nothing is left so the Loop omits the section entirely.
+  defp merge_addenda(parts) when is_list(parts) do
+    parts
+    |> Enum.reject(&(is_nil(&1) or &1 == ""))
+    |> case do
+      [] -> nil
+      cleaned -> Enum.join(cleaned, "\n\n")
+    end
+  end
 
   # ── Event → PubSub translation ───────────────────────────────────────────
 

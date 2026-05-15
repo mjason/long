@@ -10,16 +10,15 @@ defmodule Long.Agent.Memory do
   - **L2 global memory** — Phase 0 `Long.Agent.GlobalMemory` rows, scoped
     `:general` / `:insight`. Updated at runtime via the `memory_upsert` tool;
     no auto-importer from the Python source.
-  - **L3 skill index** — Phase 0 `Long.Agent.Skill` rows. Metadata in SQL,
-    body on disk under `memory_root`. Registration happens via the
-    `mix long.skill` task (or any `Long.Agent.register_skill/1` caller).
+  - **L3 skill index** — filesystem under `skill_root`, indexed by
+    `Long.Agent.Skill.Store` (in-memory ETS). This module no longer
+    touches skills.
   - **L4 session archive** — Phase 0 `Long.Agent.SessionArchive` rows. This
     module provides the synchronous archive function; periodic archival is
     Phase 5's Oban worker.
   """
 
   alias Long.Agent
-  alias Long.Agent.Skill
 
   @doc """
   Build the system prompt for a new turn, optionally seeded with a static
@@ -36,8 +35,7 @@ defmodule Long.Agent.Memory do
       [
         prefix,
         l2_section(),
-        l1_section(session_id),
-        skills_hint(opts)
+        l1_section(session_id)
       ]
       |> Enum.reject(&(&1 in [nil, ""]))
 
@@ -80,111 +78,6 @@ defmodule Long.Agent.Memory do
   defp scope_order(:insight), do: 0
   defp scope_order(:general), do: 1
   defp scope_order(_), do: 2
-
-  defp skills_hint(opts) do
-    case Keyword.get(opts, :top_skills) do
-      nil ->
-        nil
-
-      n when is_integer(n) and n > 0 ->
-        top = top_skills(n)
-        if top == [], do: nil, else: format_top_skills(top)
-    end
-  end
-
-  defp top_skills(n) do
-    case Agent.list_skills() do
-      {:ok, skills} ->
-        skills
-        |> Enum.sort_by(&{-(&1.use_count || 0), &1.last_used_at}, :asc)
-        |> Enum.take(n)
-
-      _ ->
-        []
-    end
-  end
-
-  defp format_top_skills(skills) do
-    body =
-      Enum.map_join(skills, "\n", fn s ->
-        "- `#{s.name}` (#{s.kind}, used #{s.use_count}×) — #{s.description || ""}"
-      end)
-
-    "## [Skill index — L3 · top]\n" <> body
-  end
-
-  @doc """
-  Local skill search. Replaces the Python `skill_search/engine.py` HTTP
-  client to `fudankw.cn`; we own the rows, so we rank in-process.
-
-  Scores each skill by:
-
-  - `name` match (case-insensitive substring) — weight 3.0
-  - `description` match — weight 1.0
-  - `tags` exact match — weight 2.0 per matching tag
-  - Light boost from recency (`last_used_at`) and `use_count`
-
-  Returns `[%{skill: %Skill{}, score: float, reasons: [String.t()]}]`,
-  sorted descending by score, top-`limit`.
-  """
-  def search_skills(query, opts \\ []) when is_binary(query) do
-    limit = Keyword.get(opts, :limit, 10)
-    kind = Keyword.get(opts, :kind)
-    needles = normalize_query(query)
-
-    case Agent.list_skills() do
-      {:ok, skills} ->
-        skills
-        |> filter_by_kind(kind)
-        |> Enum.map(&score_skill(&1, needles))
-        |> Enum.reject(&(&1.score <= 0))
-        |> Enum.sort_by(& &1.score, :desc)
-        |> Enum.take(limit)
-
-      _ ->
-        []
-    end
-  end
-
-  defp normalize_query(query) do
-    query
-    |> String.downcase()
-    |> String.split(~r/[\s,;]+/, trim: true)
-    |> Enum.reject(&(&1 == ""))
-  end
-
-  defp filter_by_kind(skills, nil), do: skills
-  defp filter_by_kind(skills, kind), do: Enum.filter(skills, &(&1.kind == kind))
-
-  defp score_skill(%Skill{} = s, needles) do
-    name_lower = String.downcase(s.name || "")
-    desc_lower = String.downcase(s.description || "")
-    tags_lower = MapSet.new(Enum.map(s.tags || [], &String.downcase/1))
-
-    {score, reasons} =
-      Enum.reduce(needles, {0.0, []}, fn n, {acc, reasons} ->
-        cond do
-          String.contains?(name_lower, n) -> {acc + 3.0, reasons ++ ["name~#{n}"]}
-          MapSet.member?(tags_lower, n) -> {acc + 2.0, reasons ++ ["tag=#{n}"]}
-          String.contains?(desc_lower, n) -> {acc + 1.0, reasons ++ ["desc~#{n}"]}
-          true -> {acc, reasons}
-        end
-      end)
-
-    boost = use_count_boost(s.use_count) + recency_boost(s.last_used_at)
-    %{skill: s, score: score + boost, reasons: reasons}
-  end
-
-  defp use_count_boost(nil), do: 0.0
-  defp use_count_boost(0), do: 0.0
-  defp use_count_boost(n) when is_integer(n), do: :math.log(n + 1) * 0.1
-
-  defp recency_boost(nil), do: 0.0
-
-  defp recency_boost(%DateTime{} = ts) do
-    days_ago = DateTime.diff(DateTime.utc_now(), ts, :second) / 86_400.0
-    if days_ago < 0, do: 0.0, else: max(0.0, 0.5 * :math.exp(-days_ago / 30.0))
-  end
 
   @doc """
   Synchronous L4 archive: serializes a finished session's messages + final
