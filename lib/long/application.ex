@@ -18,6 +18,7 @@ defmodule Long.Application do
          Application.fetch_env!(:long, Oban)
        )},
       {Task.Supervisor, name: Long.Agent.TaskSup},
+      Long.Agent.Activity,
       Long.Agent.Browser.Cli.Limiter,
       Long.Agent.Browser.Engine,
       Long.Agent.Bots.Telegram,

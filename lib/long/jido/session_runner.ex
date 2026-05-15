@@ -48,7 +48,8 @@ defmodule Long.Jido.SessionRunner do
     Long.Jido.Tools.ListScheduledTasks,
     Long.Jido.Tools.CancelScheduledTask,
     Long.Jido.Tools.SendMedia,
-    Long.Jido.Tools.AskUser
+    Long.Jido.Tools.AskUser,
+    Long.Jido.Tools.AgentStatus
   ]
 
   def topic(session_id), do: @topic_prefix <> session_id
@@ -124,14 +125,7 @@ defmodule Long.Jido.SessionRunner do
               Exception.format(:error, e, stacktrace)
           )
 
-          case ErrorTracker.report(e, stacktrace, %{session_id: session_id, source: "jido.loop"}) do
-            {:error, reason} ->
-              Logger.warning("ErrorTracker drop: #{inspect(reason)}")
-
-            _ ->
-              :ok
-          end
-
+          _ = ErrorTracker.report(e, stacktrace, %{session_id: session_id, source: "jido.loop"})
           broadcast(session_id, {:loop_error, Exception.message(e)})
           %{result: :error, error: e}
       end

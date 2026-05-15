@@ -168,14 +168,19 @@ defmodule Long.Agent.Bots.Wechat.Worker do
 
       typing = start_typing(token, uid, ctx_token)
 
-      result =
-        Bots.run_and_collect(:wechat, uid, body,
-          session_title: "wechat:#{uid}",
-          attachments: image_paths
-        )
-
-      stop_typing(typing)
-      send_reply(token, uid, ctx_token, result, media_paths)
+      # Fire the agent on a background task; reply when `:loop_ended`
+      # arrives instead of blocking this Worker process. Without this,
+      # a long-running agent run (>2 min) silently dropped the reply
+      # because the synchronous `run_and_collect` timed out before the
+      # final assistant message landed.
+      Bots.run_async(:wechat, uid, body,
+        session_title: "wechat:#{uid}",
+        attachments: image_paths,
+        on_complete: fn _bot_user, result ->
+          stop_typing(typing)
+          send_reply(token, uid, ctx_token, result, media_paths)
+        end
+      )
     end
   end
 
@@ -216,10 +221,19 @@ defmodule Long.Agent.Bots.Wechat.Worker do
 
   # ── Typing keepalive ─────────────────────────────────────────────────
 
+  # Detached from the caller via `Task.Supervisor.start_child` (no link,
+  # no monitor) so typing survives this Worker task exiting — the
+  # reply-watcher in `Bots.run_async` is what calls `stop_typing/1`
+  # later, often many minutes after `handle_message` already returned.
   defp start_typing(token, uid, ctx_token) do
     case Client.get_typing_ticket(token, uid, ctx_token) do
       {:ok, ticket} when ticket != "" ->
-        Task.async(fn -> typing_loop(token, uid, ticket) end)
+        case Task.Supervisor.start_child(Long.Agent.TaskSup, fn ->
+               typing_loop(token, uid, ticket)
+             end) do
+          {:ok, pid} -> pid
+          _ -> nil
+        end
 
       _ ->
         nil
@@ -228,9 +242,10 @@ defmodule Long.Agent.Bots.Wechat.Worker do
 
   defp stop_typing(nil), do: :ok
 
-  defp stop_typing(%Task{} = task) do
-    send(task.pid, :stop)
-    Task.shutdown(task, :brutal_kill)
+  defp stop_typing(pid) when is_pid(pid) do
+    # `send/2` to a dead local pid is a no-op; the alive? probe was TOCTOU theatre.
+    send(pid, :stop)
+    :ok
   end
 
   defp typing_loop(token, uid, ticket) do

@@ -129,6 +129,14 @@ defmodule Long.Jido.Loop do
     display_text = display_text_for(user_prompt, attachments)
     on_message.({:user, user_msg, display_text})
 
+    # Per-run ETS cache shared with tools via `tool_ctx`. WebScan uses
+    # it to dedup repeated calls to the same URL within a single user
+    # message and to circuit-break URLs that keep failing — same URL
+    # failing 2x stops spawning Obscura on attempt 3, returning a
+    # synthetic "this URL keeps failing" result so the LLM moves on.
+    scan_cache = :ets.new(:scan_cache, [:public, :set])
+    tool_ctx = Map.put(tool_ctx, :scan_cache, scan_cache)
+
     callbacks =
       Map.new(tools, fn mod -> {mod.name(), fn args -> Jido.Exec.run(mod, args, tool_ctx) end} end)
 
@@ -148,7 +156,11 @@ defmodule Long.Jido.Loop do
       on_message: on_message
     }
 
-    loop(state)
+    try do
+      loop(state)
+    after
+      :ets.delete(scan_cache)
+    end
   end
 
   defp loop(%{turn: turn, max_turns: max} = state) when turn > max do

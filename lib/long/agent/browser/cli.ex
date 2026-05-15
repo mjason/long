@@ -9,7 +9,12 @@ defmodule Long.Agent.Browser.Cli do
   alias Long.Agent.Browser.Cli.Limiter
   alias Long.Agent.Browser.Installer
 
-  @default_timeout_s 25
+  # Single navigation cap. 30s is enough for any reasonable page on a
+  # decent connection; longer means the page is broken or stuck (ads
+  # keeping `networkidle0` from ever firing, etc.) — we'd rather give
+  # up and let the circuit breaker mark the URL dead than burn another
+  # Loop turn on it.
+  @default_timeout_s 30
   # `networkidle0` waits until all network requests have settled — the
   # right default for modern SPAs (Reuters, TechCrunch, OpenAI's site,
   # …) that hydrate the body client-side. `load` returns after the

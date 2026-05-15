@@ -27,9 +27,13 @@ defmodule Long.Agent.Bots.Feishu do
   @doc """
   Process an `im.message.receive_v1` event. Returns one of:
 
-  - `{:ok, :replied}` — message handled and reply dispatched
+  - `{:ok, :accepted}` — message handed off to a background watcher;
+    the reply will be POSTed to Feishu when the agent finishes (could
+    be minutes later for heavy tool-running turns). Webhooks should
+    ACK immediately, which is why this is fire-and-forget.
   - `{:ok, :ignored}` — event wasn't a chat message we care about
-  - `{:error, reason}`
+  - `{:error, reason}` — session resolution failed before we could
+    spawn the watcher
   """
   def handle_event(payload, opts \\ [])
 
@@ -45,24 +49,22 @@ defmodule Long.Agent.Bots.Feishu do
         Keyword.merge(opts,
           chat_id: chat_id,
           display_name: sender["sender_id"]["user_id"],
-          metadata: %{"feishu_chat_id" => chat_id, "message_id" => message_id}
+          metadata: %{"feishu_chat_id" => chat_id, "message_id" => message_id},
+          on_complete: fn _bot_user, result ->
+            case result do
+              {:ok, %{text: text, tool_calls: tool_calls, ask: ask}} ->
+                body = render_reply(text, tool_calls, ask)
+                reply(message_id, body, opts)
+
+              {:error, _e} ->
+                :ignore
+            end
+          end
         )
 
-      task = Task.async(fn -> Bots.run_and_collect(:feishu, open_id, text, run_opts) end)
-
-      case Task.yield(task, Keyword.get(opts, :timeout, 60_000)) || Task.shutdown(task) do
-        {:ok, {:ok, %{text: text, tool_calls: tool_calls, ask: ask}}} ->
-          body = render_reply(text, tool_calls, ask)
-          reply(message_id, body, opts)
-
-        {:ok, {:error, e}} ->
-          {:error, e}
-
-        nil ->
-          {:error, :timeout}
-
-        other ->
-          {:error, other}
+      case Bots.run_async(:feishu, open_id, text, run_opts) do
+        {:ok, _} -> {:ok, :accepted}
+        {:error, _} = err -> err
       end
     else
       _ -> {:ok, :ignored}

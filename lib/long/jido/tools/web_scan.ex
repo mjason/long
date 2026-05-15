@@ -4,6 +4,15 @@ defmodule Long.Jido.Tools.WebScan do
   Replaces the older CDP-WebSocket-driven scan: every call gets its own
   fresh browser, with anti-detect stealth on by default. No persistent
   "current page" concept — pass a URL on every call.
+
+  Per-run dedup + circuit breaker (via the `:scan_cache` ETS table that
+  `Long.Jido.Loop` creates and threads through `tool_ctx`):
+
+    - A URL that already returned successfully in this run is replayed
+      from cache instead of spawning Obscura again.
+    - A URL that has failed twice short-circuits on the third attempt
+      with a synthetic "URL keeps failing" result so the LLM stops
+      grinding the same dead link.
   """
 
   use Jido.Action,
@@ -36,16 +45,38 @@ defmodule Long.Jido.Tools.WebScan do
   alias Long.Agent.Browser.SimpHtml
 
   @max_elements 50
+  @failure_cutoff 2
 
   @impl true
-  def run(params, _ctx) do
+  def run(params, ctx) do
     url = params[:url] || params["url"] || ""
 
     if url == "" do
       {:ok, %{status: "error", msg: "url is required"}}
     else
-      do_scan(url, params)
+      cache_lookup(ctx[:scan_cache], url) |> dispatch(url, params, ctx)
     end
+  end
+
+  defp dispatch({:hit, cached}, _url, _params, _ctx),
+    do: {:ok, Map.put(cached, :cached, true)}
+
+  defp dispatch(:circuit_broken, url, _params, _ctx) do
+    {:ok,
+     %{
+       status: "error",
+       url: url,
+       msg:
+         "This URL has failed #{@failure_cutoff}+ times in this run. " <>
+           "Skipping further attempts — try a different URL.",
+       circuit_broken: true
+     }}
+  end
+
+  defp dispatch(:miss, url, params, ctx) do
+    result = do_scan(url, params)
+    cache_store(ctx[:scan_cache], url, result)
+    result
   end
 
   defp do_scan(url, params) do
@@ -66,7 +97,13 @@ defmodule Long.Jido.Tools.WebScan do
          }}
 
       {:error, reason} ->
-        {:ok, %{status: "error", msg: inspect(reason)}}
+        {:ok,
+         %{
+           status: "error",
+           url: url,
+           msg: inspect(reason),
+           hint: cli_error_hint(reason)
+         }}
     end
   end
 
@@ -92,10 +129,6 @@ defmodule Long.Jido.Tools.WebScan do
     end
   end
 
-  # Cap the elements list so a page with hundreds of links doesn't blow
-  # up the LLM context. `elements_truncated`/`elements_total` let the
-  # model decide whether to fetch a deeper view (e.g. via web_execute_js
-  # with a tighter selector).
   defp capped_elements(elements) when is_list(elements) do
     total = length(elements)
 
@@ -114,5 +147,40 @@ defmodule Long.Jido.Tools.WebScan do
         v -> [{key, v} | acc]
       end
     end)
+  end
+
+  defp cli_error_hint({:cli_exit, _status, _stderr}),
+    do: "Page didn't settle within the navigation timeout. Try `wait_until: \"load\"` or `wait_until: \"domcontentloaded\"`, or skip this URL."
+
+  defp cli_error_hint(_), do: nil
+
+  # ── cache helpers ────────────────────────────────────────────────────
+
+  defp cache_lookup(nil, _url), do: :miss
+
+  defp cache_lookup(table, url) do
+    case :ets.lookup(table, url) do
+      [{^url, {:ok, payload}}] -> {:hit, payload}
+      [{^url, {:fail, n}}] when n >= @failure_cutoff -> :circuit_broken
+      _ -> :miss
+    end
+  end
+
+  defp cache_store(nil, _url, _result), do: :ok
+
+  defp cache_store(table, url, {:ok, %{status: "success"} = payload}) do
+    :ets.insert(table, {url, {:ok, payload}})
+    :ok
+  end
+
+  defp cache_store(table, url, _result) do
+    count =
+      case :ets.lookup(table, url) do
+        [{^url, {:fail, n}}] -> n + 1
+        _ -> 1
+      end
+
+    :ets.insert(table, {url, {:fail, count}})
+    :ok
   end
 end

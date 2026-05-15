@@ -389,8 +389,11 @@ defmodule Long.Agent.BotsTest do
         }
       }
 
-      assert {:ok, :replied} = Feishu.handle_event(payload, http: http, timeout: 5_000)
-      assert_received {:feishu_reply, _}
+      assert {:ok, :accepted} = Feishu.handle_event(payload, http: http, timeout: 5_000)
+
+      # Reply is dispatched asynchronously by the watcher task spawned
+      # under Bots.run_async — wait for it to fire.
+      assert_receive {:feishu_reply, _}, 5_000
     end
   end
 end

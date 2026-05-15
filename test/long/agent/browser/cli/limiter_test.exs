@@ -1,6 +1,8 @@
 defmodule Long.Agent.Browser.Cli.LimiterTest do
   use ExUnit.Case, async: false
 
+  import Long.AsyncHelpers, only: [eventually: 1]
+
   alias Long.Agent.Browser.Cli.Limiter
 
   setup do
@@ -72,18 +74,4 @@ defmodule Long.Agent.Browser.Cli.LimiterTest do
     end
   end
 
-  defp eventually(fun, attempts \\ 20, sleep_ms \\ 25) do
-    Enum.reduce_while(1..attempts, false, fn _, _ ->
-      if fun.() do
-        {:halt, true}
-      else
-        Process.sleep(sleep_ms)
-        {:cont, false}
-      end
-    end)
-    |> case do
-      true -> :ok
-      false -> flunk("eventually/1 condition never became true")
-    end
-  end
 end

@@ -189,17 +189,20 @@ defmodule Long.Agent.Bots.Telegram do
       Keyword.merge(state.run_opts,
         chat_id: msg.chat_id,
         display_name: msg.display_name,
-        metadata: %{"telegram" => true}
+        metadata: %{"telegram" => true},
+        on_complete: fn _bot_user, result ->
+          case result do
+            {:ok, %{text: text, tool_calls: tool_calls, ask: ask}} ->
+              body = render_reply(text, tool_calls, ask)
+              if body != "", do: call_send_message(state, msg.chat_id, body)
+
+            {:error, e} ->
+              call_send_message(state, msg.chat_id, "[error] #{inspect(e)}")
+          end
+        end
       )
 
-    case Bots.run_and_collect(:telegram, msg.user_id, msg.text, run_opts) do
-      {:ok, %{text: text, tool_calls: tool_calls, ask: ask}} ->
-        body = render_reply(text, tool_calls, ask)
-        if body != "", do: call_send_message(state, msg.chat_id, body)
-
-      {:error, e} ->
-        call_send_message(state, msg.chat_id, "[error] #{inspect(e)}")
-    end
+    Bots.run_async(:telegram, msg.user_id, msg.text, run_opts)
   end
 
   defp render_reply(text, tool_calls, nil) do

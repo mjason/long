@@ -17,7 +17,11 @@ defmodule Long.Agent.Bots do
 
   ## Options
 
-  - `:timeout` — max ms to wait for the loop to finish (default 120_000)
+  - `:timeout` — max ms to wait for the loop to finish (default 600_000 / 10 min).
+    Sized to cover a ~20-turn ReAct loop hitting `dispatch_per_tool_timeout_ms`
+    on a few of those turns. Shorter timeouts silently drop replies — the
+    agent keeps running and persists the final assistant message, but
+    the bot worker has already given up and won't push it back.
   - `:on_delta` — `fn binary -> :ok end` called with each `:llm_chunk`,
     useful for adapters that support streaming UIs
   - `:on_tool_start` — `fn %{name, args, id} -> :ok end`
@@ -27,15 +31,83 @@ defmodule Long.Agent.Bots do
   - `:session_title` — title for the auto-created session
   """
 
+  require Logger
+
   alias Long.Agent
+  alias Long.Agent.Activity
   alias Long.SessionRunner
 
   @default_timeout 120_000
+
+  # Generous wall-clock cap for `run_async` watchers. 1 hour is much
+  # longer than any realistic agent run; serves only as a safety net
+  # for stuck loops / dead LLM connections that never broadcast
+  # `:loop_ended`. Operators can override per-call via opts.
+  @default_async_timeout 60 * 60 * 1_000
+
+  @task_sup Long.Agent.TaskSup
 
   def run_and_collect(platform, external_id, text, opts \\ []) do
     with {:ok, %{session_id: session_id}} <- ensure_session(platform, external_id, opts) do
       run_on_session(session_id, text, opts)
     end
+  end
+
+  @doc """
+  Fire-and-forget version of `run_and_collect/4` — drives the agent on
+  a background `Task.Supervisor` task, then invokes the `:on_complete`
+  callback (required) with the bot_user struct and the collected
+  result. The caller (a platform Worker handling an inbound message)
+  is no longer blocked on agent runtime, so it can keep processing
+  other inbound messages while the agent works.
+
+  Returns `{:ok, %{bot_user, session_id, watcher_pid}}` once the watcher
+  task is spawned, or `{:error, reason}` if session resolution failed.
+
+  The callback is called exactly once, even on `:loop_error` /
+  `:timeout` results, so platforms can always push *something* back to
+  the user.
+  """
+  def run_async(platform, external_id, text, opts \\ []) do
+    on_complete = Keyword.fetch!(opts, :on_complete)
+    watcher_opts = Keyword.put_new(opts, :timeout, @default_async_timeout)
+
+    with {:ok, %{session_id: session_id, bot_user: user}} <-
+           ensure_session(platform, external_id, opts) do
+      case Task.Supervisor.start_child(@task_sup, fn ->
+             watcher_run(user, session_id, text, watcher_opts, on_complete)
+           end) do
+        {:ok, _pid} -> {:ok, %{bot_user: user, session_id: session_id}}
+        {:error, reason} -> {:error, {:task_start_failed, reason}}
+      end
+    end
+  end
+
+  defp watcher_run(user, session_id, text, watcher_opts, on_complete) do
+    Activity.register(session_id)
+
+    try do
+      result = run_on_session(session_id, text, watcher_opts)
+      on_complete.(user, result)
+    rescue
+      e ->
+        report_crash(e, __STACKTRACE__, session_id)
+        on_complete.(user, {:error, e})
+    catch
+      kind, reason ->
+        report_crash({kind, reason}, __STACKTRACE__, session_id)
+        on_complete.(user, {:error, {kind, reason}})
+    after
+      Activity.unregister(session_id)
+    end
+  end
+
+  defp report_crash(error, stacktrace, session_id) do
+    Logger.error(
+      "Bots.run_async watcher crashed (session_id=#{session_id}): #{inspect(error)}"
+    )
+
+    _ = ErrorTracker.report(error, stacktrace, %{session_id: session_id, source: "bots.run_async"})
   end
 
   @doc """
@@ -157,7 +229,12 @@ defmodule Long.Agent.Bots do
 
   defp collect(session_id, opts) do
     timeout = Keyword.get(opts, :timeout, @default_timeout)
-    deadline = System.monotonic_time(:millisecond) + timeout
+
+    deadline =
+      case timeout do
+        :infinity -> :infinity
+        ms when is_integer(ms) -> System.monotonic_time(:millisecond) + ms
+      end
 
     do_collect(
       %{
@@ -176,7 +253,11 @@ defmodule Long.Agent.Bots do
   end
 
   defp do_collect(state, deadline) do
-    remaining = max(0, deadline - System.monotonic_time(:millisecond))
+    remaining =
+      case deadline do
+        :infinity -> :infinity
+        ms -> max(0, ms - System.monotonic_time(:millisecond))
+      end
 
     receive do
       :loop_ended ->
@@ -201,6 +282,7 @@ defmodule Long.Agent.Bots do
 
       {:tool_start, %{id: id, name: name, args: args}} ->
         if state.on_tool_start, do: state.on_tool_start.(%{id: id, name: name, args: args})
+        Activity.update(state.session_id, %{tool: name, tool_args: args})
 
         do_collect(
           %{state | tool_calls: state.tool_calls ++ [%{id: id, name: name, args: args}]},
@@ -209,6 +291,11 @@ defmodule Long.Agent.Bots do
 
       {:tool_done, %{id: id, name: name, data: data}} ->
         if state.on_tool_done, do: state.on_tool_done.(%{id: id, name: name, data: data})
+        Activity.update(state.session_id, %{tool: nil, tool_args: nil})
+        do_collect(state, deadline)
+
+      {:turn_start, n} ->
+        Activity.update(state.session_id, %{turn: n})
         do_collect(state, deadline)
 
       {:ask_user, payload} ->
