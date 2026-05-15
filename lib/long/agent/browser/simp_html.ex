@@ -164,9 +164,7 @@ defmodule Long.Agent.Browser.SimpHtml do
   defp truncate(nil, _), do: ""
 
   defp truncate(s, max) when byte_size(s) > max do
-    binary_part(s, 0, div(max, 2)) <>
-      "\n\n[…omitted…]\n\n" <>
-      binary_part(s, byte_size(s) - div(max, 2), div(max, 2))
+    Long.Util.Utf8.head_tail(s, max, "\n\n[…omitted…]\n\n")
   end
 
   defp truncate(s, _), do: s

@@ -7,6 +7,8 @@ defmodule Long.Application do
 
   @impl true
   def start(_type, _args) do
+    Long.ErrorTrackerLogger.install()
+
     children = [
       LongWeb.Telemetry,
       Long.Repo,

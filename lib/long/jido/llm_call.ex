@@ -18,6 +18,8 @@ defmodule Long.Jido.LLMCall do
       {:ok, %{type: :tool_calls | :final_answer, text, thinking, tool_calls, ...}}
   """
 
+  require Logger
+
   alias Long.Agent
   alias Long.Agent.LLM.Resolver
 
@@ -39,7 +41,16 @@ defmodule Long.Jido.LLMCall do
     each `ReqLLM.Tool`'s callback. The loop above this layer is what
     actually invokes them, but ReqLLM requires the field.
   """
+  # Total attempts including the initial try. 3 keeps tail latency
+  # bounded for genuinely broken upstream while smoothing over
+  # transient relay blips (HTTP 5xx, "Network connection failed").
+  @max_attempts 3
+
   def call(messages, tools, opts \\ []) do
+    do_call(messages, tools, opts, 1)
+  end
+
+  defp do_call(messages, tools, opts, attempt) do
     alias_name = Keyword.get(opts, :llm_alias, "聆思")
     cfg = setup!(alias_name)
 
@@ -53,19 +64,8 @@ defmodule Long.Jido.LLMCall do
       temperature: Keyword.get(opts, :temperature, 0.5)
     ]
 
-    with {:ok, %ReqLLM.StreamResponse{} = sr} <-
-           ReqLLM.Generation.stream_text(cfg.model, messages, req_opts) do
-      classify_stream(sr)
-    end
-  end
-
-  # `ReqLLM.StreamResponse.classify/1` drains the SSE stream lazily and
-  # raises on transport errors mid-flight (e.g. relay returning 500 after
-  # the connection upgrade). Normalize that into `{:error, _}` so callers
-  # — Summarizer, Loop, History.maybe_compress — can pattern-match
-  # instead of crashing the whole session task.
-  defp classify_stream(sr) do
     try do
+      {:ok, sr} = ReqLLM.Generation.stream_text(cfg.model, messages, req_opts)
       classification = ReqLLM.StreamResponse.classify(sr)
 
       {:ok,
@@ -78,9 +78,45 @@ defmodule Long.Jido.LLMCall do
          usage: ReqLLM.StreamResponse.usage(sr)
        }}
     rescue
-      e -> {:error, e}
+      e -> maybe_retry(e, __STACKTRACE__, messages, tools, opts, attempt)
     end
   end
+
+  # Idiomatic "crash and try again": every LLM call is retried on
+  # transient relay errors (5xx, network blips, "Network connection
+  # failed") with exponential backoff. After `@max_attempts` failures
+  # we surface the last exception so callers see something concrete.
+  # ErrorTracker is only notified for the final failure — intermittent
+  # blips that succeed on retry stay out of `/errors`.
+  defp maybe_retry(exception, stacktrace, messages, tools, opts, attempt) do
+    if retriable?(exception) and attempt < @max_attempts do
+      Process.sleep(backoff_ms(attempt))
+      Logger.warning("LLMCall retry #{attempt + 1}/#{@max_attempts}: #{Exception.message(exception)}")
+      do_call(messages, tools, opts, attempt + 1)
+    else
+      _ =
+        ErrorTracker.report(exception, stacktrace, %{
+          source: "llm_call",
+          attempts: attempt,
+          retriable: retriable?(exception)
+        })
+
+      {:error, exception}
+    end
+  end
+
+  # Conservative whitelist: only retry things that look like the
+  # upstream choking. Logic errors (bad model name, invalid params,
+  # auth) should fail fast.
+  defp retriable?(%ReqLLM.Error.API.Request{status: status}) when status in 500..599, do: true
+  defp retriable?(%ReqLLM.Error.API.Request{status: 429}), do: true
+  defp retriable?(%ReqLLM.Error.API.Stream{}), do: true
+  defp retriable?(%{__struct__: Mint.TransportError}), do: true
+  defp retriable?(_), do: false
+
+  # Jitter (0-150 ms) breaks lockstep retries when many sessions
+  # rebound off the same upstream blip simultaneously.
+  defp backoff_ms(attempt), do: 250 * Integer.pow(3, attempt - 1) + :rand.uniform(150)
 
   # ReqLLM accepts the api_key as a per-request option (set in `req_opts`
   # below), which beats `ReqLLM.put_key/2` — the global put_key is a

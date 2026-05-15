@@ -128,7 +128,7 @@ defmodule Long.Agent.ActivityTest do
   end
 
   describe "describe/1" do
-    test "renders runtime + turn + tool", %{sid: sid} do
+    test "without request, falls back to runtime + turn + tool", %{sid: sid} do
       :acquired = Activity.try_acquire_or_enqueue(sid, :p)
       Activity.update(sid, %{turn: 4, tool: "web_scan"})
       info = Activity.lookup(sid)
@@ -137,6 +137,17 @@ defmodule Long.Agent.ActivityTest do
       assert text =~ "运行中"
       assert text =~ "第 4 轮"
       assert text =~ "web_scan"
+    end
+
+    test "with request, leads with the user prompt preview", %{sid: sid} do
+      :acquired = Activity.try_acquire_or_enqueue(sid, :p)
+      Activity.update(sid, %{request: "帮我找雷欧奥特曼的图片", turn: 2, tool: "web_search"})
+
+      text = Activity.describe(Activity.lookup(sid))
+      assert text =~ "处理「帮我找雷欧奥特曼的图片」"
+      assert text =~ "运行"
+      assert text =~ "第 2 轮"
+      assert text =~ "web_search"
     end
   end
 end

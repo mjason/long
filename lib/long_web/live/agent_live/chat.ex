@@ -316,13 +316,10 @@ defmodule LongWeb.AgentLive.Chat do
   end
 
   defp short_args(args) when is_map(args) do
-    args |> Long.Util.Utf8.sanitize() |> Jason.encode!() |> truncate(80)
+    args |> Long.Util.Utf8.sanitize() |> Jason.encode!() |> Long.Util.Text.preview(80)
   end
 
   defp short_args(_), do: ""
-
-  defp truncate(s, max) when byte_size(s) > max, do: binary_part(s, 0, max) <> "…"
-  defp truncate(s, _), do: s
 
   defp tool_status_pill(:running),
     do: {"bg-amber-100 text-amber-800 ring-amber-200", "running…", "animate-pulse"}

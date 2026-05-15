@@ -48,6 +48,10 @@ defmodule Long.Agent.Bots do
 
   @task_sup Long.Agent.TaskSup
 
+  # Codepoint cap for the user-request preview shown in `/status` /
+  # `agent_status`. ~40 chars fits one bot-message line on a phone.
+  @request_preview_chars 40
+
   def run_and_collect(platform, external_id, text, opts \\ []) do
     with {:ok, %{session_id: session_id}} <- ensure_session(platform, external_id, opts) do
       run_on_session(session_id, text, opts)
@@ -69,8 +73,9 @@ defmodule Long.Agent.Bots do
       agent (picked up via `Long.Jido.Loop`'s `inject_btws/1`)
 
   Returns `{:ok, %{bot_user, session_id, mode}}` where `mode` is one of
-  `:cleared | :status | :btw | :acquired | :enqueued`, or
-  `{:error, reason}` if session resolution / task spawn failed.
+  `:cleared | :status | :btw | :dispatched`, or `{:error, reason}` if
+  session resolution / task spawn failed. (Acquire-vs-enqueue happens
+  inside the watcher task, so callers see `:dispatched` either way.)
   """
   def run_async(platform, external_id, text, opts \\ []) do
     on_complete = Keyword.fetch!(opts, :on_complete)
@@ -174,23 +179,41 @@ defmodule Long.Agent.Bots do
     if extras == "", do: base, else: base <> " · " <> extras
   end
 
+  # Watcher Task decides acquire-vs-enqueue from inside itself, so the
+  # pid Activity registers is the watcher's own (long-lived) pid, not
+  # the inbound handler's (which exits right after `run_async` returns
+  # and would trigger an immediate DOWN that drops the owner record
+  # mid-run).
   defp dispatch_message(user, session_id, text, watcher_opts, on_complete) do
+    case Task.Supervisor.start_child(@task_sup, fn ->
+           acquire_or_enqueue(user, session_id, text, watcher_opts, on_complete)
+         end) do
+      {:ok, _pid} -> {:ok, %{bot_user: user, session_id: session_id, mode: :dispatched}}
+      {:error, reason} -> {:error, {:task_start_failed, reason}}
+    end
+  end
+
+  defp acquire_or_enqueue(user, session_id, text, watcher_opts, on_complete) do
     payload = {user, text, on_complete}
 
     case Activity.try_acquire_or_enqueue(session_id, payload) do
       :acquired ->
-        case Task.Supervisor.start_child(@task_sup, fn ->
-               watcher_run(user, session_id, text, watcher_opts, on_complete)
-             end) do
-          {:ok, _pid} -> {:ok, %{bot_user: user, session_id: session_id, mode: :acquired}}
-          {:error, reason} -> {:error, {:task_start_failed, reason}}
-        end
+        Activity.update(session_id, %{request: short_request(text)})
+        watcher_run(user, session_id, text, watcher_opts, on_complete)
 
       :enqueued ->
+        # Exit immediately; the current owner's `drain_queue/2` will
+        # pop our payload and invoke the closure with the agent's
+        # result when it's our turn.
         on_complete.(user, {:ok, ack("收到,前一条还在处理中,跑完后立刻处理你这条。")})
-        {:ok, %{bot_user: user, session_id: session_id, mode: :enqueued}}
     end
   end
+
+  defp short_request(text) when is_binary(text) do
+    text |> Long.Util.Text.first_line() |> Long.Util.Text.preview(@request_preview_chars)
+  end
+
+  defp short_request(_), do: nil
 
   # Watcher owns the slot. Processes the first message, then drains the
   # queue (still under the same slot) until empty before releasing.
@@ -217,6 +240,14 @@ defmodule Long.Agent.Bots do
         :ok
 
       {next_user, next_text, next_on_complete} ->
+        # Refresh `:request` (and clear stale tool/turn from the previous
+        # message) so `/status` reflects what we're working on right now.
+        Activity.update(session_id, %{
+          request: short_request(next_text),
+          turn: nil,
+          tool: nil
+        })
+
         process_one(next_user, session_id, next_text, watcher_opts, next_on_complete)
         drain_queue(session_id, watcher_opts)
     end
@@ -386,7 +417,7 @@ defmodule Long.Agent.Bots do
 
     receive do
       :loop_ended ->
-        {:ok, Map.take(state, [:text, :tool_calls, :attachments, :ask, :error])}
+        {:ok, state |> apply_error_fallback() |> Map.take([:text, :tool_calls, :attachments, :ask, :error])}
 
       {:bot_send_media, payload} ->
         do_collect(%{state | attachments: state.attachments ++ [payload]}, deadline)
@@ -429,11 +460,33 @@ defmodule Long.Agent.Bots do
       {:loop_error, msg} ->
         do_collect(%{state | error: msg}, deadline)
 
+      # When Loop returns gracefully with `:error` (e.g. LLMCall
+      # rescued and returned `{:error, _}` rather than raising),
+      # session_runner emits `:done` with reason details but never
+      # `:loop_error`. Capture the exception from `:done` so the
+      # watcher's `on_complete` gets it in `result.error` and
+      # platforms can render a meaningful reply.
+      {:done, %{reason: :error, error: e}} ->
+        do_collect(%{state | error: e}, deadline)
+
+      {:done, _other_reason} ->
+        do_collect(state, deadline)
+
       _other ->
         do_collect(state, deadline)
     after
       remaining -> {:error, :timeout}
     end
+  end
+
+  # When the loop ended with `:error` and no assistant text was
+  # produced, synthesize a friendly fallback so platforms (which
+  # render `result.text`) don't push an empty reply.
+  defp apply_error_fallback(%{error: nil} = state), do: state
+  defp apply_error_fallback(%{text: t} = state) when is_binary(t) and t != "", do: state
+
+  defp apply_error_fallback(%{error: err} = state) do
+    %{state | text: "出错了:" <> Long.Util.Error.humanize(err)}
   end
 
   @doc "Convenience that walks `tool_calls` into a one-line summary."

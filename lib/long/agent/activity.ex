@@ -147,8 +147,13 @@ defmodule Long.Agent.Activity do
   @doc "Render a one-line status describing one owner info entry."
   @spec describe(map()) :: String.t()
   def describe(info) when is_map(info) do
-    secs = Duration.seconds_since(info.since)
-    "运行中 #{Duration.format_zh(secs)}#{describe_detail(info[:turn], info[:tool])}"
+    prefix =
+      case info[:request] do
+        r when is_binary(r) and r != "" -> "处理「#{r}」 · "
+        _ -> ""
+      end
+
+    "#{prefix}运行中 #{Duration.format_zh(Duration.seconds_since(info.since))}#{describe_detail(info[:turn], info[:tool])}"
   end
 
   defp describe_detail(nil, nil), do: ""
@@ -251,7 +256,8 @@ defmodule Long.Agent.Activity do
       watcher_ref: ref,
       since: System.system_time(:millisecond),
       turn: nil,
-      tool: nil
+      tool: nil,
+      request: nil
     }
 
     :ets.insert(@owners, {sid, info})
