@@ -171,7 +171,16 @@ case "$OS" in
     PLIST_DIR="$HOME/Library/LaunchAgents"
     PLIST="$PLIST_DIR/${LABEL}.plist"
     UID_NUM=$(id -u)
-    DOMAIN="gui/${UID_NUM}"
+    # `gui/<uid>` requires an active GUI login (Console.app session).
+    # Over SSH there is no GUI session, so we use `user/<uid>` for the
+    # actual bootstrap. The plist file itself in ~/Library/LaunchAgents/
+    # is auto-loaded by launchd on the next GUI login regardless of
+    # which domain we bootstrap into now.
+    if launchctl print "gui/${UID_NUM}" >/dev/null 2>&1; then
+      DOMAIN="gui/${UID_NUM}"
+    else
+      DOMAIN="user/${UID_NUM}"
+    fi
 
     write_plist() {
       mkdir -p "$PLIST_DIR"
@@ -209,9 +218,18 @@ PLISTEOF
     case "${1:-status}" in
       install)
         write_plist
-        # bootstrap is the modern (10.10+) API; fall back to load for old systems.
-        launchctl bootstrap "$DOMAIN" "$PLIST" 2>/dev/null \
-          || launchctl load -w "$PLIST"
+        # If something is already loaded under this label, bail out and
+        # ask the user to uninstall first — bootstrap fails noisily on a
+        # double-load and we don't want to leave a half-state.
+        launchctl bootout "$DOMAIN/$LABEL" 2>/dev/null || true
+        if ! launchctl bootstrap "$DOMAIN" "$PLIST" 2>/tmp/.long_launch.err; then
+          echo "WARN: launchctl bootstrap 失败:" >&2
+          cat /tmp/.long_launch.err >&2
+          echo "plist 已写入 $PLIST，下次 GUI 登录会自动加载。" >&2
+          rm -f /tmp/.long_launch.err
+          exit 0
+        fi
+        rm -f /tmp/.long_launch.err
         echo "==> 已注册开机自启: $PLIST"
         echo "    立即启动: $0 start"
         ;;
