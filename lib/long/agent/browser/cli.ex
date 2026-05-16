@@ -15,6 +15,12 @@ defmodule Long.Agent.Browser.Cli do
   # up and let the circuit breaker mark the URL dead than burn another
   # Loop turn on it.
   @default_timeout_s 30
+  # External hard cap = obscura's own `--timeout` + a 60s buffer to
+  # cover wait / eval / dump / serialization phases. If we hit this,
+  # obscura itself has hung (deno stack overflow, infinite JS loop on
+  # the target page, …) and is *not* honoring its internal timeout;
+  # we have to SIGKILL it from the BEAM side or it pegs a CPU forever.
+  @hard_timeout_buffer_ms 60_000
   # `networkidle0` waits until all network requests have settled — the
   # right default for modern SPAs (Reuters, TechCrunch, OpenAI's site,
   # …) that hydrate the body client-side. `load` returns after the
@@ -49,10 +55,9 @@ defmodule Long.Agent.Browser.Cli do
 
     * `:wait_until` — `"load"` (default) | `"domcontentloaded"` |
       `"networkidle0"`. Use `networkidle0` for JS-heavy SPAs.
-    * `:timeout_s` — max navigation time in seconds (default 25).
+    * `:timeout_s` — max navigation time in seconds (default 30).
     * `:stealth` — pass `--stealth`; default true.
-    * `:runner` — injection point for tests; defaults to
-      `&System.cmd/3`. Signature: `(bin, args, opts) -> {output, exit}`.
+    * `:limiter` — bypass the concurrency limiter (default true).
   """
   @spec eval(String.t(), String.t(), keyword()) ::
           {:ok, String.t()} | {:error, term()}
@@ -85,7 +90,7 @@ defmodule Long.Agent.Browser.Cli do
     * `:markdown` — readability-style markdown
     * `:links` — newline-separated link list
 
-  Same `:wait_until` / `:timeout_s` / `:stealth` / `:runner` options as
+  Same `:wait_until` / `:timeout_s` / `:stealth` / `:limiter` options as
   `eval/3`.
   """
   @spec dump(String.t(), keyword()) :: {:ok, String.t()} | {:error, term()}
@@ -119,25 +124,72 @@ defmodule Long.Agent.Browser.Cli do
   # bypass the limiter by passing `limiter: false` to the call so
   # async_stream'd assertions don't serialize through the singleton.
   defp run(bin, args, opts) do
-    runner = Keyword.get(opts, :runner, &System.cmd/3)
-    cmd_opts = [stderr_to_stdout: false]
-    use_limiter? = Keyword.get(opts, :limiter, true)
+    hard_timeout_ms = Keyword.get(opts, :timeout_s, @default_timeout_s) * 1_000 + @hard_timeout_buffer_ms
 
-    work = fn ->
-      try do
-        case runner.(bin, args, cmd_opts) do
-          {output, 0} -> {:ok, output}
-          {output, exit_status} -> {:error, {:cli_exit, exit_status, String.trim(output)}}
-        end
-      rescue
-        e in [ErlangError, File.Error] -> {:error, {:cli_crash, Exception.message(e)}}
-      end
-    end
+    work = fn -> spawn_and_collect(bin, args, hard_timeout_ms) end
 
-    if use_limiter? and limiter_available?() do
+    if Keyword.get(opts, :limiter, true) and limiter_available?() do
       Limiter.with_slot(work)
     else
       work.()
+    end
+  end
+
+  # Port-based spawn so we can SIGKILL the OS process when it ignores
+  # its own internal `--timeout` (deno stack overflow on the target
+  # page, infinite JS loop, …). `System.cmd/3` doesn't expose the OS
+  # pid and blocks the caller forever in that case.
+  defp spawn_and_collect(bin, args, hard_timeout_ms) do
+    port =
+      Port.open(
+        {:spawn_executable, bin},
+        [:binary, :exit_status, {:args, args}]
+      )
+
+    deadline = System.monotonic_time(:millisecond) + hard_timeout_ms
+    collect_output(port, [], deadline, hard_timeout_ms)
+  rescue
+    e -> {:error, {:cli_crash, Exception.message(e)}}
+  end
+
+  # iolist accumulator — obscura `--dump html` on a heavy SPA can be
+  # multiple MB and we'd otherwise do O(n²) binary copies on each
+  # `:data` chunk.
+  defp collect_output(port, acc, deadline, hard_timeout_ms) do
+    remaining = max(0, deadline - System.monotonic_time(:millisecond))
+
+    receive do
+      {^port, {:data, chunk}} ->
+        collect_output(port, [acc, chunk], deadline, hard_timeout_ms)
+
+      {^port, {:exit_status, 0}} ->
+        {:ok, IO.iodata_to_binary(acc)}
+
+      {^port, {:exit_status, status}} ->
+        {:error, {:cli_exit, status, acc |> IO.iodata_to_binary() |> String.trim()}}
+    after
+      remaining ->
+        brutal_kill(port)
+        {:error, {:hard_timeout, div(hard_timeout_ms, 1_000)}}
+    end
+  end
+
+  # `Port.close/1` alone only sends SIGTERM and waits politely — useless
+  # against a runaway obscura already ignoring its own timeout. Send
+  # SIGKILL to the OS pid first so the kernel terminates it, then close
+  # the port to drain.
+  defp brutal_kill(port) do
+    case Port.info(port, :os_pid) do
+      {:os_pid, pid} -> _ = System.cmd("kill", ["-9", to_string(pid)])
+      _ -> :ok
+    end
+
+    try do
+      Port.close(port)
+    rescue
+      _ -> :ok
+    catch
+      _, _ -> :ok
     end
   end
 
