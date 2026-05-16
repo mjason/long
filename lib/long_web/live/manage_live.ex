@@ -19,7 +19,7 @@ defmodule LongWeb.ManageLive do
   import LongWeb.Components.Alert, only: [flash_group: 1]
 
   alias Long.Agent
-  alias Long.Agent.LLMConfig
+  alias Long.Agent.{LLMConfig, SearchConfig}
   alias Long.Agent.Skill.Store, as: SkillStore
   alias Long.Util.Text
 
@@ -35,6 +35,12 @@ defmodule LongWeb.ManageLive do
 
   @memory_kinds ~w(fact preference goal decision)
   @memory_scopes ~w(general insight)
+  @scheduled_repeats ~w(once daily weekday weekly monthly every_n_hours every_n_minutes)
+
+  defp memory_kinds, do: @memory_kinds
+  defp memory_scopes, do: @memory_scopes
+  defp scheduled_repeats, do: @scheduled_repeats
+  defp search_providers, do: SearchConfig.providers()
 
   @impl true
   def mount(_params, _session, socket) do
@@ -46,7 +52,12 @@ defmodule LongWeb.ManageLive do
      |> assign(:globals, [])
      |> assign(:session_memories, [])
      |> assign(:checkpoints, [])
-     |> assign(:skills, [])}
+     |> assign(:skills, [])
+     |> assign(:sessions_rows, [])
+     |> assign(:search_configs, [])
+     |> assign(:bot_users, [])
+     |> assign(:wechat_credentials, [])
+     |> assign(:scheduled_tasks, [])}
   end
 
   @impl true
@@ -109,6 +120,54 @@ defmodule LongWeb.ManageLive do
 
   defp load_section(socket, :skills) do
     assign(socket, :skills, SkillStore.list_all())
+  end
+
+  defp load_section(socket, :sessions) do
+    rows =
+      case Agent.list_sessions() do
+        {:ok, list} -> Enum.sort_by(list, & &1.inserted_at, {:desc, DateTime})
+        _ -> []
+      end
+
+    assign(socket, :sessions_rows, rows)
+  end
+
+  defp load_section(socket, :search) do
+    rows =
+      case Agent.list_search_configs() do
+        {:ok, list} -> Enum.sort_by(list, &{&1.sort_order, &1.alias})
+        _ -> []
+      end
+
+    assign(socket, :search_configs, rows)
+  end
+
+  defp load_section(socket, :credentials) do
+    bot_users =
+      case Agent.list_bot_users() do
+        {:ok, list} -> Enum.sort_by(list, &{&1.platform, &1.external_id})
+        _ -> []
+      end
+
+    wechat =
+      case Agent.list_wechat_credentials() do
+        {:ok, list} -> Enum.sort_by(list, & &1.name)
+        _ -> []
+      end
+
+    socket
+    |> assign(:bot_users, bot_users)
+    |> assign(:wechat_credentials, wechat)
+  end
+
+  defp load_section(socket, :scheduled) do
+    rows =
+      case Agent.list_scheduled_tasks() do
+        {:ok, list} -> Enum.sort_by(list, & &1.next_run_at, {:asc, DateTime})
+        _ -> []
+      end
+
+    assign(socket, :scheduled_tasks, rows)
   end
 
   defp load_section(socket, _), do: socket
@@ -265,6 +324,216 @@ defmodule LongWeb.ManageLive do
     {:noreply, load_section(socket, :skills) |> put_flash(:info, "Rescanned skill_root.")}
   end
 
+  # ── Events: Sessions ─────────────────────────────────────────────────
+
+  def handle_event("archive_session", %{"id" => id}, socket) do
+    case Agent.archive_session(id) do
+      {:ok, _} -> {:noreply, load_section(socket, :sessions)}
+      {:error, e} -> {:noreply, put_flash(socket, :error, "Archive failed: #{inspect(e)}")}
+    end
+  end
+
+  def handle_event("destroy_session", %{"id" => id}, socket) do
+    with {:ok, sess} <- Agent.get_session(id),
+         :ok <- Agent.destroy_session(sess) do
+      {:noreply, load_section(socket, :sessions)}
+    else
+      {:ok, _} -> {:noreply, load_section(socket, :sessions)}
+      {:error, e} -> {:noreply, put_flash(socket, :error, "Delete failed: #{inspect(e)}")}
+    end
+  end
+
+  # ── Events: Search providers ─────────────────────────────────────────
+
+  def handle_event("new_search", _params, socket) do
+    blank = %{
+      __action__: :create_search,
+      alias: "",
+      provider: "tavily",
+      api_key: "",
+      api_key_env_var: "",
+      enabled: true,
+      sort_order: 0
+    }
+
+    {:noreply, assign(socket, :editing, blank)}
+  end
+
+  def handle_event("edit_search", %{"alias" => name}, socket) do
+    case Agent.get_search_config(name) do
+      {:ok, row} ->
+        editing = %{
+          __action__: :edit_search,
+          alias: row.alias,
+          provider: to_string(row.provider),
+          api_key: row.api_key || "",
+          api_key_env_var: row.api_key_env_var || "",
+          enabled: row.enabled,
+          sort_order: row.sort_order
+        }
+
+        {:noreply, assign(socket, :editing, editing)}
+
+      _ ->
+        {:noreply, socket}
+    end
+  end
+
+  def handle_event("save_search", %{"search" => params}, socket) do
+    attrs = %{
+      alias: String.trim(params["alias"] || ""),
+      provider: safe_atom(params["provider"], :tavily, SearchConfig.providers()),
+      api_key: trim_or_nil(params["api_key"]),
+      api_key_env_var: trim_or_nil(params["api_key_env_var"]),
+      enabled: params["enabled"] == "true",
+      sort_order: parse_int(params["sort_order"], 0)
+    }
+
+    case Agent.register_search_config(attrs) do
+      {:ok, _} -> {:noreply, socket |> assign(:editing, nil) |> load_section(:search)}
+      {:error, e} -> {:noreply, put_flash(socket, :error, "Save failed: #{inspect(e)}")}
+    end
+  end
+
+  def handle_event("toggle_search_enabled", %{"alias" => name}, socket) do
+    with {:ok, row} <- Agent.get_search_config(name),
+         {:ok, _} <- Agent.update_search_config(row, %{enabled: !row.enabled}) do
+      {:noreply, load_section(socket, :search)}
+    else
+      {:error, e} -> {:noreply, put_flash(socket, :error, "Toggle failed: #{inspect(e)}")}
+    end
+  end
+
+  def handle_event("destroy_search", %{"alias" => name}, socket) do
+    with {:ok, row} <- Agent.get_search_config(name),
+         :ok <- Agent.destroy_search_config(row) do
+      {:noreply, load_section(socket, :search)}
+    else
+      {:ok, _} -> {:noreply, load_section(socket, :search)}
+      {:error, e} -> {:noreply, put_flash(socket, :error, "Delete failed: #{inspect(e)}")}
+    end
+  end
+
+  # ── Events: Credentials ──────────────────────────────────────────────
+
+  def handle_event("destroy_bot_user", %{"id" => id}, socket) do
+    case Enum.find(socket.assigns.bot_users, &(&1.id == id)) do
+      nil ->
+        {:noreply, socket}
+
+      row ->
+        case Agent.destroy_bot_user(row) do
+          :ok -> {:noreply, load_section(socket, :credentials)}
+          {:ok, _} -> {:noreply, load_section(socket, :credentials)}
+          {:error, e} -> {:noreply, put_flash(socket, :error, "Delete failed: #{inspect(e)}")}
+        end
+    end
+  end
+
+  def handle_event("destroy_wechat_credential", %{"name" => name}, socket) do
+    with {:ok, row} <- Agent.get_wechat_credential(name),
+         :ok <- Agent.destroy_wechat_credential(row) do
+      {:noreply, load_section(socket, :credentials)}
+    else
+      {:ok, _} -> {:noreply, load_section(socket, :credentials)}
+      {:error, e} -> {:noreply, put_flash(socket, :error, "Delete failed: #{inspect(e)}")}
+    end
+  end
+
+  # ── Events: Scheduled tasks ──────────────────────────────────────────
+
+  def handle_event("new_scheduled", _params, socket) do
+    blank = %{
+      __action__: :create_scheduled,
+      name: "",
+      prompt: "",
+      repeat: "daily",
+      schedule_time: "00:00",
+      every_n: 1,
+      max_delay_hours: 6,
+      enabled: true,
+      session_id: ""
+    }
+
+    {:noreply, assign(socket, :editing, blank)}
+  end
+
+  def handle_event("edit_scheduled", %{"id" => id}, socket) do
+    case Agent.get_scheduled_task(id) do
+      {:ok, row} ->
+        editing = %{
+          __action__: :edit_scheduled,
+          id: row.id,
+          name: row.name,
+          prompt: row.prompt,
+          repeat: to_string(row.repeat),
+          schedule_time: row.schedule_time || "00:00",
+          every_n: row.every_n || 1,
+          max_delay_hours: row.max_delay_hours || 6,
+          enabled: row.enabled,
+          session_id: row.session_id || ""
+        }
+
+        {:noreply, assign(socket, :editing, editing)}
+
+      _ ->
+        {:noreply, socket}
+    end
+  end
+
+  def handle_event("save_scheduled", %{"scheduled" => params}, socket) do
+    attrs = %{
+      name: String.trim(params["name"] || ""),
+      prompt: params["prompt"] || "",
+      repeat: safe_atom(params["repeat"], :daily, @scheduled_repeats),
+      schedule_time: String.trim(params["schedule_time"] || "00:00"),
+      every_n: parse_int(params["every_n"], 1),
+      max_delay_hours: parse_int(params["max_delay_hours"], 6),
+      enabled: params["enabled"] == "true",
+      session_id: trim_or_nil(params["session_id"])
+    }
+
+    # ScheduledTask exposes separate `:create` / `:update` actions
+    # (unlike LLMConfig / SearchConfig which use upsert), so we have to
+    # dispatch by action explicitly.
+    result =
+      case socket.assigns.editing do
+        %{__action__: :edit_scheduled, id: id} ->
+          with {:ok, row} <- Agent.get_scheduled_task(id),
+               do: Agent.update_scheduled_task(row, attrs)
+
+        _ ->
+          Agent.create_scheduled_task(attrs)
+      end
+
+    case result do
+      {:ok, _} -> {:noreply, socket |> assign(:editing, nil) |> load_section(:scheduled)}
+      {:error, e} -> {:noreply, put_flash(socket, :error, "Save failed: #{inspect(e)}")}
+    end
+  end
+
+  def handle_event("toggle_scheduled_enabled", %{"id" => id}, socket) do
+    with {:ok, row} <- Agent.get_scheduled_task(id),
+         {:ok, _} <- toggle_scheduled(row) do
+      {:noreply, load_section(socket, :scheduled)}
+    else
+      {:error, e} -> {:noreply, put_flash(socket, :error, "Toggle failed: #{inspect(e)}")}
+    end
+  end
+
+  defp toggle_scheduled(%{enabled: true} = row), do: Agent.disable_scheduled_task(row)
+  defp toggle_scheduled(row), do: Agent.update_scheduled_task(row, %{enabled: true})
+
+  def handle_event("destroy_scheduled", %{"id" => id}, socket) do
+    with {:ok, row} <- Agent.get_scheduled_task(id),
+         :ok <- Agent.destroy_scheduled_task(row) do
+      {:noreply, load_section(socket, :scheduled)}
+    else
+      {:ok, _} -> {:noreply, load_section(socket, :scheduled)}
+      {:error, e} -> {:noreply, put_flash(socket, :error, "Delete failed: #{inspect(e)}")}
+    end
+  end
+
   # ── Template ─────────────────────────────────────────────────────────
 
   @impl true
@@ -315,8 +584,18 @@ defmodule LongWeb.ManageLive do
         <.memory_modal
           :if={editing_kind(@editing) == :global_memory}
           editing={@editing}
-          scopes={@memory_scopes}
-          kinds={@memory_kinds}
+          scopes={memory_scopes()}
+          kinds={memory_kinds()}
+        />
+        <.search_modal
+          :if={editing_kind(@editing) == :search}
+          editing={@editing}
+          providers={search_providers()}
+        />
+        <.scheduled_modal
+          :if={editing_kind(@editing) == :scheduled}
+          editing={@editing}
+          repeats={scheduled_repeats()}
         />
       </main>
     </div>
@@ -326,6 +605,8 @@ defmodule LongWeb.ManageLive do
   defp editing_kind(nil), do: nil
   defp editing_kind(%{__action__: a}) when a in [:create, :edit_llm], do: :llm
   defp editing_kind(%{__action__: :edit_global}), do: :global_memory
+  defp editing_kind(%{__action__: a}) when a in [:create_search, :edit_search], do: :search
+  defp editing_kind(%{__action__: a}) when a in [:create_scheduled, :edit_scheduled], do: :scheduled
   defp editing_kind(_), do: nil
 
   # ── Section views ────────────────────────────────────────────────────
@@ -333,6 +614,10 @@ defmodule LongWeb.ManageLive do
   defp section_view(%{section: :llms} = assigns), do: llm_section(assigns)
   defp section_view(%{section: :memories} = assigns), do: memory_section(assigns)
   defp section_view(%{section: :skills} = assigns), do: skill_section(assigns)
+  defp section_view(%{section: :sessions} = assigns), do: sessions_section(assigns)
+  defp section_view(%{section: :search} = assigns), do: search_section(assigns)
+  defp section_view(%{section: :credentials} = assigns), do: credentials_section(assigns)
+  defp section_view(%{section: :scheduled} = assigns), do: scheduled_section(assigns)
   defp section_view(assigns), do: placeholder(%{title: section_title(assigns.section)})
 
   defp llm_section(assigns) do
@@ -651,6 +936,329 @@ defmodule LongWeb.ManageLive do
     """
   end
 
+  defp sessions_section(assigns) do
+    ~H"""
+    <div class="p-6 space-y-4">
+      <h1 class="text-xl font-semibold">Sessions</h1>
+      <.card variant="bordered" color="natural" rounded="large" padding="none">
+        <table class="w-full text-sm">
+          <thead class="text-xs uppercase text-zinc-500 bg-zinc-50">
+            <tr>
+              <th class="text-left px-4 py-2.5">Title</th>
+              <th class="text-left px-4 py-2.5">Status</th>
+              <th class="text-left px-4 py-2.5">LLM</th>
+              <th class="text-right px-4 py-2.5">Tokens</th>
+              <th class="text-left px-4 py-2.5">Created</th>
+              <th class="text-right px-4 py-2.5">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr :for={s <- @sessions_rows} class="border-t border-zinc-100">
+              <td class="px-4 py-2 font-medium text-zinc-800">
+                <.link navigate={~p"/chat/#{s.id}"} class="hover:underline">{s.title || short(s.id)}</.link>
+              </td>
+              <td class="px-4 py-2">
+                <.badge color={session_status_color(s.status)} size="extra_small" rounded="full">{s.status}</.badge>
+              </td>
+              <td class="px-4 py-2 text-xs font-mono text-zinc-500">{s.llm_alias || "—"}</td>
+              <td class="px-4 py-2 text-right text-zinc-600">{s.token_usage || 0}</td>
+              <td class="px-4 py-2 text-xs text-zinc-500">{format_dt(s.inserted_at)}</td>
+              <td class="px-4 py-2">
+                <div class="flex justify-end gap-1.5">
+                  <.button
+                    :if={s.status != :archived}
+                    phx-click="archive_session"
+                    phx-value-id={s.id}
+                    variant="base"
+                    color="natural"
+                    size="extra_small"
+                    icon="hero-archive-box-arrow-down"
+                    rounded="medium"
+                    title="Archive"
+                  />
+                  <.button
+                    phx-click="destroy_session"
+                    phx-value-id={s.id}
+                    variant="base"
+                    color="danger"
+                    size="extra_small"
+                    icon="hero-trash"
+                    rounded="medium"
+                    data-confirm={"Delete \"#{s.title || s.id}\" and all its messages?"}
+                  />
+                </div>
+              </td>
+            </tr>
+            <tr :if={@sessions_rows == []}>
+              <td colspan="6" class="px-4 py-8 text-center text-zinc-400 text-sm">(no sessions)</td>
+            </tr>
+          </tbody>
+        </table>
+      </.card>
+    </div>
+    """
+  end
+
+  defp search_section(assigns) do
+    ~H"""
+    <div class="p-6 space-y-4">
+      <div class="flex items-center gap-3">
+        <h1 class="text-xl font-semibold flex-1">Search providers</h1>
+        <.button phx-click="new_search" color="primary" icon="hero-plus" rounded="medium" size="small">
+          New provider
+        </.button>
+      </div>
+
+      <.card variant="bordered" color="natural" rounded="large" padding="none">
+        <table class="w-full text-sm">
+          <thead class="text-xs uppercase text-zinc-500 bg-zinc-50">
+            <tr>
+              <th class="text-left px-4 py-2.5">Alias</th>
+              <th class="text-left px-4 py-2.5">Provider</th>
+              <th class="text-left px-4 py-2.5">Status</th>
+              <th class="text-right px-4 py-2.5">Sort</th>
+              <th class="text-right px-4 py-2.5">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr :for={row <- @search_configs} class="border-t border-zinc-100">
+              <td class="px-4 py-2 font-medium">{row.alias}</td>
+              <td class="px-4 py-2">
+                <.badge color="info" size="extra_small" rounded="full">{row.provider}</.badge>
+              </td>
+              <td class="px-4 py-2">
+                <.badge color={if row.enabled, do: "success", else: "silver"} size="extra_small" rounded="full">
+                  {if row.enabled, do: "enabled", else: "disabled"}
+                </.badge>
+              </td>
+              <td class="px-4 py-2 text-right text-xs text-zinc-500">{row.sort_order}</td>
+              <td class="px-4 py-2">
+                <div class="flex justify-end gap-1.5">
+                  <.button
+                    phx-click="toggle_search_enabled"
+                    phx-value-alias={row.alias}
+                    variant="base"
+                    color="natural"
+                    size="extra_small"
+                    icon={if row.enabled, do: "hero-pause", else: "hero-play"}
+                    rounded="medium"
+                  />
+                  <.button
+                    phx-click="edit_search"
+                    phx-value-alias={row.alias}
+                    variant="base"
+                    color="natural"
+                    size="extra_small"
+                    icon="hero-pencil-square"
+                    rounded="medium"
+                  />
+                  <.button
+                    phx-click="destroy_search"
+                    phx-value-alias={row.alias}
+                    variant="base"
+                    color="danger"
+                    size="extra_small"
+                    icon="hero-trash"
+                    rounded="medium"
+                    data-confirm={"Delete \"#{row.alias}\"?"}
+                  />
+                </div>
+              </td>
+            </tr>
+            <tr :if={@search_configs == []}>
+              <td colspan="5" class="px-4 py-8 text-center text-zinc-400 text-sm">
+                No search providers. Click <strong>New provider</strong> to add Tavily or Brave.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </.card>
+    </div>
+    """
+  end
+
+  defp credentials_section(assigns) do
+    ~H"""
+    <div class="p-6 space-y-6">
+      <h1 class="text-xl font-semibold">Credentials</h1>
+
+      <section class="space-y-2">
+        <h2 class="text-sm font-semibold text-zinc-700 uppercase tracking-wide">Bot users</h2>
+        <.card variant="bordered" color="natural" rounded="large" padding="none">
+          <table class="w-full text-sm">
+            <thead class="text-xs uppercase text-zinc-500 bg-zinc-50">
+              <tr>
+                <th class="text-left px-4 py-2.5">Platform</th>
+                <th class="text-left px-4 py-2.5">External id</th>
+                <th class="text-left px-4 py-2.5">Display</th>
+                <th class="text-left px-4 py-2.5">Chat</th>
+                <th class="text-right px-4 py-2.5">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr :for={u <- @bot_users} class="border-t border-zinc-100">
+                <td class="px-4 py-2">
+                  <.badge color="info" size="extra_small" rounded="full">{u.platform}</.badge>
+                </td>
+                <td class="px-4 py-2 text-xs font-mono text-zinc-700">{u.external_id}</td>
+                <td class="px-4 py-2 text-zinc-700">{u.display_name || "—"}</td>
+                <td class="px-4 py-2 text-xs font-mono text-zinc-500">{u.chat_id || "—"}</td>
+                <td class="px-4 py-2 text-right">
+                  <.button
+                    phx-click="destroy_bot_user"
+                    phx-value-id={u.id}
+                    variant="base"
+                    color="danger"
+                    size="extra_small"
+                    icon="hero-trash"
+                    rounded="medium"
+                    data-confirm={"Delete bot user \"#{u.external_id}\"?"}
+                  />
+                </td>
+              </tr>
+              <tr :if={@bot_users == []}>
+                <td colspan="5" class="px-4 py-8 text-center text-zinc-400 text-sm">(no bot users)</td>
+              </tr>
+            </tbody>
+          </table>
+        </.card>
+      </section>
+
+      <section class="space-y-2">
+        <h2 class="text-sm font-semibold text-zinc-700 uppercase tracking-wide">WeChat credentials</h2>
+        <.card variant="bordered" color="natural" rounded="large" padding="none">
+          <table class="w-full text-sm">
+            <thead class="text-xs uppercase text-zinc-500 bg-zinc-50">
+              <tr>
+                <th class="text-left px-4 py-2.5">Name</th>
+                <th class="text-left px-4 py-2.5">Bot token</th>
+                <th class="text-left px-4 py-2.5">iLink bot id</th>
+                <th class="text-left px-4 py-2.5">Buf</th>
+                <th class="text-right px-4 py-2.5">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr :for={c <- @wechat_credentials} class="border-t border-zinc-100">
+                <td class="px-4 py-2 font-medium">{c.name}</td>
+                <td class="px-4 py-2 text-xs">
+                  <.badge color={if c.bot_token, do: "success", else: "silver"} size="extra_small" rounded="full">
+                    {if c.bot_token, do: "set", else: "—"}
+                  </.badge>
+                </td>
+                <td class="px-4 py-2 text-xs font-mono text-zinc-500">{c.ilink_bot_id || "—"}</td>
+                <td class="px-4 py-2 text-xs">
+                  <.badge color={if c.updates_buf && c.updates_buf != "", do: "info", else: "silver"} size="extra_small" rounded="full">
+                    {if c.updates_buf && c.updates_buf != "", do: "buffered", else: "empty"}
+                  </.badge>
+                </td>
+                <td class="px-4 py-2 text-right">
+                  <.button
+                    phx-click="destroy_wechat_credential"
+                    phx-value-name={c.name}
+                    variant="base"
+                    color="danger"
+                    size="extra_small"
+                    icon="hero-trash"
+                    rounded="medium"
+                    data-confirm={"Delete WeChat credential \"#{c.name}\"?"}
+                  />
+                </td>
+              </tr>
+              <tr :if={@wechat_credentials == []}>
+                <td colspan="5" class="px-4 py-8 text-center text-zinc-400 text-sm">
+                  No WeChat credentials. Run <code class="text-xs">mix long.wechat.login</code> to create one.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </.card>
+      </section>
+    </div>
+    """
+  end
+
+  defp scheduled_section(assigns) do
+    ~H"""
+    <div class="p-6 space-y-4">
+      <div class="flex items-center gap-3">
+        <h1 class="text-xl font-semibold flex-1">Scheduled tasks</h1>
+        <.button phx-click="new_scheduled" color="primary" icon="hero-plus" rounded="medium" size="small">
+          New task
+        </.button>
+      </div>
+
+      <.card variant="bordered" color="natural" rounded="large" padding="none">
+        <table class="w-full text-sm">
+          <thead class="text-xs uppercase text-zinc-500 bg-zinc-50">
+            <tr>
+              <th class="text-left px-4 py-2.5">Name</th>
+              <th class="text-left px-4 py-2.5">Repeat</th>
+              <th class="text-left px-4 py-2.5">Prompt</th>
+              <th class="text-left px-4 py-2.5">Status</th>
+              <th class="text-left px-4 py-2.5">Next run</th>
+              <th class="text-left px-4 py-2.5">Last run</th>
+              <th class="text-right px-4 py-2.5">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr :for={t <- @scheduled_tasks} class="border-t border-zinc-100">
+              <td class="px-4 py-2 font-medium">{t.name}</td>
+              <td class="px-4 py-2">
+                <.badge color="info" size="extra_small" rounded="full">{repeat_label(t)}</.badge>
+              </td>
+              <td class="px-4 py-2 text-zinc-600 max-w-md">{Text.preview(t.prompt || "", 80)}</td>
+              <td class="px-4 py-2">
+                <.badge color={if t.enabled, do: "success", else: "silver"} size="extra_small" rounded="full">
+                  {if t.enabled, do: "on", else: "off"}
+                </.badge>
+              </td>
+              <td class="px-4 py-2 text-xs text-zinc-500">{format_dt(t.next_run_at)}</td>
+              <td class="px-4 py-2 text-xs text-zinc-500">{format_dt(t.last_run_at)}</td>
+              <td class="px-4 py-2">
+                <div class="flex justify-end gap-1.5">
+                  <.button
+                    phx-click="toggle_scheduled_enabled"
+                    phx-value-id={t.id}
+                    variant="base"
+                    color="natural"
+                    size="extra_small"
+                    icon={if t.enabled, do: "hero-pause", else: "hero-play"}
+                    rounded="medium"
+                  />
+                  <.button
+                    phx-click="edit_scheduled"
+                    phx-value-id={t.id}
+                    variant="base"
+                    color="natural"
+                    size="extra_small"
+                    icon="hero-pencil-square"
+                    rounded="medium"
+                  />
+                  <.button
+                    phx-click="destroy_scheduled"
+                    phx-value-id={t.id}
+                    variant="base"
+                    color="danger"
+                    size="extra_small"
+                    icon="hero-trash"
+                    rounded="medium"
+                    data-confirm={"Delete \"#{t.name}\"?"}
+                  />
+                </div>
+              </td>
+            </tr>
+            <tr :if={@scheduled_tasks == []}>
+              <td colspan="7" class="px-4 py-8 text-center text-zinc-400 text-sm">
+                No scheduled tasks. Click <strong>New task</strong> to add one (or let the agent schedule them via the `schedule_task` tool).
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </.card>
+    </div>
+    """
+  end
+
   # ── Modals ───────────────────────────────────────────────────────────
 
   attr :editing, :map, required: true
@@ -949,4 +1557,206 @@ defmodule LongWeb.ManageLive do
   defp display_provider(%{kind: :native_openai}), do: "openai *"
   defp display_provider(%{kind: :mixin}), do: "mixin *"
   defp display_provider(_), do: "—"
+
+  defp session_status_color(:active), do: "success"
+  defp session_status_color(:archived), do: "silver"
+  defp session_status_color(:errored), do: "danger"
+  defp session_status_color(_), do: "info"
+
+  defp repeat_label(%{repeat: :every_n_hours, every_n: n}), do: "every #{n}h"
+  defp repeat_label(%{repeat: :every_n_minutes, every_n: n}), do: "every #{n}m"
+  defp repeat_label(%{repeat: r}), do: to_string(r)
+
+  attr :editing, :map, required: true
+  attr :providers, :list, required: true
+
+  defp search_modal(assigns) do
+    assigns = assign(assigns, :is_new?, assigns.editing.__action__ == :create_search)
+
+    ~H"""
+    <.modal
+      id="search-edit-modal"
+      show
+      title={if @is_new?, do: "New search provider", else: "Edit #{@editing.alias}"}
+      on_cancel={JS.push("cancel_edit")}
+      size="medium"
+    >
+      <form phx-submit="save_search" class="space-y-3">
+        <div class="grid grid-cols-2 gap-3">
+          <label class="block">
+            <span class="text-xs font-medium text-zinc-600">Alias</span>
+            <input
+              name="search[alias]"
+              value={@editing.alias}
+              required
+              readonly={!@is_new?}
+              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm font-mono"
+              placeholder="e.g. tavily_main"
+            />
+          </label>
+          <label class="block">
+            <span class="text-xs font-medium text-zinc-600">Provider</span>
+            <select
+              name="search[provider]"
+              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm"
+            >
+              <option :for={p <- @providers} value={p} selected={@editing.provider == p}>{p}</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <label class="block">
+            <span class="text-xs font-medium text-zinc-600">API key</span>
+            <input
+              type="password"
+              name="search[api_key]"
+              value={@editing.api_key}
+              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm font-mono"
+            />
+          </label>
+          <label class="block">
+            <span class="text-xs font-medium text-zinc-600">…or env var name</span>
+            <input
+              name="search[api_key_env_var]"
+              value={@editing.api_key_env_var}
+              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm font-mono"
+              placeholder="TAVILY_API_KEY"
+            />
+          </label>
+        </div>
+
+        <div class="flex items-center gap-6 pt-1">
+          <label class="flex items-center gap-2 text-sm text-zinc-700">
+            <input type="checkbox" name="search[enabled]" value="true" checked={@editing.enabled} />
+            Enabled
+          </label>
+          <label class="block w-32">
+            <span class="text-xs font-medium text-zinc-600">Sort order</span>
+            <input
+              type="number"
+              name="search[sort_order]"
+              value={@editing.sort_order}
+              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm"
+            />
+          </label>
+        </div>
+
+        <div class="flex justify-end gap-2 pt-2">
+          <.button type="button" phx-click="cancel_edit" variant="base" color="natural" rounded="medium" size="small">
+            Cancel
+          </.button>
+          <.button type="submit" color="primary" rounded="medium" size="small">Save</.button>
+        </div>
+      </form>
+    </.modal>
+    """
+  end
+
+  attr :editing, :map, required: true
+  attr :repeats, :list, required: true
+
+  defp scheduled_modal(assigns) do
+    assigns = assign(assigns, :is_new?, assigns.editing.__action__ == :create_scheduled)
+
+    ~H"""
+    <.modal
+      id="scheduled-edit-modal"
+      show
+      title={if @is_new?, do: "New scheduled task", else: "Edit #{@editing.name}"}
+      on_cancel={JS.push("cancel_edit")}
+      size="large"
+    >
+      <form phx-submit="save_scheduled" class="space-y-3">
+        <div class="grid grid-cols-2 gap-3">
+          <label class="block">
+            <span class="text-xs font-medium text-zinc-600">Name</span>
+            <input
+              name="scheduled[name]"
+              value={@editing.name}
+              required
+              readonly={!@is_new?}
+              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm font-mono"
+              placeholder="e.g. morning_hn_digest"
+            />
+          </label>
+          <label class="block">
+            <span class="text-xs font-medium text-zinc-600">Repeat</span>
+            <select
+              name="scheduled[repeat]"
+              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm"
+            >
+              <option :for={r <- @repeats} value={r} selected={@editing.repeat == r}>{r}</option>
+            </select>
+          </label>
+        </div>
+
+        <label class="block">
+          <span class="text-xs font-medium text-zinc-600">Prompt</span>
+          <textarea
+            name="scheduled[prompt]"
+            rows="4"
+            required
+            class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm leading-snug"
+            placeholder="What should the agent do when this fires?"
+          >{@editing.prompt}</textarea>
+        </label>
+
+        <div class="grid grid-cols-3 gap-3">
+          <label class="block">
+            <span class="text-xs font-medium text-zinc-600">Time (UTC HH:MM)</span>
+            <input
+              name="scheduled[schedule_time]"
+              value={@editing.schedule_time}
+              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm font-mono"
+              placeholder="08:00"
+            />
+          </label>
+          <label class="block">
+            <span class="text-xs font-medium text-zinc-600">Every N</span>
+            <input
+              type="number"
+              min="1"
+              name="scheduled[every_n]"
+              value={@editing.every_n}
+              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm"
+            />
+          </label>
+          <label class="block">
+            <span class="text-xs font-medium text-zinc-600">Max delay (h)</span>
+            <input
+              type="number"
+              min="0"
+              name="scheduled[max_delay_hours]"
+              value={@editing.max_delay_hours}
+              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm"
+            />
+          </label>
+        </div>
+
+        <label class="block">
+          <span class="text-xs font-medium text-zinc-600">Session id (optional — leave blank to fire into a fresh session)</span>
+          <input
+            name="scheduled[session_id]"
+            value={@editing.session_id}
+            class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm font-mono"
+            placeholder="UUID"
+          />
+        </label>
+
+        <label class="flex items-center gap-2 text-sm text-zinc-700 pt-1">
+          <input type="checkbox" name="scheduled[enabled]" value="true" checked={@editing.enabled} />
+          Enabled
+        </label>
+
+        <div class="flex justify-end gap-2 pt-2">
+          <.button type="button" phx-click="cancel_edit" variant="base" color="natural" rounded="medium" size="small">
+            Cancel
+          </.button>
+          <.button type="submit" color="primary" rounded="medium" size="small">Save</.button>
+        </div>
+      </form>
+    </.modal>
+    """
+  end
 end

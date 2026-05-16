@@ -28,6 +28,11 @@ defmodule Long.Agent.SearchConfig do
     repo Long.Repo
   end
 
+  @providers ~w(tavily brave_api)
+
+  @doc "Provider names accepted by the schema. Mirrors the `one_of` constraint on `:provider` so UI pickers don't drift."
+  def providers, do: @providers
+
   @mutable_fields [
     :provider,
     :api_key,

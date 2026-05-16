@@ -96,6 +96,7 @@ defmodule Long.Agent do
 
     resource Long.Agent.WechatCredential do
       define :upsert_wechat_credential, action: :upsert
+      define :list_wechat_credentials, action: :read
       define :get_wechat_credential, action: :read, get_by: [:name]
       define :update_wechat_credential_buf, action: :update_buf
       define :destroy_wechat_credential, action: :destroy
