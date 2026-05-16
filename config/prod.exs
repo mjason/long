@@ -7,17 +7,17 @@ import Config
 # before starting your production server.
 config :long, LongWeb.Endpoint, cache_static_manifest: "priv/static/cache_manifest.json"
 
-# Force using SSL in production. This also sets the "strict-security-transport" header,
-# known as HSTS. If you have a health check endpoint, you may want to exclude it below.
-# Note `:force_ssl` is required to be set at compile-time.
-config :long, LongWeb.Endpoint,
-  force_ssl: [
-    rewrite_on: [:x_forwarded_proto],
-    exclude: [
-      # paths: ["/health"],
-      hosts: ["localhost", "127.0.0.1"]
-    ]
-  ]
+# `force_ssl` is intentionally NOT enabled — Long is meant to be
+# self-hosted on a LAN / via SSH tunnel, where TLS is provided by a
+# reverse proxy (caddy / nginx / Cloudflare Tunnel) if at all.
+# Hardcoding `force_ssl` here would 301 every plain HTTP request to
+# `https://<PHX_HOST>`, breaking access from another machine on the
+# same network without a cert.
+#
+# To re-enable when fronted by a reverse proxy that terminates TLS:
+#
+#     config :long, LongWeb.Endpoint,
+#       force_ssl: [rewrite_on: [:x_forwarded_proto]]
 
 # Configure Swoosh API Client
 config :swoosh, api_client: Swoosh.ApiClient.Req
