@@ -1,0 +1,112 @@
+name: Build Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag/version to bake into the artifact name (no leading v)"
+        required: false
+        default: "dev"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ${{ matrix.target }}
+    runs-on: ${{ matrix.runner }}
+    env:
+      MIX_ENV: prod
+      ELIXIR_VERSION: "1.19.5"
+      OTP_VERSION: "28.1"
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: macos-arm64
+            runner: macos-latest
+            install: brew
+          - target: linux-x64
+            runner: ubuntu-latest
+            install: setup-beam
+          - target: linux-arm64
+            runner: ubuntu-24.04-arm
+            install: setup-beam
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # macOS: brew install. setup-beam doesn't support arm64 macOS yet.
+      - name: Install Erlang & Elixir (Homebrew)
+        if: matrix.install == 'brew'
+        run: |
+          brew install erlang elixir
+          mix local.hex --force
+          mix local.rebar --force
+
+      # Linux: setup-beam is faster + caches.
+      - name: Install Erlang & Elixir (setup-beam)
+        if: matrix.install == 'setup-beam'
+        uses: erlef/setup-beam@v1
+        with:
+          otp-version: ${{ env.OTP_VERSION }}
+          elixir-version: ${{ env.ELIXIR_VERSION }}
+
+      - name: Cache deps + _build
+        uses: actions/cache@v4
+        with:
+          path: |
+            deps
+            _build/prod
+          key: ${{ matrix.target }}-prod-${{ hashFiles('**/mix.lock') }}
+          restore-keys: |
+            ${{ matrix.target }}-prod-
+
+      - name: Install dependencies
+        run: mix deps.get --only prod
+
+      - name: Compile dependencies
+        run: mix deps.compile
+
+      - name: Setup assets
+        run: mix assets.setup
+
+      - name: Build assets
+        run: mix assets.deploy
+
+      - name: Build release
+        run: mix release
+
+      - name: Package tarball
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+          else
+            VERSION="${{ github.event.inputs.tag || 'dev' }}-$(git rev-parse --short HEAD)"
+          fi
+
+          TARBALL="long-${VERSION}-${{ matrix.target }}.tar.gz"
+          cd _build/prod/rel
+          tar czf "../../../${TARBALL}" long
+          cd ../../..
+
+          echo "TARBALL=${TARBALL}" >> $GITHUB_ENV
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          ls -lh "${TARBALL}"
+
+      - name: Upload to GitHub Releases (tag push)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.TARBALL }}
+          generate_release_notes: true
+
+      - name: Upload build artifact (manual run)
+        if: "!startsWith(github.ref, 'refs/tags/v')"
+        uses: actions/upload-artifact@v4
+        with:
+          name: long-${{ env.VERSION }}-${{ matrix.target }}
+          path: ${{ env.TARBALL }}

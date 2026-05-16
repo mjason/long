@@ -16,8 +16,32 @@ defmodule Long.MixProject do
       usage_rules: usage_rules(),
       description: description(),
       package: package(),
+      releases: releases(),
       source_url: "https://github.com/mjason/long"
     ]
+  end
+
+  defp releases do
+    [
+      long: [
+        include_executables_for: [:unix],
+        applications: [runtime_tools: :permanent],
+        # Strip beam files to shrink the tarball ~30%.
+        strip_beams: Mix.env() == :prod,
+        # `priv/agent/` is the runtime workspace (uv venv, skills, AI
+        # scratch). Dev runs accumulate hundreds of MB there; the
+        # installer recreates whatever's needed under `~/.long/agent`.
+        steps: [:assemble, &strip_agent_workspace/1]
+      ]
+    ]
+  end
+
+  defp strip_agent_workspace(release) do
+    agent_dir =
+      Path.join([release.path, "lib", "long-#{release.version}", "priv", "agent"])
+
+    if File.exists?(agent_dir), do: File.rm_rf!(agent_dir)
+    release
   end
 
   defp description do

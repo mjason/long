@@ -61,13 +61,42 @@ Long 是把原先用 Python 写的 GenericAgent 整套搬到 Elixir 的版本—
 
 ## 快速开始
 
-### 1. 依赖
+### 一键安装 (macOS / Linux)
+
+预编译版本支持 `macos-arm64`、`linux-x64`、`linux-arm64`。需要先装并登录 [GitHub CLI](https://cli.github.com/)：
+
+```bash
+brew install gh        # 或 apt install gh
+gh auth login
+```
+
+然后一行安装：
+
+```bash
+gh api "repos/mjason/long/contents/install.sh" --jq '.content' | base64 -d | bash
+```
+
+脚本会：
+
+- 拉取最新 release tarball，解压到 `~/.long/`
+- 检测不到 `uv` 时自动装一份（[Astral uv](https://docs.astral.sh/uv/)，`code_run` 工具需要）
+- 首次运行生成 `~/.long/env`，里面有 `SECRET_KEY_BASE`、`DATABASE_PATH` 等
+- 生成启动脚本 `~/.long/run`
+
+```bash
+$EDITOR ~/.long/env    # 通常无需修改
+~/.long/run            # 启动，访问 http://localhost:4000
+```
+
+> 默认安装目录 `~/.long`，可用 `LONG_INSTALL_DIR` 环境变量覆盖。
+
+### 从源码运行
+
+依赖：
 
 - Elixir 1.15+ / Erlang 26+
 - SQLite 3
 - `uv`（[Astral uv](https://docs.astral.sh/uv/)，给 Skill 的 Python 脚本提供运行时；不用 Python skill 可以不装）
-
-### 2. 克隆 + 启动
 
 ```bash
 git clone https://github.com/mjason/long.git
@@ -78,7 +107,7 @@ mix phx.server
 
 浏览器打开 <http://localhost:4004/>，从导航中心进入 `/chat` 或 `/manage/llms`。
 
-### 3. 配置第一个 LLM
+### 配置第一个 LLM
 
 打开 `/manage/llms` → **New LLM**：
 
@@ -94,7 +123,7 @@ mix phx.server
 
 保存后回到 `/chat`，新会话会自动绑这个 alias。同样的流程适用 OpenAI / Google / Groq / DeepSeek 等任意 ReqLLM 支持的 provider。
 
-### 4. 安装第一个 Skill（可选）
+### 安装第一个 Skill（可选）
 
 ```bash
 mkdir -p priv/agent/skills/hello-world/scripts

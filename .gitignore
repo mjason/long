@@ -31,6 +31,16 @@ long-*.tar
 # Ignore digested assets cache.
 /priv/static/cache_manifest.json
 
+# Phoenix digested static files (favicon-<hash>.ico, robots-<hash>.txt, etc.)
+/priv/static/*-*.ico
+/priv/static/*-*.txt
+/priv/static/*.gz
+/priv/static/images/*-*.svg
+/priv/static/images/*.gz
+
+# Release tarballs from local `mix release`
+/long-*.tar.gz
+
 # In case you use Node.js/npm, you want to ignore these.
 npm-debug.log
 /assets/node_modules/

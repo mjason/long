@@ -48,6 +48,21 @@ if config_env() == :prod do
 
   host = System.get_env("PHX_HOST") || "example.com"
 
+  # Agent workspace paths. `LONG_WORKSPACE_ROOT` is the umbrella; the
+  # individual roots default underneath it but can be overridden one by
+  # one (`LONG_SKILL_ROOT`, `LONG_TEMP_ROOT`, …). Defaults to
+  # `~/.long/agent` so the installer's `~/.long` layout works
+  # out-of-the-box.
+  agent_root =
+    System.get_env("LONG_WORKSPACE_ROOT") ||
+      Path.join(System.user_home!(), ".long/agent")
+
+  config :long, Long.Agent,
+    workspace_root: System.get_env("LONG_WORKSPACE") || Path.join(agent_root, "workspace"),
+    skill_root: System.get_env("LONG_SKILL_ROOT") || Path.join(agent_root, "skills"),
+    temp_root: System.get_env("LONG_TEMP_ROOT") || Path.join(agent_root, "temp"),
+    memory_root: System.get_env("LONG_MEMORY_ROOT") || Path.join(agent_root, "memory")
+
   config :long, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
 
   config :long, LongWeb.Endpoint,
