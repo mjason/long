@@ -71,6 +71,11 @@ jobs:
       - name: Compile dependencies
         run: mix deps.compile
 
+      - name: Compile application
+        # Compiles colocated `phoenix-colocated/long` hooks that esbuild
+        # imports in `mix assets.deploy` below.
+        run: mix compile
+
       - name: Setup assets
         run: mix assets.setup
 
