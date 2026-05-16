@@ -65,18 +65,23 @@ defmodule Long.Jido.LLMCall do
     ]
 
     try do
-      {:ok, sr} = ReqLLM.Generation.stream_text(cfg.model, messages, req_opts)
-      classification = ReqLLM.StreamResponse.classify(sr)
+      case ReqLLM.Generation.stream_text(cfg.model, messages, req_opts) do
+        {:ok, sr} ->
+          classification = ReqLLM.StreamResponse.classify(sr)
 
-      {:ok,
-       %{
-         type: classification.type,
-         text: classification.text,
-         thinking: classification.thinking,
-         tool_calls: classification.tool_calls,
-         finish_reason: classification.finish_reason,
-         usage: ReqLLM.StreamResponse.usage(sr)
-       }}
+          {:ok,
+           %{
+             type: classification.type,
+             text: classification.text,
+             thinking: classification.thinking,
+             tool_calls: classification.tool_calls,
+             finish_reason: classification.finish_reason,
+             usage: ReqLLM.StreamResponse.usage(sr)
+           }}
+
+        {:error, exception} ->
+          maybe_retry(exception, [], messages, tools, opts, attempt)
+      end
     rescue
       e -> maybe_retry(e, __STACKTRACE__, messages, tools, opts, attempt)
     end

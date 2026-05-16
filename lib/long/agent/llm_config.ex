@@ -28,15 +28,19 @@ defmodule Long.Agent.LLMConfig do
 
   # Whitelist of ReqLLM provider strings + commonly-used wire protocols
   # — single source of truth for both the SQL `one_of` constraint and
-  # the manage-UI picker. ReqLLM auto-generates its list during model
-  # sync, so adding a provider on their side picks up automatically.
-  @providers ReqLLM.Provider.Generated.ValidProviders.list()
-             |> Enum.map(&Atom.to_string/1)
-             |> Enum.sort()
-
+  # the manage-UI picker. We list only providers with a real Provider
+  # module registered (`ReqLLM.Providers.list/0`), not the broader
+  # `Provider.Generated.ValidProviders` set — the latter includes
+  # ~30 metadata-only ids (aihubmix, openrouter aggregators, …) that
+  # have no implementation and would fail at `stream_text` time.
   @wire_protocols ~w(openai_chat openai_responses anthropic_messages google_genai)
 
-  def providers, do: @providers
+  def providers do
+    ReqLLM.Providers.list()
+    |> Enum.map(&Atom.to_string/1)
+    |> Enum.sort()
+  end
+
   def wire_protocols, do: @wire_protocols
 
   @mutable_fields [
