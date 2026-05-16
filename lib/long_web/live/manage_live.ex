@@ -1485,11 +1485,11 @@ defmodule LongWeb.ManageLive do
     }
   end
 
-  # Strip empty strings + checkbox booleans, plus default the legacy
-  # `kind` field so register can satisfy its NOT NULL constraint without
-  # the form having to expose it.
-  defp sanitize_llm_attrs(params, action) do
-    base = %{
+  # Strip empty strings + checkbox booleans, and always derive the legacy
+  # `kind` field from `provider` so the `register` upsert satisfies its
+  # NOT NULL constraint on both create and edit paths.
+  defp sanitize_llm_attrs(params, _action) do
+    %{
       alias: String.trim(params["alias"] || ""),
       provider: trim_or_nil(params["provider"]),
       wire_protocol: trim_or_nil(params["wire_protocol"]),
@@ -1498,13 +1498,9 @@ defmodule LongWeb.ManageLive do
       api_key: trim_or_nil(params["api_key"]),
       api_key_env_var: trim_or_nil(params["api_key_env_var"]),
       enabled: params["enabled"] == "true",
-      default: params["default"] == "true"
+      default: params["default"] == "true",
+      kind: kind_for(trim_or_nil(params["provider"]))
     }
-
-    case action do
-      :create -> Map.put(base, :kind, kind_for(base.provider))
-      _ -> base
-    end
   end
 
   defp trim_or_nil(nil), do: nil
