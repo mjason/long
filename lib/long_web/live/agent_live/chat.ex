@@ -858,7 +858,7 @@ defmodule LongWeb.AgentLive.Chat do
               do: "Working…",
               else: "Send a message  (Enter to send · Shift+Enter for newline)"
           }
-          class="flex-1 resize-none border border-zinc-300 rounded-2xl px-4 py-2.5 leading-relaxed bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none max-h-60"
+          class="flex-1 resize-none border border-zinc-300 rounded-2xl px-4 py-3 leading-relaxed bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none max-h-60"
           autofocus
         ></textarea>
         <.button
@@ -869,7 +869,7 @@ defmodule LongWeb.AgentLive.Chat do
           size="medium"
           icon={if @loop_running?, do: "hero-arrow-path", else: "hero-paper-airplane"}
           icon_class={@loop_running? && "animate-spin"}
-          class="!h-10 !w-10 !p-0 shrink-0"
+          class="!h-[50px] !w-[50px] !p-0 shrink-0 flex items-center justify-center"
           title="Send"
         />
       </div>
