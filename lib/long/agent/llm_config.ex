@@ -26,6 +26,19 @@ defmodule Long.Agent.LLMConfig do
     repo Long.Repo
   end
 
+  # Whitelist of ReqLLM provider strings + commonly-used wire protocols
+  # — single source of truth for both the SQL `one_of` constraint and
+  # the manage-UI picker. ReqLLM auto-generates its list during model
+  # sync, so adding a provider on their side picks up automatically.
+  @providers ReqLLM.Provider.Generated.ValidProviders.list()
+             |> Enum.map(&Atom.to_string/1)
+             |> Enum.sort()
+
+  @wire_protocols ~w(openai_chat openai_responses anthropic_messages google_genai)
+
+  def providers, do: @providers
+  def wire_protocols, do: @wire_protocols
+
   @mutable_fields [
     :kind,
     :provider,
@@ -57,6 +70,7 @@ defmodule Long.Agent.LLMConfig do
     update :set_default do
       accept []
       require_atomic? false
+      transaction? true
 
       change set_attribute(:default, true)
       change before_action(&Long.Agent.LLMConfig.unset_other_defaults/2)

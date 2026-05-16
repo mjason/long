@@ -33,6 +33,7 @@ defmodule Long.Agent do
     resource Long.Agent.WorkingCheckpoint do
       define :upsert_checkpoint, action: :upsert
       define :get_checkpoint, action: :read, get_by: [:session_id]
+      define :list_checkpoints, action: :read
     end
 
     resource Long.Agent.GlobalMemory do

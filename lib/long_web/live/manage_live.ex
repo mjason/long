@@ -19,7 +19,9 @@ defmodule LongWeb.ManageLive do
   import LongWeb.Components.Alert, only: [flash_group: 1]
 
   alias Long.Agent
+  alias Long.Agent.LLMConfig
   alias Long.Agent.Skill.Store, as: SkillStore
+  alias Long.Util.Text
 
   @sections [
     {:llms, "LLMs", "hero-cpu-chip"},
@@ -31,15 +33,6 @@ defmodule LongWeb.ManageLive do
     {:scheduled, "Scheduled", "hero-clock"}
   ]
 
-  # ReqLLM providers exposed in the picker. Kept in sync with the
-  # filenames under `deps/req_llm/lib/req_llm/providers/`. Strings (not
-  # atoms) so we never accidentally allocate atoms from user input.
-  @providers ~w(openai anthropic google groq deepseek openrouter mistral
-                cerebras cohere meta xai vllm amazon_bedrock google_vertex
-                alibaba alibaba_cn azure venice openai_codex zai_coder)
-
-  @wire_protocols ~w(openai_chat openai_responses anthropic_messages google_genai)
-
   @memory_kinds ~w(fact preference goal decision)
   @memory_scopes ~w(general insight)
 
@@ -48,10 +41,6 @@ defmodule LongWeb.ManageLive do
     {:ok,
      socket
      |> assign(:sections, @sections)
-     |> assign(:providers, @providers)
-     |> assign(:wire_protocols, @wire_protocols)
-     |> assign(:memory_kinds, @memory_kinds)
-     |> assign(:memory_scopes, @memory_scopes)
      |> assign(:editing, nil)
      |> assign(:llms, [])
      |> assign(:globals, [])
@@ -97,19 +86,19 @@ defmodule LongWeb.ManageLive do
       end
 
     checkpoints =
-      case Agent.list_sessions() do
-        {:ok, sess_rows} ->
-          sess_rows
-          |> Enum.map(fn s ->
-            case Agent.get_checkpoint(s.id) do
-              {:ok, cp} -> %{session: s, checkpoint: cp}
-              _ -> nil
-            end
-          end)
-          |> Enum.reject(&is_nil/1)
+      with {:ok, sess_rows} <- Agent.list_sessions(),
+           {:ok, cp_rows} <- Agent.list_checkpoints() do
+        sessions_by_id = Map.new(sess_rows, &{&1.id, &1})
 
-        _ ->
-          []
+        cp_rows
+        |> Enum.flat_map(fn cp ->
+          case sessions_by_id[cp.session_id] do
+            nil -> []
+            s -> [%{session: s, checkpoint: cp}]
+          end
+        end)
+      else
+        _ -> []
       end
 
     socket
@@ -253,11 +242,13 @@ defmodule LongWeb.ManageLive do
   end
 
   def handle_event("save_global_memory", %{"memory" => params}, socket) do
+    # `to_existing_atom` blocks the `params -> atom` exhaustion vector;
+    # the schema's `one_of` constraints have already loaded these atoms.
     attrs = %{
-      scope: String.to_atom(params["scope"] || "general"),
+      scope: safe_atom(params["scope"], :general, @memory_scopes),
       key: String.trim(params["key"] || ""),
       value: params["value"] || "",
-      kind: String.to_atom(params["kind"] || "fact"),
+      kind: safe_atom(params["kind"], :fact, @memory_kinds),
       importance: parse_int(params["importance"], 3)
     }
 
@@ -315,7 +306,12 @@ defmodule LongWeb.ManageLive do
       <main class="flex-1 overflow-y-auto">
         <.flash_group flash={@flash} />
         <.section_view {assigns} />
-        <.llm_modal :if={editing_kind(@editing) == :llm} editing={@editing} providers={@providers} wire_protocols={@wire_protocols} />
+        <.llm_modal
+          :if={editing_kind(@editing) == :llm}
+          editing={@editing}
+          providers={LLMConfig.providers()}
+          wire_protocols={LLMConfig.wire_protocols()}
+        />
         <.memory_modal
           :if={editing_kind(@editing) == :global_memory}
           editing={@editing}
@@ -513,7 +509,7 @@ defmodule LongWeb.ManageLive do
                 </td>
                 <td class="px-4 py-2 text-xs text-zinc-500">{row.kind}</td>
                 <td class="px-4 py-2 font-medium text-zinc-800">{row.key}</td>
-                <td class="px-4 py-2 text-zinc-600 leading-snug">{truncate(row.value, 140)}</td>
+                <td class="px-4 py-2 text-zinc-600 leading-snug">{Text.preview(row.value, 140)}</td>
                 <td class="px-4 py-2 text-xs">{row.importance || 3}</td>
                 <td class="px-4 py-2 text-right">
                   <div class="flex justify-end gap-1.5">
@@ -565,7 +561,7 @@ defmodule LongWeb.ManageLive do
                 <td class="px-4 py-2 text-xs font-mono text-zinc-500">{short(row.session_id)}</td>
                 <td class="px-4 py-2 text-xs text-zinc-500">{row.kind}</td>
                 <td class="px-4 py-2 font-medium text-zinc-800">{row.key}</td>
-                <td class="px-4 py-2 text-zinc-600 leading-snug">{truncate(row.value, 140)}</td>
+                <td class="px-4 py-2 text-zinc-600 leading-snug">{Text.preview(row.value, 140)}</td>
                 <td class="px-4 py-2 text-right">
                   <.button
                     phx-click="destroy_session_memory"
@@ -623,7 +619,7 @@ defmodule LongWeb.ManageLive do
           <tbody>
             <tr :for={s <- @skills} class="border-t border-zinc-100">
               <td class="px-4 py-2 font-mono text-zinc-800">{s.name}</td>
-              <td class="px-4 py-2 text-zinc-600 leading-snug max-w-md">{truncate(s.description || "", 120)}</td>
+              <td class="px-4 py-2 text-zinc-600 leading-snug max-w-md">{Text.preview(s.description || "", 120)}</td>
               <td class="px-4 py-2">
                 <span class="inline-flex gap-1">
                   <.badge :for={t <- s.tags || []} color="silver" size="extra_small" rounded="full">{t}</.badge>
@@ -929,14 +925,17 @@ defmodule LongWeb.ManageLive do
 
   defp parse_int(_, default), do: default
 
-  defp truncate(nil, _), do: ""
-
-  defp truncate(s, cap) when is_binary(s) do
-    if String.length(s) > cap, do: String.slice(s, 0, cap) <> "…", else: s
-  end
-
   defp short(uuid) when is_binary(uuid), do: String.slice(uuid, 0, 8)
   defp short(_), do: ""
+
+  # Coerce a form-submitted string to an atom in `allowed`; fall back
+  # to `default` for missing or unknown values. Uses `to_existing_atom`
+  # so a crafted POST can't allocate new atoms.
+  defp safe_atom(value, default, allowed) when is_binary(value) do
+    if value in allowed, do: String.to_existing_atom(value), else: default
+  end
+
+  defp safe_atom(_, default, _), do: default
 
   defp format_dt(nil), do: "—"
 

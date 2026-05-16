@@ -140,7 +140,17 @@ defmodule Long.Jido.LLMCall do
     %{model: model, base_url: config.api_base, api_key: backend.api_key}
   end
 
-  defp resolve_provider(%{provider: p}) when is_binary(p) and p != "", do: String.to_atom(p)
+  # `to_existing_atom` keeps us safe even if the LLMConfig `one_of`
+  # constraint regresses: the provider atom set is the one ReqLLM
+  # generated at compile time (and is already loaded as far as
+  # `LLMConfig` is concerned), so an unknown value falls through to
+  # the legacy `kind` mapping instead of allocating an atom.
+  defp resolve_provider(%{provider: p}) when is_binary(p) and p != "" do
+    String.to_existing_atom(p)
+  rescue
+    ArgumentError -> :openai
+  end
+
   defp resolve_provider(%{kind: :claude}), do: :anthropic
   defp resolve_provider(%{kind: :native_claude}), do: :anthropic
   defp resolve_provider(%{kind: kind}) when kind in [:openai, :native_openai, :mixin], do: :openai
