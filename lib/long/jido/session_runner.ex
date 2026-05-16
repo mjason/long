@@ -140,6 +140,7 @@ defmodule Long.Jido.SessionRunner do
 
     broadcast(session_id, {:done, done_reason(result)})
     broadcast(session_id, :loop_ended)
+    _ = Long.Jido.TitleGen.maybe_generate_async(session_id, alias_name)
   end
 
   defp done_reason(%{result: :done, text: _}), do: %{reason: :no_tool_call}

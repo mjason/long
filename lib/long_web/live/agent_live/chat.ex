@@ -30,7 +30,8 @@ defmodule LongWeb.AgentLive.Chat do
      |> assign(:loop_notice, nil)
      |> assign(:sessions, list_sessions())
      |> assign(:sidebar_open?, true)
-     |> assign(:memory_open?, true)}
+     |> assign(:memory_open?, true)
+     |> assign(:editing_title?, false)}
   end
 
   @impl true
@@ -79,6 +80,32 @@ defmodule LongWeb.AgentLive.Chat do
   def handle_event("toggle_memory", _, socket),
     do: {:noreply, update(socket, :memory_open?, &(!&1))}
 
+  def handle_event("edit_title", _, socket),
+    do: {:noreply, assign(socket, :editing_title?, true)}
+
+  def handle_event("cancel_title", _, socket),
+    do: {:noreply, assign(socket, :editing_title?, false)}
+
+  # Form submit sends %{"title" => …}, phx-blur on the <input> sends
+  # %{"value" => …}. Accept either so Enter and click-away both save.
+  def handle_event("save_title", params, socket) do
+    title = params["title"] || params["value"] || ""
+
+    case String.trim(title) do
+      "" ->
+        {:noreply, assign(socket, :editing_title?, false)}
+
+      cleaned ->
+        {:ok, sess} = Agent.update_session(socket.assigns.session, %{title: cleaned})
+
+        {:noreply,
+         socket
+         |> assign(:session, sess)
+         |> assign(:editing_title?, false)
+         |> assign(:sessions, list_sessions())}
+    end
+  end
+
   # ── Loop events via PubSub ───────────────────────────────────────────────
 
   @impl true
@@ -96,6 +123,10 @@ defmodule LongWeb.AgentLive.Chat do
 
   def handle_info({:message_persisted, _}, socket) do
     {:noreply, assign(socket, :messages, load_messages(socket.assigns.session_id))}
+  end
+
+  def handle_info({:session_updated, session}, socket) do
+    {:noreply, socket |> assign(:session, session) |> assign(:sessions, list_sessions())}
   end
 
   def handle_info({:turn_start, _n}, socket) do
@@ -353,6 +384,7 @@ defmodule LongWeb.AgentLive.Chat do
           available_llms={@available_llms}
           sidebar_open?={@sidebar_open?}
           memory_open?={@memory_open?}
+          editing_title?={@editing_title?}
         />
 
         <div
@@ -479,6 +511,7 @@ defmodule LongWeb.AgentLive.Chat do
   attr :available_llms, :list, required: true
   attr :sidebar_open?, :boolean, required: true
   attr :memory_open?, :boolean, required: true
+  attr :editing_title?, :boolean, required: true
 
   defp chat_header(assigns) do
     ~H"""
@@ -493,7 +526,7 @@ defmodule LongWeb.AgentLive.Chat do
         class="!p-2"
         title={if @sidebar_open?, do: "Hide sessions", else: "Show sessions"}
       />
-      <div class="font-semibold truncate">{(@session && @session.title) || "—"}</div>
+      <.session_title session={@session} editing?={@editing_title?} />
       <div class="flex-1" />
       <form phx-change="set_llm" class="flex items-center gap-2 text-xs text-zinc-500">
         <span>Model</span>
@@ -519,6 +552,39 @@ defmodule LongWeb.AgentLive.Chat do
         title={if @memory_open?, do: "Hide memory", else: "Show memory"}
       />
     </header>
+    """
+  end
+
+  attr :session, :any, required: true
+  attr :editing?, :boolean, required: true
+
+  defp session_title(%{editing?: true} = assigns) do
+    ~H"""
+    <form phx-submit="save_title" class="flex items-center gap-1 min-w-0">
+      <input
+        type="text"
+        name="title"
+        value={@session && @session.title}
+        autofocus
+        phx-blur="save_title"
+        phx-key="escape"
+        phx-keyup="cancel_title"
+        class="font-semibold border border-zinc-300 rounded px-2 py-0.5 text-sm bg-white focus:ring-2 focus:ring-blue-400 outline-none"
+      />
+    </form>
+    """
+  end
+
+  defp session_title(assigns) do
+    ~H"""
+    <button
+      type="button"
+      phx-click="edit_title"
+      class="font-semibold truncate hover:bg-zinc-100 px-2 py-0.5 rounded transition text-left max-w-md"
+      title="Click to rename"
+    >
+      {(@session && @session.title) || "—"}
+    </button>
     """
   end
 

@@ -521,9 +521,6 @@ defmodule LongWeb.ManageLive do
     end
   end
 
-  defp toggle_scheduled(%{enabled: true} = row), do: Agent.disable_scheduled_task(row)
-  defp toggle_scheduled(row), do: Agent.update_scheduled_task(row, %{enabled: true})
-
   def handle_event("destroy_scheduled", %{"id" => id}, socket) do
     with {:ok, row} <- Agent.get_scheduled_task(id),
          :ok <- Agent.destroy_scheduled_task(row) do
@@ -1557,6 +1554,9 @@ defmodule LongWeb.ManageLive do
   defp display_provider(%{kind: :native_openai}), do: "openai *"
   defp display_provider(%{kind: :mixin}), do: "mixin *"
   defp display_provider(_), do: "—"
+
+  defp toggle_scheduled(%{enabled: true} = row), do: Agent.disable_scheduled_task(row)
+  defp toggle_scheduled(row), do: Agent.update_scheduled_task(row, %{enabled: true})
 
   defp session_status_color(:active), do: "success"
   defp session_status_color(:archived), do: "silver"
