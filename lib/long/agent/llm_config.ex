@@ -28,12 +28,15 @@ defmodule Long.Agent.LLMConfig do
 
   @mutable_fields [
     :kind,
+    :provider,
+    :wire_protocol,
     :model,
     :api_base,
     :api_key,
     :api_key_env_var,
     :params,
     :enabled,
+    :default,
     :sort_order
   ]
 
@@ -50,6 +53,14 @@ defmodule Long.Agent.LLMConfig do
     update :update do
       accept @mutable_fields
     end
+
+    update :set_default do
+      accept []
+      require_atomic? false
+
+      change set_attribute(:default, true)
+      change before_action(&Long.Agent.LLMConfig.unset_other_defaults/2)
+    end
   end
 
   attributes do
@@ -62,7 +73,25 @@ defmodule Long.Agent.LLMConfig do
     end
 
     attribute :kind, :atom do
+      description "Legacy adapter kind, kept for the deprecated Long.Agent.LLM.Backend path. The Jido runtime ignores this in favour of `provider` + `wire_protocol`."
       constraints one_of: [:claude, :openai, :native_claude, :native_openai, :mixin]
+      allow_nil? false
+      public? true
+    end
+
+    attribute :provider, :string do
+      description "ReqLLM provider id, e.g. \"openai\", \"anthropic\", \"google\", \"groq\", \"openrouter\", \"deepseek\". When blank, the runtime derives one from `kind` for backward compatibility."
+      public? true
+    end
+
+    attribute :wire_protocol, :string do
+      description "ReqLLM wire protocol, e.g. \"openai_chat\", \"openai_responses\", \"anthropic_messages\", \"google_genai\". When blank, ReqLLM picks the provider's default."
+      public? true
+    end
+
+    attribute :default, :boolean do
+      description "Marks this row as the fallback alias when a session has no `llm_alias` set. Only one row at a time should have this set; the `set_default` action enforces it."
+      default false
       allow_nil? false
       public? true
     end
@@ -109,5 +138,18 @@ defmodule Long.Agent.LLMConfig do
 
   identities do
     identity :alias, [:alias]
+  end
+
+  @doc false
+  def unset_other_defaults(changeset, _opts) do
+    target_id = Ash.Changeset.get_attribute(changeset, :id) || changeset.data.id
+
+    require Ash.Query
+
+    Long.Agent.LLMConfig
+    |> Ash.Query.filter(default == true and id != ^target_id)
+    |> Ash.bulk_update!(:update, %{default: false}, return_records?: false)
+
+    changeset
   end
 end

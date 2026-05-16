@@ -126,16 +126,36 @@ defmodule Long.Jido.LLMCall do
     {:ok, config} = Agent.get_llm(alias_name)
     {:ok, backend} = Resolver.resolve(config)
 
+    provider = resolve_provider(config)
+    extra = wire_extra(config, provider)
+
     {:ok, model} =
       ReqLLM.model(%{
-        provider: :openai,
+        provider: provider,
         id: config.model,
         model: config.model,
-        extra: %{wire: %{protocol: "openai_chat"}}
+        extra: extra
       })
 
     %{model: model, base_url: config.api_base, api_key: backend.api_key}
   end
+
+  defp resolve_provider(%{provider: p}) when is_binary(p) and p != "", do: String.to_atom(p)
+  defp resolve_provider(%{kind: :claude}), do: :anthropic
+  defp resolve_provider(%{kind: :native_claude}), do: :anthropic
+  defp resolve_provider(%{kind: kind}) when kind in [:openai, :native_openai, :mixin], do: :openai
+  defp resolve_provider(_), do: :openai
+
+  defp wire_extra(%{wire_protocol: w}, _provider) when is_binary(w) and w != "",
+    do: %{wire: %{protocol: w}}
+
+  # Legacy rows (no wire_protocol set) routed through an OpenAI-compatible relay
+  # need to stay on the chat-completions shape — ReqLLM auto-upgrades newer model
+  # ids to "openai_responses", which most third-party relays don't speak.
+  defp wire_extra(%{kind: kind}, :openai) when kind in [:openai, :native_openai, :mixin],
+    do: %{wire: %{protocol: "openai_chat"}}
+
+  defp wire_extra(_, _), do: %{}
 
   # `tools` can mix `ReqLLM.Tool.t()` structs and `Jido.Action` modules.
   # For modules we lean on `Jido.AI.ToolAdapter.from_action/1`, which

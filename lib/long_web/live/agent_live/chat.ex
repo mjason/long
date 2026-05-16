@@ -321,13 +321,19 @@ defmodule LongWeb.AgentLive.Chat do
 
   defp short_args(_), do: ""
 
-  defp tool_status_pill(:running),
-    do: {"bg-amber-100 text-amber-800 ring-amber-200", "running…", "animate-pulse"}
+  # Maps tool status to a `<.badge>` color + label. `pulse?` is a class
+  # we toggle on the badge to indicate work-in-progress without inventing
+  # a new variant.
+  defp tool_status_badge(:running), do: {"warning", "running…", true}
+  defp tool_status_badge(:done), do: {"success", "✓ done", false}
+  defp tool_status_badge(_), do: {"silver", "?", false}
 
-  defp tool_status_pill(:done),
-    do: {"bg-emerald-100 text-emerald-800 ring-emerald-200", "✓ done", ""}
+  defp notice_alert_kind(:warning), do: :warning
+  defp notice_alert_kind(:error), do: :danger
+  defp notice_alert_kind(_), do: :natural
 
-  defp tool_status_pill(_), do: {"bg-zinc-100 text-zinc-700 ring-zinc-200", "?", ""}
+  defp llm_label(%{alias: a, default: true}), do: "★ " <> a
+  defp llm_label(%{alias: a}), do: a
 
   defp format_data(nil), do: nil
   defp format_data(d) when is_binary(d), do: d
@@ -338,7 +344,7 @@ defmodule LongWeb.AgentLive.Chat do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="flex h-screen bg-zinc-100 text-zinc-900">
+    <div class="flex h-screen bg-zinc-50 text-zinc-900">
       <.sessions_pane sessions={@sessions} session_id={@session_id} open?={@sidebar_open?} />
 
       <main class="flex-1 flex flex-col min-w-0">
@@ -355,11 +361,8 @@ defmodule LongWeb.AgentLive.Chat do
           class="flex-1 overflow-y-auto px-4 sm:px-8 py-6 space-y-4"
         >
           <.empty_state :if={visible_messages(@messages) == [] and is_nil(@streaming)} />
-
           <.message_bubble :for={msg <- visible_messages(@messages)} msg={msg} />
-
           <.streaming_bubble :if={@streaming != nil} streaming={@streaming} />
-
           <.ask_user_card :if={@ask_user} ask={@ask_user} />
           <.loop_notice :if={@loop_notice} notice={@loop_notice} />
         </div>
@@ -423,17 +426,21 @@ defmodule LongWeb.AgentLive.Chat do
   defp sessions_pane(assigns) do
     ~H"""
     <aside class={[
-      "border-r border-zinc-200 bg-white flex flex-col transition-all overflow-hidden",
+      "h-full border-r border-zinc-200 bg-white flex flex-col transition-all overflow-hidden shrink-0",
       @open? && "w-60",
       !@open? && "w-0"
     ]}>
       <div class="p-3 border-b border-zinc-200">
-        <button
+        <.button
           phx-click="new_session"
-          class="w-full px-3 py-2 rounded-lg bg-zinc-900 text-white text-sm font-medium hover:bg-zinc-700 transition"
+          color="primary"
+          full_width
+          icon="hero-plus"
+          rounded="large"
+          size="medium"
         >
-          + New session
-        </button>
+          New session
+        </.button>
       </div>
       <ul class="flex-1 overflow-y-auto text-sm">
         <li
@@ -451,6 +458,19 @@ defmodule LongWeb.AgentLive.Chat do
           </div>
         </li>
       </ul>
+      <div class="p-2 border-t border-zinc-200">
+        <.button_link
+          navigate={~p"/manage"}
+          variant="base"
+          color="natural"
+          full_width
+          size="small"
+          icon="hero-cog-6-tooth"
+          rounded="medium"
+        >
+          Manage
+        </.button_link>
+      </div>
     </aside>
     """
   end
@@ -463,37 +483,41 @@ defmodule LongWeb.AgentLive.Chat do
   defp chat_header(assigns) do
     ~H"""
     <header class="bg-white border-b border-zinc-200 px-4 sm:px-6 h-14 flex items-center gap-3 shrink-0">
-      <button
+      <.button
         phx-click="toggle_sidebar"
-        class="p-1.5 rounded hover:bg-zinc-100 text-zinc-500"
+        variant="base"
+        color="natural"
+        rounded="small"
+        size="extra_small"
+        icon="hero-bars-3"
+        class="!p-2"
         title={if @sidebar_open?, do: "Hide sessions", else: "Show sessions"}
-      >
-        ☰
-      </button>
+      />
       <div class="font-semibold truncate">{(@session && @session.title) || "—"}</div>
       <div class="flex-1" />
       <form phx-change="set_llm" class="flex items-center gap-2 text-xs text-zinc-500">
         <span>Model</span>
-        <select name="alias" class="border border-zinc-300 rounded px-2 py-1 text-xs bg-white">
-          <option value="" selected={is_nil(@session && @session.llm_alias)}>
-            echo (demo)
-          </option>
-          <option
+        <.native_select name="alias" size="extra_small" space="none">
+          <:option value="" selected={is_nil(@session && @session.llm_alias)}>echo (demo)</:option>
+          <:option
             :for={llm <- @available_llms}
             value={llm.alias}
             selected={@session && @session.llm_alias == llm.alias}
           >
-            {llm.alias}
-          </option>
-        </select>
+            {llm_label(llm)}
+          </:option>
+        </.native_select>
       </form>
-      <button
+      <.button
         phx-click="toggle_memory"
-        class="p-1.5 rounded hover:bg-zinc-100 text-zinc-500"
+        variant="base"
+        color="natural"
+        rounded="small"
+        size="extra_small"
+        icon="hero-bars-4"
+        class="!p-2"
         title={if @memory_open?, do: "Hide memory", else: "Show memory"}
-      >
-        ☷
-      </button>
+      />
     </header>
     """
   end
@@ -501,7 +525,7 @@ defmodule LongWeb.AgentLive.Chat do
   defp empty_state(assigns) do
     ~H"""
     <div class="h-full flex flex-col items-center justify-center text-center text-zinc-400 py-20">
-      <div class="text-5xl mb-4">💬</div>
+      <.icon name="hero-chat-bubble-left-right" class="size-14 mb-4 text-zinc-300" />
       <div class="text-zinc-500 font-medium">Start a conversation</div>
       <div class="text-xs mt-1.5 max-w-xs">
         Type a message below. The agent has access to file I/O, code execution,
@@ -515,18 +539,18 @@ defmodule LongWeb.AgentLive.Chat do
 
   defp message_bubble(%{msg: %{role: :user}} = assigns) do
     ~H"""
-    <article class="flex justify-end">
-      <div class="max-w-[75%] bg-blue-600 text-white px-4 py-2.5 rounded-2xl rounded-tr-md">
+    <.chat position="flipped" color="primary" variant="default" rounded="extra_large" padding="none">
+      <.chat_section class="max-w-[75%] px-4 py-2.5">
         <div class="whitespace-pre-wrap break-words">{@msg.content}</div>
-      </div>
-    </article>
+      </.chat_section>
+    </.chat>
     """
   end
 
   defp message_bubble(%{msg: %{role: :assistant}} = assigns) do
     ~H"""
-    <article class="flex justify-start">
-      <div class="max-w-[85%] bg-white border border-zinc-200 px-4 py-3 rounded-2xl rounded-tl-md shadow-sm">
+    <.chat position="normal" color="natural" variant="bordered" rounded="extra_large" padding="none" class="[&>.chat-section-bubble]:shadow-sm [&>.chat-section-bubble]:bg-white">
+      <.chat_section class="max-w-[85%] px-4 py-3">
         <div
           :if={(@msg.content || "") != ""}
           class="whitespace-pre-wrap break-words leading-relaxed"
@@ -534,8 +558,8 @@ defmodule LongWeb.AgentLive.Chat do
           {format_text(@msg.content)}
         </div>
         <.tool_call_list :if={(@msg.tool_calls || []) != []} tool_calls={@msg.tool_calls} />
-      </div>
-    </article>
+      </.chat_section>
+    </.chat>
     """
   end
 
@@ -547,9 +571,11 @@ defmodule LongWeb.AgentLive.Chat do
     ~H"""
     <div class="mt-3 space-y-1.5">
       <details :for={tc <- @tool_calls} class="group">
-        <summary class="cursor-pointer text-xs text-zinc-600 hover:text-zinc-900 select-none">
-          <span class="font-mono">🛠 {tc["name"]}</span>
-          <span class="text-zinc-400">({short_args(tc["input"] || %{})})</span>
+        <summary class="cursor-pointer text-xs text-zinc-600 hover:text-zinc-900 select-none flex items-center gap-2">
+          <.badge color="misc" size="extra_small" icon="hero-wrench-screwdriver" rounded="full">
+            {tc["name"]}
+          </.badge>
+          <span class="text-zinc-400 font-mono">({short_args(tc["input"] || %{})})</span>
         </summary>
         <pre class="mt-1.5 text-[11px] bg-zinc-50 border border-zinc-200 rounded p-2 overflow-x-auto leading-snug font-mono">{format_data(tc["input"] || %{})}</pre>
       </details>
@@ -561,8 +587,8 @@ defmodule LongWeb.AgentLive.Chat do
 
   defp streaming_bubble(assigns) do
     ~H"""
-    <article class="flex justify-start">
-      <div class="max-w-[85%] bg-white border border-zinc-200 px-4 py-3 rounded-2xl rounded-tl-md shadow-sm">
+    <.chat position="normal" color="natural" variant="bordered" rounded="extra_large" padding="none" class="[&>.chat-section-bubble]:shadow-sm [&>.chat-section-bubble]:bg-white">
+      <.chat_section class="max-w-[85%] px-4 py-3">
         <details :if={@streaming.thinking != ""} class="mb-2">
           <summary class="cursor-pointer text-xs text-zinc-400">thinking…</summary>
           <pre class="mt-1.5 text-xs text-zinc-500 whitespace-pre-wrap leading-snug">{@streaming.thinking}</pre>
@@ -574,36 +600,39 @@ defmodule LongWeb.AgentLive.Chat do
           :if={@streaming.text == "" and @streaming.tool_runs == []}
           class="flex items-center gap-2 text-sm text-zinc-400"
         >
-          <span class="flex gap-1">
-            <span class="w-1.5 h-1.5 rounded-full bg-zinc-300 animate-bounce [animation-delay:0ms]" />
-            <span class="w-1.5 h-1.5 rounded-full bg-zinc-300 animate-bounce [animation-delay:150ms]" />
-            <span class="w-1.5 h-1.5 rounded-full bg-zinc-300 animate-bounce [animation-delay:300ms]" />
-          </span>
-          thinking
+          <.spinner color="natural" size="extra_small" /> thinking
         </div>
         <.tool_run_card :for={run <- @streaming.tool_runs} run={run} />
-      </div>
-    </article>
+      </.chat_section>
+    </.chat>
     """
   end
 
   attr :run, :map, required: true
 
   defp tool_run_card(assigns) do
-    {pill_class, pill_label, pulse} = tool_status_pill(assigns.run.status)
+    {badge_color, badge_label, pulse?} = tool_status_badge(assigns.run.status)
 
     assigns =
-      assign(assigns, :pill_class, pill_class)
-      |> assign(:pill_label, pill_label)
-      |> assign(:pulse, pulse)
+      assigns
+      |> assign(:badge_color, badge_color)
+      |> assign(:badge_label, badge_label)
+      |> assign(:pulse?, pulse?)
 
     ~H"""
-    <div class="mt-3 border border-zinc-200 rounded-lg bg-zinc-50/50 overflow-hidden">
+    <.card variant="bordered" color="silver" rounded="large" padding="none" class="mt-3">
       <div class="px-3 py-2 flex items-center justify-between text-xs">
-        <span class="font-mono text-zinc-700">🛠 {@run.name}</span>
-        <span class={["ring-1 rounded-full px-2 py-0.5 text-[10px] font-medium", @pill_class, @pulse]}>
-          {@pill_label}
-        </span>
+        <.badge color="misc" size="extra_small" icon="hero-wrench-screwdriver" rounded="full">
+          {@run.name}
+        </.badge>
+        <.badge
+          color={@badge_color}
+          size="extra_small"
+          rounded="full"
+          class={@pulse? && "animate-pulse"}
+        >
+          {@badge_label}
+        </.badge>
       </div>
       <details class="px-3 pb-2 text-[11px] text-zinc-500">
         <summary class="cursor-pointer">args</summary>
@@ -617,26 +646,28 @@ defmodule LongWeb.AgentLive.Chat do
         <summary class="cursor-pointer">result</summary>
         <pre class="mt-1 bg-white border border-zinc-200 rounded p-2 overflow-x-auto leading-snug font-mono text-zinc-700">{format_data(@run.data)}</pre>
       </details>
-    </div>
+    </.card>
     """
   end
 
   attr :notice, :map, required: true
 
   defp loop_notice(assigns) do
+    assigns = assign(assigns, :alert_kind, notice_alert_kind(assigns.notice.kind))
+
     ~H"""
-    <article class={[
-      "max-w-2xl mx-auto rounded-2xl p-3 text-sm flex items-start gap-3",
-      @notice.kind == :warning && "border border-amber-300 bg-amber-50 text-amber-900",
-      @notice.kind == :error && "border border-red-300 bg-red-50 text-red-900"
-    ]}>
-      <div class="flex-1">{@notice.text}</div>
-      <button
-        type="button"
-        phx-click="dismiss_notice"
-        class="text-xs underline opacity-70 hover:opacity-100"
-      >dismiss</button>
-    </article>
+    <.alert kind={@alert_kind} rounded="extra_large" class="max-w-2xl mx-auto">
+      <div class="flex items-start gap-3">
+        <div class="flex-1">{@notice.text}</div>
+        <button
+          type="button"
+          phx-click="dismiss_notice"
+          class="text-xs underline opacity-70 hover:opacity-100"
+        >
+          dismiss
+        </button>
+      </div>
+    </.alert>
     """
   end
 
@@ -644,34 +675,36 @@ defmodule LongWeb.AgentLive.Chat do
 
   defp ask_user_card(assigns) do
     ~H"""
-    <article class="border-2 border-amber-400 rounded-2xl p-4 bg-amber-50 max-w-2xl mx-auto shadow">
-      <div class="font-semibold text-amber-900 mb-2">The agent is asking:</div>
-      <p class="mb-3 text-amber-950">{@ask["question"]}</p>
-      <form phx-submit="answer_ask_user" class="flex gap-2">
+    <.alert
+      kind={:warning}
+      title="The agent is asking"
+      rounded="extra_large"
+      class="max-w-2xl mx-auto"
+    >
+      <p class="mb-3">{@ask["question"]}</p>
+      <form phx-submit="answer_ask_user" class="flex gap-2 mb-3">
         <input
           name="answer"
           autofocus
           class="flex-1 border border-amber-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-amber-400 outline-none"
           placeholder="Type your answer…"
         />
-        <button
-          type="submit"
-          class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-medium"
-        >
-          Send
-        </button>
+        <.button type="submit" color="warning" rounded="large" size="small">Send</.button>
       </form>
-      <div :if={(@ask["candidates"] || []) != []} class="mt-3 flex gap-2 flex-wrap">
-        <button
+      <div :if={(@ask["candidates"] || []) != []} class="flex gap-2 flex-wrap">
+        <.button
           :for={c <- @ask["candidates"]}
           phx-click="answer_ask_user"
           phx-value-answer={c}
-          class="text-xs px-3 py-1.5 bg-white border border-amber-200 rounded-full hover:bg-amber-100 text-amber-900"
+          size="extra_small"
+          rounded="full"
+          variant="outline"
+          color="warning"
         >
           {c}
-        </button>
+        </.button>
       </div>
-    </article>
+    </.alert>
     """
   end
 
@@ -697,20 +730,17 @@ defmodule LongWeb.AgentLive.Chat do
           class="flex-1 resize-none border border-zinc-300 rounded-2xl px-4 py-2.5 leading-relaxed bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none max-h-60"
           autofocus
         ></textarea>
-        <button
+        <.button
           type="submit"
           disabled={@loop_running?}
-          class={[
-            "shrink-0 h-10 w-10 rounded-full flex items-center justify-center text-white transition shadow",
-            !@loop_running? && "bg-blue-600 hover:bg-blue-700",
-            @loop_running? && "bg-zinc-400 cursor-not-allowed"
-          ]}
+          color={if @loop_running?, do: "natural", else: "primary"}
+          rounded="full"
+          size="medium"
+          icon={if @loop_running?, do: "hero-arrow-path", else: "hero-paper-airplane"}
+          icon_class={@loop_running? && "animate-spin"}
+          class="!h-10 !w-10 !p-0 shrink-0"
           title="Send"
-        >
-          <span class={if @loop_running?, do: "animate-spin text-sm", else: "text-base"}>
-            {if @loop_running?, do: "◌", else: "↑"}
-          </span>
-        </button>
+        />
       </div>
     </form>
     """
@@ -723,27 +753,27 @@ defmodule LongWeb.AgentLive.Chat do
   defp memory_pane(assigns) do
     ~H"""
     <aside class={[
-      "border-l border-zinc-200 bg-white overflow-y-auto transition-all",
+      "h-full border-l border-zinc-200 bg-white overflow-y-auto transition-all shrink-0",
       @open? && "w-72",
       !@open? && "w-0"
     ]}>
-      <div class="p-4">
-        <h3 class="text-[11px] uppercase tracking-wide font-semibold text-zinc-500 mb-2">
-          L1 · Working memory
-        </h3>
-        <pre class="text-xs bg-zinc-50 border border-zinc-200 p-2.5 rounded whitespace-pre-wrap text-zinc-700 leading-snug min-h-[1.5em]">{(@checkpoint && @checkpoint.key_info) || "(empty)"}</pre>
+      <div class="p-4 space-y-4">
+        <.card variant="bordered" color="natural" rounded="large" padding="small">
+          <.card_title title="L1 · Working memory" size="extra_small" class="text-zinc-500 uppercase" />
+          <pre class="text-xs whitespace-pre-wrap text-zinc-700 leading-snug min-h-[1.5em]">{(@checkpoint && @checkpoint.key_info) || "(empty)"}</pre>
+        </.card>
 
-        <h3 class="text-[11px] uppercase tracking-wide font-semibold text-zinc-500 mt-5 mb-2">
-          L2 · Global memory
-        </h3>
-        <p :if={@global_memory == []} class="text-xs text-zinc-400">(empty)</p>
-        <ul :if={@global_memory != []} class="space-y-2 text-xs">
-          <li :for={entry <- @global_memory} class="border-l-2 border-zinc-200 pl-2.5">
-            <div class="text-[10px] uppercase tracking-wide text-zinc-400">{entry.scope}</div>
-            <div class="font-medium text-zinc-700">{entry.key}</div>
-            <div class="text-zinc-500 leading-snug">{entry.value}</div>
-          </li>
-        </ul>
+        <.card variant="bordered" color="natural" rounded="large" padding="small">
+          <.card_title title="L2 · Global memory" size="extra_small" class="text-zinc-500 uppercase" />
+          <p :if={@global_memory == []} class="text-xs text-zinc-400">(empty)</p>
+          <ul :if={@global_memory != []} class="space-y-2 text-xs">
+            <li :for={entry <- @global_memory} class="border-l-2 border-zinc-200 pl-2.5">
+              <div class="text-[10px] uppercase tracking-wide text-zinc-400">{entry.scope}</div>
+              <div class="font-medium text-zinc-700">{entry.key}</div>
+              <div class="text-zinc-500 leading-snug">{entry.value}</div>
+            </li>
+          </ul>
+        </.card>
       </div>
     </aside>
     """

@@ -60,6 +60,7 @@ defmodule Long.Agent do
       define :list_llms, action: :read
       define :get_llm, action: :read, get_by: [:alias]
       define :update_llm, action: :update
+      define :set_default_llm, action: :set_default, get_by: [:alias]
       define :destroy_llm, action: :destroy
     end
 
@@ -97,6 +98,19 @@ defmodule Long.Agent do
       define :get_wechat_credential, action: :read, get_by: [:name]
       define :update_wechat_credential_buf, action: :update_buf
       define :destroy_wechat_credential, action: :destroy
+    end
+  end
+
+  @doc """
+  Return the alias of the LLM marked as `default`, or `nil` if none. Used
+  by chat-bootstrap and Bots to pick an alias when the user/session
+  didn't specify one.
+  """
+  @spec default_llm_alias() :: String.t() | nil
+  def default_llm_alias do
+    case list_llms() do
+      {:ok, rows} -> Enum.find_value(rows, &if(&1.default && &1.enabled, do: &1.alias))
+      _ -> nil
     end
   end
 end

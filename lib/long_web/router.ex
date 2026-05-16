@@ -25,6 +25,15 @@ defmodule LongWeb.Router do
     live "/chat", AgentLive.Chat
     live "/chat/:session_id", AgentLive.Chat
     live "/wechat", WechatLive.Login
+
+    live "/manage", ManageLive, :llms
+    live "/manage/llms", ManageLive, :llms
+    live "/manage/memories", ManageLive, :memories
+    live "/manage/skills", ManageLive, :skills
+    live "/manage/sessions", ManageLive, :sessions
+    live "/manage/search", ManageLive, :search
+    live "/manage/credentials", ManageLive, :credentials
+    live "/manage/scheduled", ManageLive, :scheduled
   end
 
   scope "/webhooks/feishu", LongWeb do
