@@ -62,8 +62,24 @@ defmodule Long.Agent.PythonRunner do
     [{~c"PATH", String.to_charlist(Enum.join([venv_bin, workspace, parent], ":"))}]
   end
 
-  @doc "Best-effort port close; swallow already-closed errors."
+  @doc """
+  Best-effort port + OS-process termination. `Port.close/1` alone only
+  sends SIGTERM, which a busy-loop Python script (`while True: pass`,
+  pegged C extension, …) ignores until the next scheduler tick — that
+  leaves an orphan process pegging CPU while the BEAM has already
+  released the port. Send SIGKILL first when the port is still alive,
+  then close.
+
+  Mirrors `Long.Agent.Browser.Cli.brutal_kill/1` — kept as a separate
+  function rather than a shared helper because the only two callers
+  live in unrelated subsystems.
+  """
   def kill_port(port) do
+    case Port.info(port, :os_pid) do
+      {:os_pid, pid} -> _ = System.cmd("kill", ["-9", to_string(pid)])
+      _ -> :ok
+    end
+
     try do
       Port.close(port)
     rescue
