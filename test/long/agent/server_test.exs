@@ -147,6 +147,42 @@ defmodule Long.Agent.ServerTest do
     end
   end
 
+  describe "tool timeout" do
+    test "hung tool is killed and synthesises a timeout tool_result", %{session: session} do
+      Application.put_env(:long, :default_tools, [Long.Test.HangTool])
+      Application.put_env(:long, :tool_timeout_ms, 50)
+
+      on_exit(fn ->
+        # Terminate the Server BEFORE clearing the Application env, so
+        # any in-flight `start_turn` won't see a half-cleared default.
+        Server.terminate_session(session.id)
+        Application.delete_env(:long, :default_tools)
+        Application.delete_env(:long, :tool_timeout_ms)
+      end)
+
+      # 1st LLM response → tool_calls(hang_tool); 2nd → final_answer
+      LLMConsumerMock.push_response(session.id, %{
+        type: :tool_calls,
+        tool_calls: [%{id: "call_1", name: "hang_tool", arguments: %{}}]
+      })
+
+      LLMConsumerMock.push_response(session.id, %{type: :final_answer, text: "after timeout"})
+
+      Long.Jido.SessionRunner.subscribe(session.id)
+      :ok = Server.send_user_message(session.id, "hang please", llm_consumer: LLMConsumerMock)
+
+      # The tool_done event carries the synthesised timeout error.
+      assert_receive {:tool_done, %{id: "call_1", data: data}}, 2_000
+      assert is_map(data) and Map.get(data, "error") =~ "timed out"
+
+      # The Server continues into the next LLM turn and finishes cleanly.
+      assert_receive :loop_ended, 2_000
+
+      snap = Server.snapshot(session.id)
+      assert snap.stage == :idle
+    end
+  end
+
   describe "crash recovery" do
     test "Server reinitializes from snapshot on restart", %{session: session} do
       LLMConsumerMock.push_response(session.id, %{type: :final_answer, text: "first turn"})

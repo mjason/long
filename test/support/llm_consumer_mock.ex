@@ -59,9 +59,7 @@ defmodule Long.Test.LLMConsumerMock do
 
   defp next_response(session_id) do
     # The Server can outlive the test that created the ETS table (a
-    # restarted child fires its first :llm_result after on_exit ran).
-    # Treat a missing table as "no script, default response" instead
-    # of crashing.
+    # restarted child / late timer fires after on_exit deleted it).
     if :ets.whereis(@ets) == :undefined do
       default_response()
     else

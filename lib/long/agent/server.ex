@@ -33,6 +33,7 @@ defmodule Long.Agent.Server do
   @task_sup Long.Agent.TaskSup
   @default_max_turns 20
   @max_tool_calls_per_turn 4
+  @default_tool_timeout_ms 60_000
 
   # ── Client API ────────────────────────────────────────────────────────
 
@@ -163,7 +164,7 @@ defmodule Long.Agent.Server do
       llm_pid: nil,
       llm_monitor: nil,
 
-      # In-flight tools (tool_monitors: %{ref => {pid, tc}})
+      # In-flight tools (tool_monitors: %{ref => {%Task{}, tc, timer_ref}})
       pending_tool_calls: %{},
       tool_results: %{},
       tool_monitors: %{},
@@ -258,8 +259,31 @@ defmodule Long.Agent.Server do
   # Stale (came after abort / next turn started). Drop.
   def handle_info({:llm_result, _ref, _}, state), do: {:noreply, state}
 
-  def handle_info({:tool_done, id, payload}, state) do
-    {:noreply, record_tool_done(state, id, payload)}
+  # Tool task completed normally — `Task.Supervisor.async_nolink`
+  # delivers the return value as `{ref, value}`.
+  def handle_info({ref, result}, state) when is_reference(ref) do
+    case Map.pop(state.tool_monitors, ref) do
+      {nil, _} ->
+        {:noreply, state}
+
+      {{_task, tc, timer}, tool_monitors} ->
+        Process.cancel_timer(timer)
+        Process.demonitor(ref, [:flush])
+        state = %{state | tool_monitors: tool_monitors}
+        {:noreply, record_tool_done(state, tc.id, result)}
+    end
+  end
+
+  def handle_info({:tool_timeout, ref}, state) do
+    case Map.pop(state.tool_monitors, ref) do
+      {nil, _} ->
+        {:noreply, state}
+
+      {{task, tc, _timer}, tool_monitors} ->
+        _ = Task.shutdown(task, :brutal_kill)
+        state = %{state | tool_monitors: tool_monitors}
+        {:noreply, record_tool_done(state, tc.id, {synth_tool_timeout(tc), nil})}
+    end
   end
 
   def handle_info({:DOWN, ref, :process, _pid, reason}, %{llm_monitor: ref} = state) do
@@ -276,10 +300,12 @@ defmodule Long.Agent.Server do
       {nil, _} ->
         {:noreply, state}
 
-      {{_pid, _tc}, tool_monitors} when reason == :normal ->
+      {{_task, _tc, timer}, tool_monitors} when reason == :normal ->
+        Process.cancel_timer(timer)
         {:noreply, %{state | tool_monitors: tool_monitors}}
 
-      {{_pid, tc}, tool_monitors} ->
+      {{_task, tc, timer}, tool_monitors} ->
+        Process.cancel_timer(timer)
         state = %{state | tool_monitors: tool_monitors}
         crash_result = synth_tool_crash(tc, reason)
         {:noreply, record_tool_done(state, tc.id, {crash_result, nil})}
@@ -431,7 +457,6 @@ defmodule Long.Agent.Server do
 
   defp spawn_tools(state, tool_calls) do
     tools_index = Map.new(state.tools, fn mod -> {mod.name(), mod} end)
-    server = self()
 
     monitors =
       Enum.reduce(tool_calls, state.tool_monitors, fn tc, acc ->
@@ -440,18 +465,13 @@ defmodule Long.Agent.Server do
           {:tool_start, %{id: tc.id, name: tc.name, args: tc.arguments, index: 0, count: 1}}
         )
 
-        case Task.Supervisor.start_child(@task_sup, fn ->
-               result = execute_tool(tc, tools_index, state.tool_ctx)
-               send(server, {:tool_done, tc.id, result})
-             end) do
-          {:ok, pid} ->
-            ref = Process.monitor(pid)
-            Map.put(acc, ref, {pid, tc})
+        task =
+          Task.Supervisor.async_nolink(@task_sup, fn ->
+            execute_tool(tc, tools_index, state.tool_ctx)
+          end)
 
-          {:error, reason} ->
-            send(server, {:tool_done, tc.id, {synth_tool_crash(tc, reason), nil}})
-            acc
-        end
+        timer = Process.send_after(self(), {:tool_timeout, task.ref}, tool_timeout_ms())
+        Map.put(acc, task.ref, {task, tc, timer})
       end)
 
     %{state | tool_monitors: monitors}
@@ -559,9 +579,9 @@ defmodule Long.Agent.Server do
     if state.llm_monitor, do: Process.demonitor(state.llm_monitor, [:flush])
     if is_pid(state.llm_pid), do: Process.exit(state.llm_pid, :kill)
 
-    Enum.each(state.tool_monitors, fn {ref, {pid, _tc}} ->
-      Process.demonitor(ref, [:flush])
-      if is_pid(pid), do: Process.exit(pid, :kill)
+    Enum.each(state.tool_monitors, fn {_ref, {task, _tc, timer}} ->
+      Process.cancel_timer(timer)
+      _ = Task.shutdown(task, :brutal_kill)
     end)
 
     :ok
@@ -620,23 +640,29 @@ defmodule Long.Agent.Server do
   defp format_result({:error, e}), do: Jason.encode!(%{error: inspect(e)})
 
   defp skipped_tool_result(tc) do
-    payload = %{
+    synth_error_result(tc, %{
       error: "skipped",
       reason:
         "Too many tool_calls in this turn (cap = #{@max_tool_calls_per_turn}). " <>
           "Issue this call again in the next turn.",
       tool_name: tc.name
-    }
-
-    ReqLLM.Context.tool_result(tc.id, Jason.encode!(payload))
+    })
   end
 
-  defp synth_tool_crash(tc, reason) do
-    ReqLLM.Context.tool_result(
-      tc.id,
-      Jason.encode!(%{error: "tool execution exited: #{inspect(reason)}"})
-    )
-  end
+  defp synth_tool_crash(tc, reason),
+    do: synth_error_result(tc, %{error: "tool execution exited: #{inspect(reason)}"})
+
+  defp synth_tool_timeout(tc),
+    do:
+      synth_error_result(tc, %{
+        error: "tool execution timed out after #{tool_timeout_ms()}ms"
+      })
+
+  defp synth_error_result(tc, payload),
+    do: ReqLLM.Context.tool_result(tc.id, Jason.encode!(payload))
+
+  defp tool_timeout_ms,
+    do: Application.get_env(:long, :tool_timeout_ms, @default_tool_timeout_ms)
 
   defp build_user_message(text, []), do: ReqLLM.Context.user(text)
 
@@ -704,7 +730,9 @@ defmodule Long.Agent.Server do
     end
   end
 
-  defp default_tools, do: Long.Jido.SessionRunner.default_tools()
+  defp default_tools do
+    Application.get_env(:long, :default_tools, Long.Jido.SessionRunner.default_tools())
+  end
 
   defp workspace_root,
     do: Application.get_env(:long, Long.Agent, [])[:workspace_root] || Path.expand("priv/agent/workspace", File.cwd!())
@@ -725,20 +753,25 @@ defmodule Long.Agent.Server do
     end
   end
 
+  # `ReqLLM.Context.tool_result/2` wraps the result string as a `:text`
+  # ContentPart, not `:tool_result`; we match both so synthesised error
+  # results (crash/timeout/skipped) still surface in the PubSub event.
   defp tool_data_for_event(%ReqLLM.Message{content: parts}) when is_list(parts) do
     Enum.find_value(parts, fn
-      %{type: :tool_result, output: o} ->
-        case Jason.decode(to_string(o)) do
-          {:ok, decoded} -> decoded
-          _ -> to_string(o)
-        end
-
-      _ ->
-        nil
+      %{type: :text, text: t} -> decode_or_text(t)
+      %{type: :tool_result, output: o} -> decode_or_text(o)
+      _ -> nil
     end)
   end
 
   defp tool_data_for_event(_), do: nil
+
+  defp decode_or_text(s) do
+    case Jason.decode(to_string(s)) do
+      {:ok, decoded} -> decoded
+      _ -> to_string(s)
+    end
+  end
 
   defp tool_call_order_in_last_assistant(messages) do
     messages
