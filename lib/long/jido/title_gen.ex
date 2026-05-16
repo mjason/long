@@ -35,6 +35,7 @@ defmodule Long.Jido.TitleGen do
 
   defp generate(session_id, alias_name) do
     with {:ok, session} <- Agent.get_session(session_id),
+         false <- session.title_locked,
          true <- session.title == @placeholder,
          snippets when snippets != [] <- load_snippets(session_id),
          {:ok, title} <- ask_llm(snippets, alias_name),

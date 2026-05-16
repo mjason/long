@@ -23,6 +23,7 @@ defmodule Long.Agent.Session do
     update :update do
       accept [
         :title,
+        :title_locked,
         :status,
         :llm_alias,
         :summary,
@@ -42,6 +43,13 @@ defmodule Long.Agent.Session do
     uuid_primary_key :id
 
     attribute :title, :string do
+      allow_nil? false
+      public? true
+    end
+
+    attribute :title_locked, :boolean do
+      description "True once the user has manually saved a title — keeps `Long.Jido.TitleGen` from overwriting it on the next loop_ended."
+      default false
       allow_nil? false
       public? true
     end

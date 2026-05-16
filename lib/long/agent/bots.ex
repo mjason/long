@@ -366,7 +366,10 @@ defmodule Long.Agent.Bots do
 
   defp attach_session(%{session_id: nil} = user) do
     with {:ok, session} <-
-           Agent.start_session(%{title: "#{user.platform}:#{user.external_id}"}),
+           Agent.start_session(%{
+             title: "#{user.platform}:#{user.external_id}",
+             llm_alias: Agent.default_llm_alias()
+           }),
          {:ok, user} <- Agent.rotate_bot_session(user, %{session_id: session.id}) do
       {:ok, %{bot_user: user, session_id: session.id}}
     end

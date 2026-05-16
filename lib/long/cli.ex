@@ -49,7 +49,11 @@ defmodule Long.CLI do
         :ok
 
       "/reset" ->
-        {:ok, sess} = Agent.start_session(%{title: "cli-#{System.unique_integer([:positive])}"})
+        {:ok, sess} =
+          Agent.start_session(%{
+            title: "cli-#{System.unique_integer([:positive])}",
+            llm_alias: Agent.default_llm_alias()
+          })
         io.puts("[new session: #{sess.id}]")
         do_chat(sess.id, io, opts)
 
@@ -100,7 +104,7 @@ defmodule Long.CLI do
   end
 
   defp start_session!(title) do
-    {:ok, sess} = Agent.start_session(%{title: title})
+    {:ok, sess} = Agent.start_session(%{title: title, llm_alias: Agent.default_llm_alias()})
     sess.id
   end
 

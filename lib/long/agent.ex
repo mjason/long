@@ -104,15 +104,25 @@ defmodule Long.Agent do
   end
 
   @doc """
-  Return the alias of the LLM marked as `default`, or `nil` if none. Used
-  by chat-bootstrap and Bots to pick an alias when the user/session
-  didn't specify one.
+  Return the alias of the LLM marked as `default`, or the first
+  enabled row when nothing is explicitly defaulted, or `nil` if no
+  LLMs are configured. Used by chat-bootstrap and Bots to pick an
+  alias when the user/session didn't specify one.
   """
   @spec default_llm_alias() :: String.t() | nil
   def default_llm_alias do
     case list_llms() do
-      {:ok, rows} -> Enum.find_value(rows, &if(&1.default && &1.enabled, do: &1.alias))
-      _ -> nil
+      {:ok, rows} ->
+        enabled = Enum.filter(rows, & &1.enabled)
+
+        cond do
+          row = Enum.find(enabled, & &1.default) -> row.alias
+          first = List.first(enabled) -> first.alias
+          true -> nil
+        end
+
+      _ ->
+        nil
     end
   end
 end

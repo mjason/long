@@ -55,12 +55,29 @@ defmodule LongWeb.AgentLive.Chat do
   end
 
   def handle_event("new_session", _, socket) do
-    {:ok, sess} = Agent.start_session(%{title: "untitled"})
+    {:ok, sess} =
+      Agent.start_session(%{title: "untitled", llm_alias: Agent.default_llm_alias()})
+
     {:noreply, push_navigate(socket, to: ~p"/chat/#{sess.id}")}
   end
 
   def handle_event("switch_session", %{"id" => id}, socket) do
     {:noreply, push_navigate(socket, to: ~p"/chat/#{id}")}
+  end
+
+  def handle_event("destroy_session", %{"id" => id}, socket) do
+    with {:ok, sess} <- Agent.get_session(id),
+         :ok <- Agent.destroy_session(sess) do
+      target =
+        case list_sessions() do
+          [%{id: next_id} | _] -> ~p"/chat/#{next_id}"
+          [] -> ~p"/chat"
+        end
+
+      {:noreply, push_navigate(socket, to: target)}
+    else
+      _ -> {:noreply, socket}
+    end
   end
 
   def handle_event("set_llm", %{"alias" => alias_str}, socket) do
@@ -86,17 +103,19 @@ defmodule LongWeb.AgentLive.Chat do
   def handle_event("cancel_title", _, socket),
     do: {:noreply, assign(socket, :editing_title?, false)}
 
-  # Form submit sends %{"title" => …}, phx-blur on the <input> sends
-  # %{"value" => …}. Accept either so Enter and click-away both save.
-  def handle_event("save_title", params, socket) do
-    title = params["title"] || params["value"] || ""
-
+  def handle_event("save_title", %{"title" => title}, socket) do
     case String.trim(title) do
       "" ->
         {:noreply, assign(socket, :editing_title?, false)}
 
       cleaned ->
-        {:ok, sess} = Agent.update_session(socket.assigns.session, %{title: cleaned})
+        # `title_locked: true` keeps TitleGen from overwriting this on
+        # the next loop_ended — manual edits win against auto-gen.
+        {:ok, sess} =
+          Agent.update_session(socket.assigns.session, %{
+            title: cleaned,
+            title_locked: true
+          })
 
         {:noreply,
          socket
@@ -219,7 +238,9 @@ defmodule LongWeb.AgentLive.Chat do
   end
 
   defp create_new_session do
-    {:ok, sess} = Agent.start_session(%{title: "untitled"})
+    {:ok, sess} =
+      Agent.start_session(%{title: "untitled", llm_alias: Agent.default_llm_alias()})
+
     {:ok, sess.id}
   end
 
@@ -477,17 +498,32 @@ defmodule LongWeb.AgentLive.Chat do
       <ul class="flex-1 overflow-y-auto text-sm">
         <li
           :for={s <- @sessions}
-          phx-click="switch_session"
-          phx-value-id={s.id}
           class={[
-            "px-3 py-2.5 border-b border-zinc-100 cursor-pointer hover:bg-zinc-50 transition",
+            "group border-b border-zinc-100 flex items-center transition",
             s.id == @session_id && "bg-blue-50 border-l-2 border-l-blue-500"
           ]}
         >
-          <div class="truncate font-medium text-zinc-800">{s.title}</div>
-          <div class="text-xs text-zinc-400 mt-0.5">
-            {s.status} · {Calendar.strftime(s.inserted_at, "%m-%d %H:%M")}
-          </div>
+          <button
+            type="button"
+            phx-click="switch_session"
+            phx-value-id={s.id}
+            class="flex-1 min-w-0 text-left px-3 py-2.5 cursor-pointer hover:bg-zinc-50 transition"
+          >
+            <div class="truncate font-medium text-zinc-800">{s.title}</div>
+            <div class="text-xs text-zinc-400 mt-0.5">
+              {s.status} · {Calendar.strftime(s.inserted_at, "%m-%d %H:%M")}
+            </div>
+          </button>
+          <button
+            type="button"
+            phx-click="destroy_session"
+            phx-value-id={s.id}
+            data-confirm={"Delete \"#{s.title}\" and all its messages?"}
+            class="px-2 py-2 mr-1 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded opacity-0 group-hover:opacity-100 transition"
+            title="Delete session"
+          >
+            <.icon name="hero-trash" class="size-4" />
+          </button>
         </li>
       </ul>
       <div class="p-2 border-t border-zinc-200">
@@ -566,10 +602,21 @@ defmodule LongWeb.AgentLive.Chat do
         name="title"
         value={@session && @session.title}
         autofocus
-        phx-blur="save_title"
         phx-key="escape"
         phx-keyup="cancel_title"
-        class="font-semibold border border-zinc-300 rounded px-2 py-0.5 text-sm bg-white focus:ring-2 focus:ring-blue-400 outline-none"
+        class="font-semibold border border-zinc-300 rounded px-2 py-0.5 text-sm bg-white focus:ring-2 focus:ring-blue-400 outline-none min-w-0 max-w-xs"
+      />
+      <.button type="submit" color="primary" size="extra_small" rounded="medium" icon="hero-check" class="!p-1.5" title="Save (Enter)" />
+      <.button
+        type="button"
+        phx-click="cancel_title"
+        variant="base"
+        color="natural"
+        size="extra_small"
+        rounded="medium"
+        icon="hero-x-mark"
+        class="!p-1.5"
+        title="Cancel (Esc)"
       />
     </form>
     """
