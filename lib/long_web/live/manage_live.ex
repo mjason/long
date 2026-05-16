@@ -76,7 +76,7 @@ defmodule LongWeb.ManageLive do
   defp load_section(socket, :llms) do
     rows =
       case Agent.list_llms() do
-        {:ok, l} -> Enum.sort_by(l, &{&1.sort_order, &1.alias})
+        {:ok, l} -> Enum.sort_by(l, & &1.alias)
         _ -> []
       end
 

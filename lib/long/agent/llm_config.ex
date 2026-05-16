@@ -49,8 +49,7 @@ defmodule Long.Agent.LLMConfig do
     :api_key_env_var,
     :params,
     :enabled,
-    :default,
-    :sort_order
+    :default
   ]
 
   actions do
@@ -137,12 +136,6 @@ defmodule Long.Agent.LLMConfig do
 
     attribute :enabled, :boolean do
       default true
-      allow_nil? false
-      public? true
-    end
-
-    attribute :sort_order, :integer do
-      default 0
       allow_nil? false
       public? true
     end
