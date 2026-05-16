@@ -32,12 +32,14 @@ defmodule Long.Agent.Bots.Wechat.Worker do
   # ping every 4s keeps it visible without hammering the API. 2s was
   # over-pinging; >5s lets the bubble flicker off briefly between pings.
   @typing_interval_ms 4_000
-  # Hard cap on how long we keep the typing process alive. The
-  # `on_complete` callback calls `stop_typing/1` in the normal path;
-  # this guard catches the case where the watcher task is killed
-  # before it can fire (brutal shutdown, OOM) and the typing process
-  # would otherwise outlive the agent run forever.
-  @typing_max_lifetime_ms 10 * 60_000
+  # Hard cap on how long we keep the typing process alive. The primary
+  # exit signals are `:stop` (from `on_complete`) and `:loop_ended`
+  # (from the session's PubSub topic once we bind to it), so legitimate
+  # long runs of any duration are covered. The cap is purely a backstop
+  # for brutal-killed agent tasks where neither signal ever fires —
+  # bumped from 10m to 30m because real ReAct loops with many
+  # web_scan / code_run rounds routinely exceed 10 minutes.
+  @typing_max_lifetime_ms 30 * 60_000
 
   def start_link(opts \\ []), do: GenServer.start_link(__MODULE__, opts, name: __MODULE__)
 
@@ -182,14 +184,37 @@ defmodule Long.Agent.Bots.Wechat.Worker do
       # a long-running agent run (>2 min) silently dropped the reply
       # because the synchronous `run_and_collect` timed out before the
       # final assistant message landed.
-      Bots.run_async(:wechat, uid, body,
-        session_title: "wechat:#{uid}",
-        attachments: image_paths,
-        on_complete: fn _bot_user, result ->
+      result =
+        Bots.run_async(:wechat, uid, body,
+          session_title: "wechat:#{uid}",
+          attachments: image_paths,
+          on_complete: fn _bot_user, result ->
+            stop_typing(typing)
+            send_reply(token, uid, ctx_token, result, media_paths)
+          end
+        )
+
+      # Let the typing keepalive subscribe to the session's PubSub so
+      # it can exit on `:loop_ended` regardless of how long the run
+      # takes — the 30-min lifetime cap inside `typing_loop` only
+      # exists as backstop for brutal-killed agent tasks where no
+      # `:loop_ended` event ever fires.
+      case result do
+        {:ok, %{session_id: sid, mode: :dispatched}} ->
+          if is_pid(typing), do: send(typing, {:bind_session, sid})
+
+        # Magic-command modes (:cleared / :status / :btw) already fired
+        # `on_complete` synchronously, so `stop_typing` was called for
+        # them. Nothing to do.
+        {:ok, _} ->
+          :ok
+
+        # `ensure_session` (or the dispatch spawn) failed: `on_complete`
+        # will never fire, so kill the typing process ourselves to
+        # avoid leaking it until the lifetime cap.
+        _ ->
           stop_typing(typing)
-          send_reply(token, uid, ctx_token, result, media_paths)
-        end
-      )
+      end
     end
   end
 
@@ -267,11 +292,32 @@ defmodule Long.Agent.Bots.Wechat.Worker do
   defp typing_loop_step(token, uid, ticket, started_at) do
     receive do
       :stop ->
-        # Explicitly tell iLink to cancel the bubble so it disappears
-        # the moment the agent's reply lands, instead of waiting for
-        # the indicator to fade on its own.
-        _ = Client.send_typing(token, uid, ticket, cancel: true)
+        cancel_typing(token, uid, ticket)
         :ok
+
+      # Either signal from the session's PubSub means the agent run is
+      # over (cleanly or via crash-and-rescue). Cancel and exit so the
+      # bubble doesn't linger past the reply.
+      :loop_ended ->
+        cancel_typing(token, uid, ticket)
+        :ok
+
+      {:loop_error, _} ->
+        cancel_typing(token, uid, ticket)
+        :ok
+
+      {:bind_session, session_id} ->
+        Long.SessionRunner.subscribe(session_id)
+        typing_loop_step(token, uid, ticket, started_at)
+
+      # The session topic broadcasts a lot of intermediate events
+      # we don't care about (`:loop_started`, `{:turn_start, _}`,
+      # `{:tool_start, _}`, `{:message_persisted, _}`, `{:done, _}`,
+      # …). Drain them so the receive can match the next real exit
+      # signal — otherwise an early `:loop_started` would sit at the
+      # head of the mailbox and block `:loop_ended`.
+      _ ->
+        typing_loop_step(token, uid, ticket, started_at)
     after
       @typing_interval_ms ->
         if System.monotonic_time(:millisecond) - started_at > @typing_max_lifetime_ms do
@@ -281,6 +327,14 @@ defmodule Long.Agent.Bots.Wechat.Worker do
           typing_loop_step(token, uid, ticket, started_at)
         end
     end
+  end
+
+  # Explicitly tell iLink to cancel the bubble so it disappears the
+  # moment the agent's reply lands, instead of waiting for the
+  # indicator to fade on its own.
+  defp cancel_typing(token, uid, ticket) do
+    _ = Client.send_typing(token, uid, ticket, cancel: true)
+    :ok
   end
 
   # ── Filesystem ───────────────────────────────────────────────────────
