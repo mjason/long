@@ -13,7 +13,23 @@ defmodule Long.MixProject do
       compilers: [:phoenix_live_view] ++ Mix.compilers(),
       listeners: [Phoenix.CodeReloader],
       consolidate_protocols: Mix.env() != :dev,
-      usage_rules: usage_rules()
+      usage_rules: usage_rules(),
+      description: description(),
+      package: package(),
+      source_url: "https://github.com/mjason/long"
+    ]
+  end
+
+  defp description do
+    "Single-binary LLM agent runtime built on Elixir/OTP: chat UI, " <>
+      "4-tier memory, Anthropic-compatible Skills, scheduled tasks, " <>
+      "multi-provider LLM routing, and platform bots (WeChat / Telegram / Feishu)."
+  end
+
+  defp package do
+    [
+      licenses: ["MIT"],
+      links: %{"GitHub" => "https://github.com/mjason/long"}
     ]
   end
 
