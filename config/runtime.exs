@@ -74,7 +74,14 @@ if config_env() == :prod do
       # for details about using IPv6 vs IPv4 and loopback vs public addresses.
       ip: {0, 0, 0, 0, 0, 0, 0, 0}
     ],
-    secret_key_base: secret_key_base
+    secret_key_base: secret_key_base,
+    # Default off: a self-hosted LAN agent gets hit from whichever IP /
+    # hostname the user happens to type — `http://192.168.x.x:4000`,
+    # `http://my-mac.local:4000`, etc. — and the default true would
+    # reset every LiveView WebSocket whose Origin doesn't match PHX_HOST.
+    # Set LONG_CHECK_ORIGIN=true (with PHX_HOST tuned) to lock down for
+    # internet-exposed deploys.
+    check_origin: System.get_env("LONG_CHECK_ORIGIN") == "true"
 
   # ## SSL Support
   #
