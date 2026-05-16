@@ -344,7 +344,7 @@ defmodule LongWeb.AgentLive.Chat do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="flex h-screen bg-zinc-50 text-zinc-900">
+    <div class="flex h-screen bg-zinc-100 text-zinc-900">
       <.sessions_pane sessions={@sessions} session_id={@session_id} open?={@sidebar_open?} />
 
       <main class="flex-1 flex flex-col min-w-0">
@@ -358,7 +358,7 @@ defmodule LongWeb.AgentLive.Chat do
         <div
           id="thread"
           phx-hook=".ScrollBottom"
-          class="flex-1 overflow-y-auto px-4 sm:px-8 py-6 space-y-4"
+          class="flex-1 overflow-y-auto px-4 sm:px-8 pt-6 pb-8 space-y-4"
         >
           <.empty_state :if={visible_messages(@messages) == [] and is_nil(@streaming)} />
           <.message_bubble :for={msg <- visible_messages(@messages)} msg={msg} />
@@ -539,8 +539,8 @@ defmodule LongWeb.AgentLive.Chat do
 
   defp message_bubble(%{msg: %{role: :user}} = assigns) do
     ~H"""
-    <.chat position="flipped" color="primary" variant="default" rounded="extra_large" padding="none">
-      <.chat_section class="max-w-[75%] px-4 py-2.5">
+    <.chat position="flipped" color="info" variant="default" rounded="extra_large" padding="none">
+      <.chat_section class="max-w-[75%] px-4 py-2.5 text-[15px] leading-relaxed">
         <div class="whitespace-pre-wrap break-words">{@msg.content}</div>
       </.chat_section>
     </.chat>
@@ -549,12 +549,16 @@ defmodule LongWeb.AgentLive.Chat do
 
   defp message_bubble(%{msg: %{role: :assistant}} = assigns) do
     ~H"""
-    <.chat position="normal" color="natural" variant="bordered" rounded="extra_large" padding="none" class="[&>.chat-section-bubble]:shadow-sm [&>.chat-section-bubble]:bg-white">
-      <.chat_section class="max-w-[85%] px-4 py-3">
-        <div
-          :if={(@msg.content || "") != ""}
-          class="whitespace-pre-wrap break-words leading-relaxed"
-        >
+    <.chat
+      position="normal"
+      color="natural"
+      variant="bordered"
+      rounded="extra_large"
+      padding="none"
+      class="[&>.chat-section-bubble]:bg-white [&>.chat-section-bubble]:border-zinc-300 [&>.chat-section-bubble]:shadow-sm"
+    >
+      <.chat_section class="max-w-[85%] px-4 py-3 text-[15px] leading-relaxed">
+        <div :if={(@msg.content || "") != ""} class="whitespace-pre-wrap break-words">
           {format_text(@msg.content)}
         </div>
         <.tool_call_list :if={(@msg.tool_calls || []) != []} tool_calls={@msg.tool_calls} />
@@ -587,8 +591,15 @@ defmodule LongWeb.AgentLive.Chat do
 
   defp streaming_bubble(assigns) do
     ~H"""
-    <.chat position="normal" color="natural" variant="bordered" rounded="extra_large" padding="none" class="[&>.chat-section-bubble]:shadow-sm [&>.chat-section-bubble]:bg-white">
-      <.chat_section class="max-w-[85%] px-4 py-3">
+    <.chat
+      position="normal"
+      color="natural"
+      variant="bordered"
+      rounded="extra_large"
+      padding="none"
+      class="[&>.chat-section-bubble]:bg-white [&>.chat-section-bubble]:border-zinc-300 [&>.chat-section-bubble]:shadow-sm"
+    >
+      <.chat_section class="max-w-[85%] px-4 py-3 text-[15px] leading-relaxed">
         <details :if={@streaming.thinking != ""} class="mb-2">
           <summary class="cursor-pointer text-xs text-zinc-400">thinking…</summary>
           <pre class="mt-1.5 text-xs text-zinc-500 whitespace-pre-wrap leading-snug">{@streaming.thinking}</pre>
