@@ -63,24 +63,17 @@ Long 是把原先用 Python 写的 GenericAgent 整套搬到 Elixir 的版本—
 
 ### 一键安装 (macOS / Linux)
 
-预编译版本支持 `macos-arm64`、`linux-x64`、`linux-arm64`。需要先装并登录 [GitHub CLI](https://cli.github.com/)：
+预编译版本支持 `macos-arm64`、`linux-x64`、`linux-arm64`。一行安装：
 
 ```bash
-brew install gh        # 或 apt install gh
-gh auth login
-```
-
-然后一行安装：
-
-```bash
-gh api "repos/mjason/long/contents/install.sh" --jq '.content' | base64 -d | bash
+curl -fsSL https://raw.githubusercontent.com/mjason/long/main/install.sh | bash
 ```
 
 脚本会：
 
-- 拉取最新 release tarball，解压到 `~/.long/`
+- 从 GitHub Releases 拉取最新 tarball，解压到 `~/.long/`
 - 检测不到 `uv` 时自动装一份（[Astral uv](https://docs.astral.sh/uv/)，`code_run` 工具需要）
-- 首次运行生成 `~/.long/env`，里面有 `SECRET_KEY_BASE`、`DATABASE_PATH` 等
+- 首次运行生成 `~/.long/env`（含自动生成的 `SECRET_KEY_BASE`、`DATABASE_PATH` 等）
 - 生成启动脚本 `~/.long/run`
 
 ```bash
@@ -88,7 +81,12 @@ $EDITOR ~/.long/env    # 通常无需修改
 ~/.long/run            # 启动，访问 http://localhost:4000
 ```
 
-> 默认安装目录 `~/.long`，可用 `LONG_INSTALL_DIR` 环境变量覆盖。
+环境变量：
+
+| 变量 | 默认 | 说明 |
+|---|---|---|
+| `LONG_INSTALL_DIR` | `~/.long` | 安装目录 |
+| `LONG_VERSION` | latest | 指定版本，例如 `v0.1.0` |
 
 ### 从源码运行
 
