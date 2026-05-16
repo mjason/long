@@ -145,8 +145,161 @@ exec "${SCRIPT_DIR}/bin/long" start
 RUNEOF
 chmod +x "$LAUNCHER"
 
+# ── service controller (launchd on macOS, systemd-user on Linux) ────────
+SERVICE="${INSTALL_DIR}/service"
+cat > "$SERVICE" << 'SVCEOF'
+#!/bin/bash
+# Long service controller — install/uninstall autostart, start/stop, status.
+#
+#   ~/.long/service install     enable autostart (writes to OS service mgr)
+#   ~/.long/service uninstall   disable autostart (cleans up)
+#   ~/.long/service start|stop  one-off control of the running unit
+#   ~/.long/service status      is the service registered + running?
+#   ~/.long/service logs        tail run.log
+set -euo pipefail
+
+INSTALL_DIR="$(cd "$(dirname "$0")" && pwd)"
+LABEL="com.mjason.long"
+RUN="${INSTALL_DIR}/run"
+LOG="${INSTALL_DIR}/run.log"
+
+err() { echo "ERROR: $*" >&2; exit 1; }
+
+OS=$(uname -s)
+case "$OS" in
+  Darwin)
+    PLIST_DIR="$HOME/Library/LaunchAgents"
+    PLIST="$PLIST_DIR/${LABEL}.plist"
+    UID_NUM=$(id -u)
+    DOMAIN="gui/${UID_NUM}"
+
+    write_plist() {
+      mkdir -p "$PLIST_DIR"
+      cat > "$PLIST" << PLISTEOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>${LABEL}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>${RUN}</string>
+  </array>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <dict>
+    <key>SuccessfulExit</key>
+    <false/>
+  </dict>
+  <key>StandardOutPath</key>
+  <string>${LOG}</string>
+  <key>StandardErrorPath</key>
+  <string>${LOG}</string>
+  <key>WorkingDirectory</key>
+  <string>${INSTALL_DIR}</string>
+  <key>ProcessType</key>
+  <string>Interactive</string>
+</dict>
+</plist>
+PLISTEOF
+    }
+
+    case "${1:-status}" in
+      install)
+        write_plist
+        # bootstrap is the modern (10.10+) API; fall back to load for old systems.
+        launchctl bootstrap "$DOMAIN" "$PLIST" 2>/dev/null \
+          || launchctl load -w "$PLIST"
+        echo "==> 已注册开机自启: $PLIST"
+        echo "    立即启动: $0 start"
+        ;;
+      uninstall)
+        launchctl bootout "$DOMAIN/$LABEL" 2>/dev/null \
+          || launchctl unload "$PLIST" 2>/dev/null \
+          || true
+        rm -f "$PLIST"
+        echo "==> 已取消开机自启 ($PLIST 已删除)"
+        ;;
+      start)
+        [[ -f "$PLIST" ]] || err "服务未注册，先跑 $0 install"
+        launchctl kickstart -k "$DOMAIN/$LABEL"
+        echo "==> 已启动"
+        ;;
+      stop)
+        launchctl bootout "$DOMAIN/$LABEL" 2>/dev/null || true
+        echo "==> 已停止 (uninstall 才会移除自启)"
+        ;;
+      status)
+        if launchctl print "$DOMAIN/$LABEL" >/dev/null 2>&1; then
+          launchctl print "$DOMAIN/$LABEL" | grep -E "^\s*(state|pid|program)" | head -5
+        else
+          echo "未注册 (跑 $0 install 启用)"
+        fi
+        ;;
+      logs) tail -f "$LOG" ;;
+      *) err "用法: $0 {install|uninstall|start|stop|status|logs}" ;;
+    esac
+    ;;
+
+  Linux)
+    UNIT="$HOME/.config/systemd/user/long.service"
+
+    write_unit() {
+      mkdir -p "$(dirname "$UNIT")"
+      cat > "$UNIT" << UNITEOF
+[Unit]
+Description=Long agent runtime
+After=network.target
+
+[Service]
+ExecStart=${RUN}
+Restart=on-failure
+RestartSec=5
+WorkingDirectory=${INSTALL_DIR}
+StandardOutput=append:${LOG}
+StandardError=append:${LOG}
+
+[Install]
+WantedBy=default.target
+UNITEOF
+    }
+
+    case "${1:-status}" in
+      install)
+        command -v systemctl >/dev/null || err "需要 systemd"
+        write_unit
+        systemctl --user daemon-reload
+        systemctl --user enable --now long.service
+        # User services need linger to survive logout / start at boot.
+        if command -v loginctl >/dev/null 2>&1; then
+          loginctl enable-linger "$USER" 2>/dev/null || true
+        fi
+        echo "==> 已注册开机自启: $UNIT"
+        ;;
+      uninstall)
+        systemctl --user disable --now long.service 2>/dev/null || true
+        rm -f "$UNIT"
+        systemctl --user daemon-reload || true
+        echo "==> 已取消开机自启 ($UNIT 已删除)"
+        ;;
+      start)  systemctl --user start  long.service ;;
+      stop)   systemctl --user stop   long.service ;;
+      status) systemctl --user status long.service --no-pager 2>&1 | head -10 ;;
+      logs)   journalctl --user -u long.service -f ;;
+      *) err "用法: $0 {install|uninstall|start|stop|status|logs}" ;;
+    esac
+    ;;
+
+  *) err "不支持的操作系统: $OS" ;;
+esac
+SVCEOF
+chmod +x "$SERVICE"
+
 info "安装完成! ${TAG}"
 echo
 echo "  配置: \$EDITOR ${CONFIG_FILE}"
 echo "  启动: ${LAUNCHER}"
+echo "  开机自启: ${SERVICE} install   (uninstall 取消)"
 echo "  访问: http://localhost:\${PORT:-4000}"
