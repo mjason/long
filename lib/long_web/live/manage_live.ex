@@ -544,7 +544,7 @@ defmodule LongWeb.ManageLive do
         <div class="p-4 border-b border-zinc-200">
           <div class="font-semibold text-zinc-900">Long · Manage</div>
           <.button_link
-            navigate={~p"/chat"}
+            navigate={~p"/"}
             variant="base"
             color="natural"
             size="extra_small"
@@ -552,7 +552,7 @@ defmodule LongWeb.ManageLive do
             rounded="medium"
             class="!mt-2"
           >
-            Back to chat
+            Back to home
           </.button_link>
         </div>
         <nav class="flex-1 overflow-y-auto p-2 space-y-0.5">
