@@ -225,7 +225,7 @@ PLISTEOF
         if ! launchctl bootstrap "$DOMAIN" "$PLIST" 2>/tmp/.long_launch.err; then
           echo "WARN: launchctl bootstrap 失败:" >&2
           cat /tmp/.long_launch.err >&2
-          echo "plist 已写入 $PLIST，下次 GUI 登录会自动加载。" >&2
+          echo "plist 已写入 ${PLIST}，下次 GUI 登录会自动加载。" >&2
           rm -f /tmp/.long_launch.err
           exit 0
         fi
