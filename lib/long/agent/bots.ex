@@ -284,7 +284,7 @@ defmodule Long.Agent.Bots do
     :ok = SessionRunner.subscribe(session_id)
 
     try do
-      {:ok, _pid} =
+      :ok =
         SessionRunner.send_user_message(
           session_id,
           text,

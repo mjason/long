@@ -22,7 +22,7 @@ defmodule Long.CLI do
     :ok = SessionRunner.subscribe(session_id)
 
     try do
-      {:ok, _pid} = SessionRunner.send_user_message(session_id, prompt)
+      :ok = SessionRunner.send_user_message(session_id, prompt)
       collect_stream(session_id, io, opts)
     after
       SessionRunner.unsubscribe(session_id)
@@ -64,7 +64,7 @@ defmodule Long.CLI do
         :ok = SessionRunner.subscribe(session_id)
 
         try do
-          {:ok, _pid} = SessionRunner.send_user_message(session_id, text)
+          :ok = SessionRunner.send_user_message(session_id, text)
           collect_stream(session_id, io, opts)
         after
           SessionRunner.unsubscribe(session_id)

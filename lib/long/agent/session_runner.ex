@@ -28,8 +28,8 @@ defmodule Long.Agent.SessionRunner do
   def unsubscribe(session_id), do: Phoenix.PubSub.unsubscribe(Long.PubSub, topic(session_id))
 
   @doc """
-  Persist the user message, then run the loop in a Task. Returns
-  `{:ok, task_pid}` so the caller can monitor if desired.
+  Persist the user message, then run the loop in a Task. Returns `:ok`;
+  the task is fire-and-forget (callers observe progress via PubSub).
   """
   def send_user_message(session_id, text, opts \\ [])
       when is_binary(session_id) and is_binary(text) do
@@ -48,9 +48,12 @@ defmodule Long.Agent.SessionRunner do
 
       broadcast(session_id, {:message_persisted, %{message: user_row}})
 
-      Task.Supervisor.start_child(@task_sup, fn ->
-        run_loop(session_id, backend, history ++ [%{role: :user, content: text}], opts)
-      end)
+      {:ok, _pid} =
+        Task.Supervisor.start_child(@task_sup, fn ->
+          run_loop(session_id, backend, history ++ [%{role: :user, content: text}], opts)
+        end)
+
+      :ok
     end
   end
 

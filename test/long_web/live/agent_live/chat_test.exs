@@ -31,7 +31,7 @@ defmodule LongWeb.AgentLive.ChatTest do
     end
 
     test "broadcasts loop lifecycle + persists user/assistant messages", %{sess: sess} do
-      {:ok, _task} = SessionRunner.send_user_message(sess.id, "hi there")
+      :ok = SessionRunner.send_user_message(sess.id, "hi there")
 
       # Lifecycle: user message persisted → loop_started → text deltas → loop_ended
       assert_receive {:message_persisted, %{message: %{role: :user, content: "hi there"}}}, 1_000

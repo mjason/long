@@ -45,7 +45,7 @@ defmodule Long.Agent.Workers.RunScheduledTask do
 
   defp fire_async(task) do
     case SessionRunner.send_user_message(task.session_id, task.prompt) do
-      {:ok, _pid} -> :ok
+      :ok -> :ok
       other -> {:error, inspect(other)}
     end
   end
