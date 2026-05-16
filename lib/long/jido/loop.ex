@@ -140,6 +140,9 @@ defmodule Long.Jido.Loop do
   @dispatch_max_concurrency 4
   @dispatch_per_tool_timeout_ms 60_000
 
+  @doc "Default system prompt — exposed so Long.Agent.Server can reuse it."
+  def default_system, do: @default_system
+
   def run(user_prompt, opts) when is_binary(user_prompt) and is_list(opts) do
     tools = Keyword.fetch!(opts, :tools)
     system = Keyword.get(opts, :system, @default_system)

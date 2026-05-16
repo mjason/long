@@ -131,6 +131,10 @@ defmodule Long.Agent.Bots do
   defp clear_session(session_id) do
     {prior_owner_pid, _} = Activity.clear(session_id)
 
+    # Kill in-flight LLM/tool tasks and drop the persisted snapshot
+    # before wiping DB rows underneath the running Server.
+    Long.Agent.Server.terminate_session(session_id)
+
     Task.Supervisor.start_child(@task_sup, fn ->
       if is_pid(prior_owner_pid) do
         _ = Task.Supervisor.terminate_child(@task_sup, prior_owner_pid)

@@ -20,6 +20,8 @@ defmodule Long.Application do
          Application.fetch_env!(:long, Oban)
        )},
       {Task.Supervisor, name: Long.Agent.TaskSup},
+      {Registry, keys: :unique, name: Long.Agent.Server.Registry},
+      Long.Agent.Server.Supervisor,
       Long.Agent.Activity,
       Long.Agent.Skill.Store,
       Long.Agent.Browser.Cli.Limiter,

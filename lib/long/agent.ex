@@ -36,6 +36,12 @@ defmodule Long.Agent do
       define :list_checkpoints, action: :read
     end
 
+    resource Long.Agent.TurnSnapshot do
+      define :upsert_turn_snapshot, action: :upsert
+      define :get_turn_snapshot, action: :read, get_by: [:session_id]
+      define :destroy_turn_snapshot, action: :destroy
+    end
+
     resource Long.Agent.GlobalMemory do
       define :put_global_memory, action: :upsert
       define :list_global_memory, action: :read
