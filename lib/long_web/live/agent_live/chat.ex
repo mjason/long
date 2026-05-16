@@ -539,8 +539,15 @@ defmodule LongWeb.AgentLive.Chat do
 
   defp message_bubble(%{msg: %{role: :user}} = assigns) do
     ~H"""
-    <.chat position="flipped" color="info" variant="default" rounded="extra_large" padding="none">
-      <.chat_section class="max-w-[75%] px-4 py-2.5 text-[15px] leading-relaxed">
+    <.chat
+      position="flipped"
+      color="info"
+      variant="default"
+      rounded="extra_large"
+      padding="none"
+      class="[&>.chat-section-bubble]:!max-w-[75%]"
+    >
+      <.chat_section class="px-4 py-2.5 text-[15px] leading-relaxed">
         <div class="whitespace-pre-wrap break-words">{@msg.content}</div>
       </.chat_section>
     </.chat>
@@ -555,9 +562,9 @@ defmodule LongWeb.AgentLive.Chat do
       variant="bordered"
       rounded="extra_large"
       padding="none"
-      class="[&>.chat-section-bubble]:bg-white [&>.chat-section-bubble]:border-zinc-300 [&>.chat-section-bubble]:shadow-sm"
+      class="[&>.chat-section-bubble]:!max-w-[85%] [&>.chat-section-bubble]:bg-white [&>.chat-section-bubble]:border-zinc-300 [&>.chat-section-bubble]:shadow-sm"
     >
-      <.chat_section class="max-w-[85%] px-4 py-3 text-[15px] leading-relaxed">
+      <.chat_section class="px-4 py-3 text-[15px] leading-relaxed">
         <div :if={(@msg.content || "") != ""} class="whitespace-pre-wrap break-words">
           {format_text(@msg.content)}
         </div>
@@ -597,9 +604,9 @@ defmodule LongWeb.AgentLive.Chat do
       variant="bordered"
       rounded="extra_large"
       padding="none"
-      class="[&>.chat-section-bubble]:bg-white [&>.chat-section-bubble]:border-zinc-300 [&>.chat-section-bubble]:shadow-sm"
+      class="[&>.chat-section-bubble]:!max-w-[85%] [&>.chat-section-bubble]:bg-white [&>.chat-section-bubble]:border-zinc-300 [&>.chat-section-bubble]:shadow-sm"
     >
-      <.chat_section class="max-w-[85%] px-4 py-3 text-[15px] leading-relaxed">
+      <.chat_section class="px-4 py-3 text-[15px] leading-relaxed">
         <details :if={@streaming.thinking != ""} class="mb-2">
           <summary class="cursor-pointer text-xs text-zinc-400">thinking…</summary>
           <pre class="mt-1.5 text-xs text-zinc-500 whitespace-pre-wrap leading-snug">{@streaming.thinking}</pre>
