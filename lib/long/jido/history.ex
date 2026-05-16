@@ -121,19 +121,24 @@ defmodule Long.Jido.History do
   end
 
   defp safe_summarize(summarizer, prior, rows, llm_alias) do
-    try do
-      summarizer.(prior, rows, llm_alias)
-    rescue
-      e ->
-        require Logger
+    summarizer.(prior, rows, llm_alias)
+  rescue
+    e ->
+      require Logger
 
-        Logger.warning(
-          "History: summarizer raised, falling back to hard trim. " <>
-            "Reason: #{Exception.message(e)}"
-        )
+      Logger.warning(
+        "History: summarizer raised, falling back to hard trim. " <>
+          "Reason: #{Exception.message(e)}"
+      )
 
-        {:error, e}
-    end
+      _ =
+        ErrorTracker.report(e, __STACKTRACE__, %{
+          source: "history.summarize",
+          llm_alias: llm_alias,
+          row_count: length(rows)
+        })
+
+      {:error, e}
   end
 
   # Split `tail` into {to_fold_into_summary, to_keep_as_raw}. We choose

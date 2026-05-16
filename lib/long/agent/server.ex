@@ -401,6 +401,13 @@ defmodule Long.Agent.Server do
         state
 
       {:error, reason} ->
+        _ =
+          ErrorTracker.report(
+            %RuntimeError{message: "spawn_llm failed: #{inspect(reason)}"},
+            [],
+            %{source: "server.spawn_llm", session_id: state.session_id, turn: state.turn}
+          )
+
         broadcast(state.session_id, {:loop_error, "spawn_llm: #{inspect(reason)}"})
         end_turn(idle(state), nil)
     end
@@ -450,10 +457,27 @@ defmodule Long.Agent.Server do
   end
 
   defp handle_llm_result(state, {:error, exception}) do
+    # LLMCall already reports on final retry failure with `source: "llm_call"`,
+    # but it has no session context. Re-report here with session_id so
+    # operators can correlate errors to a conversation in /errors.
+    _ =
+      ErrorTracker.report(
+        normalize_error(exception),
+        [],
+        %{source: "server.llm_result", session_id: state.session_id, turn: state.turn}
+      )
+
     msg = if is_exception(exception), do: Exception.message(exception), else: inspect(exception)
     broadcast(state.session_id, {:loop_error, msg})
     end_turn(idle(state), nil)
   end
+
+  defp normalize_error(e) when is_exception(e), do: e
+
+  defp normalize_error({tag, reason}) when is_atom(tag),
+    do: %RuntimeError{message: "#{tag}: #{inspect(reason)}"}
+
+  defp normalize_error(other), do: %RuntimeError{message: inspect(other)}
 
   defp spawn_tools(state, tool_calls) do
     tools_index = Map.new(state.tools, fn mod -> {mod.name(), mod} end)

@@ -34,15 +34,15 @@
       </div>
     </section>
 
-    <section :if={@dev_routes?}>
+    <section>
       <h2 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-3">
-        Developer dashboards
+        Operator dashboards
       </h2>
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <.dev_card href="/errors" icon="hero-exclamation-triangle" title="Errors" desc="ErrorTracker dashboard" />
         <.dev_card href="/oban" icon="hero-queue-list" title="Jobs" desc="Oban Web" />
-        <.dev_card href="/dev/dashboard" icon="hero-chart-bar" title="Metrics" desc="LiveDashboard" />
-        <.dev_card href="/admin" icon="hero-shield-check" title="Admin" desc="Ash Admin (legacy)" />
+        <.dev_card href="/dashboard" icon="hero-chart-bar" title="Metrics" desc="LiveDashboard" />
+        <.dev_card :if={@dev_routes?} href="/admin" icon="hero-shield-check" title="Admin" desc="Ash Admin (dev only)" />
       </div>
     </section>
   </div>
