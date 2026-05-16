@@ -23,7 +23,7 @@ defmodule Long.Agent.Bots.Wechat.Worker do
 
   alias Long.Agent.Bots
   alias Long.Agent.Bots.Wechat
-  alias Long.Agent.Bots.Wechat.{Client, Credential, Media}
+  alias Long.Agent.Bots.Wechat.{Client, Credential, Media, Progress}
 
   @poll_timeout_seconds 30
   @retry_delay_ms 5_000
@@ -173,14 +173,22 @@ defmodule Long.Agent.Bots.Wechat.Worker do
       # a long-running agent run (>2 min) silently dropped the reply
       # because the synchronous `run_and_collect` timed out before the
       # final assistant message landed.
-      Bots.run_async(:wechat, uid, body,
-        session_title: "wechat:#{uid}",
-        attachments: image_paths,
-        on_complete: fn _bot_user, result ->
-          stop_typing(typing)
-          send_reply(token, uid, ctx_token, result, media_paths)
-        end
-      )
+      result =
+        Bots.run_async(:wechat, uid, body,
+          session_title: "wechat:#{uid}",
+          attachments: image_paths,
+          on_complete: fn _bot_user, result ->
+            stop_typing(typing)
+            send_reply(token, uid, ctx_token, result, media_paths)
+          end
+        )
+
+      # For real agent runs (not /clear / /status / /btw shortcuts),
+      # narrate tool activity to the user — typing alone is invisible
+      # for runs that take >10s.
+      with {:ok, %{session_id: sid, mode: :dispatched}} <- result do
+        Progress.start(token, uid, sid, ctx_token)
+      end
     end
   end
 
