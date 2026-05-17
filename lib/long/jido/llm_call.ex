@@ -181,10 +181,9 @@ defmodule Long.Jido.LLMCall do
   # overwrite it with the actual callback the caller passes — the Loop
   # one level up dispatches via `Jido.Exec.run/2` anyway, so the callback
   # is only invoked if some caller uses ReqLLM's auto-exec path.
-  # `tool_choice` lets the caller (Long.Agent.IntentRouter) force the
-  # model's first tool_call to a specific tool — useful when the
-  # request's intent is unambiguous (e.g. "每天晚上7点 ..." → must use
-  # `schedule_task`) and we don't want the model to wander.
+  # `tool_choice` forces the model's first tool_call to a specific
+  # tool. Kept as plumbing in case a caller needs strict tool routing
+  # (none today after the GraphQL migration collapsed the tool list).
   #
   # ReqLLM normalises the string form to provider-specific shape
   # (`%{type: "tool", name: …}` for Anthropic, `%{type: "function",

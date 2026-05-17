@@ -1,10 +1,11 @@
 defmodule Long.Agent.GlobalMemory do
   @moduledoc """
   System-wide memory rows — facts/preferences/decisions that should
-  survive across every session. The agent reads & writes these via the
-  `memory_remember(scope: "global", …)` / `memory_recall(scope:
-  "global", …)` tools, and at Loop entry the most relevant rows are
-  auto-injected into the system prompt addendum.
+  survive across every session. The agent reads & writes these via
+  GraphQL (`putGlobalMemory` mutation / `globalMemories` query), and
+  at Loop entry the most relevant rows are auto-injected into the
+  system prompt addendum so the agent rarely needs to recall
+  explicitly.
 
   Companion to `Long.Agent.SessionMemory`, which is scoped to a single
   conversation. Identity: `(scope, key)`.
@@ -12,15 +13,37 @@ defmodule Long.Agent.GlobalMemory do
 
   use Ash.Resource,
     domain: Long.Agent,
-    data_layer: AshSqlite.DataLayer
+    data_layer: AshSqlite.DataLayer,
+    extensions: [AshGraphql.Resource]
 
   sqlite do
     table "agent_global_memory"
     repo Long.Repo
   end
 
+  graphql do
+    type :global_memory
+
+    queries do
+      list :global_memories, :read
+      get :global_memory, :read
+    end
+
+    mutations do
+      # `put_*` is the upsert form — same shape as session memory.
+      create :put_global_memory, :upsert
+      update :update_global_memory, :update
+      destroy :destroy_global_memory, :destroy
+    end
+  end
+
   actions do
-    defaults [:read, :destroy]
+    defaults [:destroy]
+
+    read :read do
+      primary? true
+      pagination keyset?: true, default_limit: 25, max_page_size: 100, required?: false
+    end
 
     create :upsert do
       accept [:scope, :key, :value, :kind, :importance]
@@ -49,9 +72,8 @@ defmodule Long.Agent.GlobalMemory do
   attributes do
     uuid_primary_key :id
 
-    attribute :scope, :atom do
+    attribute :scope, Long.Agent.Enums.MemoryScope do
       description "Coarse bucket — keeps casual facts apart from distilled lessons."
-      constraints one_of: [:general, :insight]
       default :general
       allow_nil? false
       public? true
@@ -70,8 +92,7 @@ defmodule Long.Agent.GlobalMemory do
       public? true
     end
 
-    attribute :kind, :atom do
-      constraints one_of: [:fact, :preference, :goal, :decision]
+    attribute :kind, Long.Agent.Enums.MemoryKind do
       default :fact
       allow_nil? false
       public? true

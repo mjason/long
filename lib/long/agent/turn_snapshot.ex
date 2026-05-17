@@ -19,15 +19,32 @@ defmodule Long.Agent.TurnSnapshot do
 
   use Ash.Resource,
     domain: Long.Agent,
-    data_layer: AshSqlite.DataLayer
+    data_layer: AshSqlite.DataLayer,
+    extensions: [AshGraphql.Resource]
 
   sqlite do
     table "agent_turn_snapshots"
     repo Long.Repo
   end
 
+  graphql do
+    # Read-only — these rows are managed by Long.Agent.Server for
+    # crash-recovery; exposing mutations would let the AI corrupt
+    # its own state machine.
+    type :turn_snapshot
+
+    queries do
+      list :turn_snapshots, :read
+    end
+  end
+
   actions do
-    defaults [:read, :destroy]
+    defaults [:destroy]
+
+    read :read do
+      primary? true
+      pagination keyset?: true, default_limit: 25, max_page_size: 100, required?: false
+    end
 
     create :upsert do
       accept [
@@ -71,8 +88,7 @@ defmodule Long.Agent.TurnSnapshot do
       public? true
     end
 
-    attribute :stage, :atom do
-      constraints one_of: [:idle, :calling_llm, :running_tools, :asked_user, :done]
+    attribute :stage, Long.Agent.Enums.TurnStage do
       default :idle
       allow_nil? false
       public? true

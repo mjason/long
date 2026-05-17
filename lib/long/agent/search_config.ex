@@ -19,6 +19,9 @@ defmodule Long.Agent.SearchConfig do
   environments keep working without API keys.
   """
 
+  # Intentionally NOT exposed via AshGraphql — `api_key` is sensitive
+  # and AshGraphql doesn't auto-mask `sensitive?` attributes. Managed
+  # by the operator via `/manage/search`.
   use Ash.Resource,
     domain: Long.Agent,
     data_layer: AshSqlite.DataLayer

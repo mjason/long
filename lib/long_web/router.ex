@@ -17,6 +17,11 @@ defmodule LongWeb.Router do
     plug :accepts, ["json"]
   end
 
+  pipeline :graphql do
+    plug :accepts, ["json"]
+    plug AshGraphql.Plug
+  end
+
   scope "/", LongWeb do
     pipe_through :browser
 
@@ -39,6 +44,22 @@ defmodule LongWeb.Router do
   scope "/webhooks/feishu", LongWeb do
     pipe_through :api
     post "/", FeishuController, :receive
+  end
+
+  # GraphQL — the AI's primary data-access channel (via the `graphql`
+  # native tool) AND a generic API surface for any external client.
+  # /graphql is the JSON endpoint; /graphiql is the interactive
+  # playground (always on for now — slap basic auth in front in prod
+  # if you don't want the schema browser exposed).
+  scope "/" do
+    pipe_through :graphql
+
+    forward "/graphql", Absinthe.Plug, schema: LongWeb.GraphqlSchema
+
+    forward "/graphiql",
+            Absinthe.Plug.GraphiQL,
+            schema: LongWeb.GraphqlSchema,
+            interface: :playground
   end
 
   # Operator dashboards — always mounted. `/errors` in particular is

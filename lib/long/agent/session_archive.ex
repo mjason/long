@@ -1,21 +1,40 @@
 defmodule Long.Agent.SessionArchive do
   @moduledoc """
   L4 session archive: a compressed/summarized snapshot of a finished session
-  kept for long-term recall. Triggered by the `start_long_term_update` tool or
-  by the Oban archive worker (Phase 5).
+  kept for long-term recall. Written by the Oban archive worker (Phase 5);
+  the agent reads via GraphQL (`sessionArchives` query) to "have I worked
+  on this before?".
   """
 
   use Ash.Resource,
     domain: Long.Agent,
-    data_layer: AshSqlite.DataLayer
+    data_layer: AshSqlite.DataLayer,
+    extensions: [AshGraphql.Resource]
 
   sqlite do
     table "agent_session_archives"
     repo Long.Repo
   end
 
+  graphql do
+    # L4 long-term memory across sessions. Read-only via GraphQL — the
+    # Oban archive worker (or `start_long_term_update` historically)
+    # owns writes; the AI just queries to recall past work.
+    type :session_archive
+
+    queries do
+      list :session_archives, :read
+      get :session_archive, :read
+    end
+  end
+
   actions do
-    defaults [:read, :destroy]
+    defaults [:destroy]
+
+    read :read do
+      primary? true
+      pagination keyset?: true, default_limit: 25, max_page_size: 100, required?: false
+    end
 
     create :create do
       accept [:original_session_id, :title, :summary, :insights, :payload, :archived_at]

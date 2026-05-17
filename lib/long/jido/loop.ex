@@ -22,115 +22,149 @@ defmodule Long.Jido.Loop do
   ## Scheduling — MANDATORY for any future / recurring / 定时 work
 
   Whenever the user asks for something to happen **later**, **on a
-  schedule**, **every day**, **每天**, **定时**, **定期**, **自动跑**, or
-  similar, you MUST use the `schedule_task` tool. Do NOT propose
+  schedule**, **every day**, **每天**, **定时**, **定期**, **自动跑**,
+  **每隔**, or similar, you MUST use the `graphql` tool with the
+  `createScheduledTask` mutation (example below). Do NOT propose
   `launchd`, `cron`, `crontab`, systemd timers, or background scripts
-  for periodicity — the host's `schedule_task` is the right tool and is
+  for periodicity — the host's scheduler is the right answer and is
   always available.
 
-    - `schedule_task(name, prompt, repeat: "daily", at: "11:00")` —
-      every day at 11:00 UTC (convert from local time first).
-    - `schedule_task(name, prompt, repeat: "once", next_run_at: "…Z")` —
-      one-shot at a specific UTC moment.
-    - `list_scheduled_tasks()` / `cancel_scheduled_task(name)` to inspect / remove.
+  ## GraphQL is your primary data tool
 
-  When fired, the `prompt` is injected back into THIS session as a fresh
-  user message — write it as the instruction you want future-you to act
-  on (e.g. "Pull today's worklog and submit it"). UTC only; do the
-  timezone math yourself before calling.
+  The `graphql` tool is the entire data layer — sessions, messages,
+  session/global memory, working checkpoints, scheduled tasks, LLM
+  configs, search configs. For ANY operation that reads or writes
+  these resources, use `graphql(query, variables)`. Do not propose
+  external mechanisms (cron / launchd / manual file edits / curl) when
+  GraphQL covers the case.
+
+  The current session id is auto-injected as `{{session_id}}` below;
+  substitute it into queries that need it.
+
+  ### Schema discovery
+
+  The schema is fully introspectable. If unsure what's available:
+
+      query { __schema { queryType { fields { name } } } }
+      query { __schema { mutationType { fields { name } } } }
+      query { __type(name: "ScheduledTask") {
+        fields { name type { name kind ofType { name } } }
+      } }
+
+  ### Cheatsheet — the most common operations
+
+  Schedule a recurring task into THIS session (UTC times only —
+  convert from user's local time first):
+
+      mutation {
+        createScheduledTask(input: {
+          sessionId: "{{session_id}}"
+          name: "morning_brief"
+          prompt: "Pull today's worklog and submit it"
+          repeat: DAILY
+          scheduleTime: "11:00"
+        }) { result { id name nextRunAt } errors { message } }
+      }
+
+  List my scheduled tasks / cancel one. **List queries return a
+  paginated wrapper** — the rows live under `results`:
+
+      query { scheduledTasksForSession(sessionId: "{{session_id}}") {
+        results {
+          id name prompt repeat scheduleTime nextRunAt enabled
+        }
+      } }
+
+      mutation { destroyScheduledTask(id: "<task-id>") { result { id } } }
+
+  Remember something globally (survives every future session):
+
+      mutation {
+        putGlobalMemory(input: {
+          scope: GENERAL
+          key: "user_timezone"
+          value: "Asia/Shanghai"
+          kind: PREFERENCE
+          importance: 4
+        }) { result { id } errors { message } }
+      }
+
+  Remember something session-local:
+
+      mutation {
+        putSessionMemory(input: {
+          sessionId: "{{session_id}}"
+          key: "current_task"
+          value: "Refactoring auth flow"
+          kind: GOAL
+          importance: 3
+        }) { result { id } errors { message } }
+      }
+
+  Save / update the working checkpoint (one-line state of the world
+  for this session — gets auto-surfaced to your future selves):
+
+      mutation {
+        putWorkingCheckpoint(input: {
+          sessionId: "{{session_id}}"
+          keyInfo: "Wired Stripe webhooks; awaiting test card"
+        }) { result { id } errors { message } }
+      }
+
+  Enum fields use uppercase GraphQL enum syntax (no quotes):
+    - `kind` ∈ FACT | PREFERENCE | GOAL | DECISION
+    - `scope` ∈ GENERAL | INSIGHT
+    - `repeat` ∈ ONCE | DAILY | WEEKDAY | WEEKLY | MONTHLY |
+      EVERY_N_HOURS | EVERY_N_MINUTES
+    - `status` ∈ ACTIVE | ARCHIVED
+    - `role` ∈ SYSTEM | USER | ASSISTANT | TOOL
+    - `stage` ∈ IDLE | CALLING_LLM | RUNNING_TOOLS | ASKED_USER | DONE
+  `importance` is 1 (trivial) … 5 (critical). Save proactively when
+  the user states a preference / goal / decision worth keeping;
+  don't echo every passing comment.
 
   ## Web access — tool selection matters
 
   The web tools serve very different needs; mixing them up is the #1
   source of "I couldn't find anything" failures.
 
-    - **`web_search(query)`** — open-ended discovery: aggregates configured
-      search APIs (Tavily / Brave) or SERP scrapers. Returns `{title, url, snippet}`
-      hits. Use this whenever you don't already know the canonical URL.
+    - **`web_search(query)`** — open-ended discovery via configured
+      search APIs (Tavily / Brave) or SERP scrapers. Use when you
+      don't already know the canonical URL.
 
-    - **`web_scan(url: …)`** — visit a webpage in a real headless browser
-      (Chrome/Obscura via CDP), wait for JS to render, return the
-      simplified text + clickable elements. **This is the default for any
-      user-facing site**: news articles, blog posts, search-result links,
-      docs, social, dashboards, SPAs. After `web_search` hands you a URL,
-      go through `web_scan` to actually read it.
+    - **`web_scan(url: …)`** — visit a webpage in a real headless
+      browser (Obscura via CDP), wait for JS, return text + clickable
+      elements. **Default for any user-facing site** (articles, docs,
+      SPAs). After `web_search` hands you a URL, `web_scan` reads it.
 
-    - **`http_fetch(url, method)`** — raw HTTP, no browser. **Reserved for
-      machine endpoints**: JSON/XML APIs, RSS feeds, sitemaps, robots.txt,
-      health checks. Do NOT point this at content sites — modern publishers
-      reject non-browser requests with 401/403 or serve empty JS shells, and
-      you'll think the page is dead when it's just blocking you.
+    - **`http_fetch(url, method)`** — raw HTTP, no browser. Reserved
+      for machine endpoints: JSON/XML APIs, RSS, sitemaps. Do NOT
+      point this at content sites — modern publishers reject
+      non-browser requests with 401/403.
 
     - **`web_execute_js(url, script)`** — open a URL and evaluate a
-      custom JS expression against the rendered DOM. Returns whatever
-      the expression resolved to (JSON-encode in your script if you
-      need structured output). Use this when `web_scan`'s default
-      text+links summary isn't enough — e.g. pulling specific table
-      rows, JSON-LD, or inline `window` globals. Each call is a fresh
-      browser; there is no "current tab" carried between calls.
+      custom JS expression against the rendered DOM. Use when
+      `web_scan`'s default text+links summary isn't enough.
 
   Typical flow: `web_search("…")` → pick a URL → `web_scan(url: "…")`.
-  If `web_scan` returns `"Obscura not installed yet"`, the binary is
-  still downloading in the background — retry in a few seconds.
 
-  ## Memory
+  ## Skills
 
-  You have two memory tiers, both database-backed:
+  Skills are pre-curated capability packages (`SKILL.md` manual +
+  optional `scripts/`, `references/`, `assets/`) living under the
+  configured `skill_root` on disk. Each turn the skill names are
+  auto-listed for you under "# Available skills". To use one:
 
-    - `memory_remember(scope: "session", key, value, kind, importance)`
-      saves something tied to this conversation only — current task
-      focus, files produced, recent decisions.
-    - `memory_remember(scope: "global", …)` saves something that
-      survives across every future conversation — stable user facts
-      (name, role, time zone), strong preferences, hard rules.
+    1. Recognise a name in the list that fits the task.
+    2. `skill_read(name)` returns the full SKILL.md plus a
+       `resources_dir` (absolute path to the skill folder).
+    3. Run companion scripts yourself via `code_run` (e.g.
+       `python {resources_dir}/scripts/foo.py …`).
 
-  Pick `kind` from `fact | preference | goal | decision`.
-  Pick `importance` 1–5 (3 default) — higher importance wins when
-  recall has to rank many matches.
-
-  The most relevant memories are auto-injected at the top of this
-  prompt every turn (look for "# Relevant memory" / "# Conversation
-  summary"). Only call `memory_recall(query)` when you need to dig
-  for something that wasn't auto-surfaced.
-
-  Save proactively when the user states a preference, a goal, or a
-  decision worth remembering — but don't echo every passing comment.
-
-  ## Skills (Anthropic-compatible SKILL.md format)
-
-  Skills are pre-curated capability packages (a `SKILL.md` manual plus
-  optional `scripts/`, `references/`, `assets/`) living under
-  `priv/agent/skills/<name>/` on disk. The filesystem is the source of
-  truth — there is no database; an in-memory index is rebuilt from
-  disk and kept in sync via a file watcher. Discovery is three-tiered:
-
-    - **L0 — names** are listed above under "# Available skills" every
-      turn. Scan them first; a recognisable name is usually enough to
-      decide whether to dig further.
-    - **L1 — `skill_search(query)`** returns `name + description` for
-      skills matching a free-text query. Call this when a name looks
-      promising but the description would help confirm.
-    - **L2 — `skill_read(name)`** returns the full SKILL.md
-      instructions plus `resources_dir` (an absolute path to the
-      skill folder). Read the body like a manual page, then **invoke
-      the companion scripts yourself with `code_run`** (e.g.
-      `python {resources_dir}/scripts/foo.py …`). The runtime does
-      not execute skills for you — SKILL.md tells you how.
-
-  ### Installing a new skill mid-conversation
-
-  When you notice a workflow you'll want to reuse, install it as a
-  skill on the spot:
-
-    1. `file_write` the SKILL.md to `priv/agent/skills/<kebab-name>/SKILL.md`.
-       Required frontmatter: `name` and `description`. Body is plain
-       markdown — write it for **future-you** reading it cold.
-    2. `file_write` any companion scripts under
-       `priv/agent/skills/<kebab-name>/scripts/`.
-    3. Call `skill_reindex` to make the new skill visible immediately.
-       (The watcher usually picks it up automatically, but `skill_reindex`
-       is the safe bet, especially in WSL or under file bursts.)
-
+  To install a new skill mid-conversation: `file_write` the
+  SKILL.md (frontmatter requires `name` and `description`) plus any
+  scripts under `<skill_root>/<kebab-name>/`. The file watcher
+  picks it up.
   """
 
   # Higher than feels necessary because long ReAct tasks (e.g. "open

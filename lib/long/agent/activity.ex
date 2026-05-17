@@ -84,7 +84,7 @@ defmodule Long.Agent.Activity do
 
   @doc """
   Full snapshot — owner info (may be nil), queue depth, pending btw
-  count. Used by the `/status` command and the `agent_status` tool.
+  count. Used by the `/status` magic command (bots/web chat).
   """
   @spec snapshot(String.t()) :: %{owner: map() | nil, queue_length: non_neg_integer(), pending_btws: non_neg_integer()}
   def snapshot(session_id) when is_binary(session_id) do

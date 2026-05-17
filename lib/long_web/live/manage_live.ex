@@ -33,13 +33,15 @@ defmodule LongWeb.ManageLive do
     {:scheduled, "Scheduled", "hero-clock"}
   ]
 
-  @memory_kinds ~w(fact preference goal decision)
-  @memory_scopes ~w(general insight)
-  @scheduled_repeats ~w(once daily weekday weekly monthly every_n_hours every_n_minutes)
+  # Pull enum values straight from the Ash.Type.Enum modules so the UI
+  # pickers can't drift from the schema. `to_string/1` because pickers
+  # render strings; the form's cast still converts back to atoms on save.
+  defp memory_kinds, do: Enum.map(Long.Agent.Enums.MemoryKind.values(), &Atom.to_string/1)
+  defp memory_scopes, do: Enum.map(Long.Agent.Enums.MemoryScope.values(), &Atom.to_string/1)
 
-  defp memory_kinds, do: @memory_kinds
-  defp memory_scopes, do: @memory_scopes
-  defp scheduled_repeats, do: @scheduled_repeats
+  defp scheduled_repeats,
+    do: Enum.map(Long.Agent.Enums.ScheduledTaskRepeat.values(), &Atom.to_string/1)
+
   defp search_providers, do: SearchConfig.providers()
 
   @impl true
@@ -1246,7 +1248,7 @@ defmodule LongWeb.ManageLive do
             </tr>
             <tr :if={@scheduled_tasks == []}>
               <td colspan="7" class="px-4 py-8 text-center text-zinc-400 text-sm">
-                No scheduled tasks. Click <strong>New task</strong> to add one (or let the agent schedule them via the `schedule_task` tool).
+                No scheduled tasks. Click <strong>New task</strong> to add one (or let the agent schedule them via GraphQL <code>createScheduledTask</code>).
               </td>
             </tr>
           </tbody>
@@ -1556,7 +1558,6 @@ defmodule LongWeb.ManageLive do
 
   defp session_status_color(:active), do: "success"
   defp session_status_color(:archived), do: "silver"
-  defp session_status_color(:errored), do: "danger"
   defp session_status_color(_), do: "info"
 
   defp repeat_label(%{repeat: :every_n_hours, every_n: n}), do: "every #{n}h"

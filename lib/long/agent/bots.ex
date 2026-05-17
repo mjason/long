@@ -48,8 +48,8 @@ defmodule Long.Agent.Bots do
 
   @task_sup Long.Agent.TaskSup
 
-  # Codepoint cap for the user-request preview shown in `/status` /
-  # `agent_status`. ~40 chars fits one bot-message line on a phone.
+  # Codepoint cap for the user-request preview shown in `/status`.
+  # ~40 chars fits one bot-message line on a phone.
   @request_preview_chars 40
 
   def run_and_collect(platform, external_id, text, opts \\ []) do
@@ -419,7 +419,7 @@ defmodule Long.Agent.Bots do
 
       {:tool_start, %{id: id, name: name, args: args}} ->
         if state.on_tool_start, do: state.on_tool_start.(%{id: id, name: name, args: args})
-        Activity.update(state.session_id, %{tool: name, tool_args: args})
+        Activity.update(state.session_id, %{tool: name})
 
         do_collect(
           %{state | tool_calls: state.tool_calls ++ [%{id: id, name: name, args: args}]},
@@ -428,7 +428,7 @@ defmodule Long.Agent.Bots do
 
       {:tool_done, %{id: id, name: name, data: data}} ->
         if state.on_tool_done, do: state.on_tool_done.(%{id: id, name: name, data: data})
-        Activity.update(state.session_id, %{tool: nil, tool_args: nil})
+        Activity.update(state.session_id, %{tool: nil})
         do_collect(state, deadline)
 
       {:turn_start, n} ->

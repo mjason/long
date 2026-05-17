@@ -6,15 +6,35 @@ defmodule Long.Agent.Session do
 
   use Ash.Resource,
     domain: Long.Agent,
-    data_layer: AshSqlite.DataLayer
+    data_layer: AshSqlite.DataLayer,
+    extensions: [AshGraphql.Resource]
 
   sqlite do
     table "agent_sessions"
     repo Long.Repo
   end
 
+  graphql do
+    type :session
+
+    queries do
+      list :sessions, :read
+      get :session, :read
+    end
+
+    mutations do
+      create :start_session, :start
+      update :update_session, :update
+      update :archive_session, :archive
+      destroy :destroy_session, :destroy
+    end
+  end
+
   actions do
-    defaults [:read]
+    read :read do
+      primary? true
+      pagination keyset?: true, default_limit: 25, max_page_size: 100, required?: false
+    end
 
     destroy :destroy do
       primary? true
@@ -63,8 +83,7 @@ defmodule Long.Agent.Session do
       public? true
     end
 
-    attribute :status, :atom do
-      constraints one_of: [:active, :archived, :errored]
+    attribute :status, Long.Agent.Enums.SessionStatus do
       default :active
       allow_nil? false
       public? true

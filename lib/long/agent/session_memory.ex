@@ -4,12 +4,11 @@ defmodule Long.Agent.SessionMemory do
   that the agent picks up during a conversation and should keep
   accessible across turns of the *same* session.
 
-  Lives next to `Long.Agent.GlobalMemory` (cross-session) and is
-  populated/queried via the `memory_remember` / `memory_recall` tools.
-  At Loop entry, the top-K most relevant rows are also pulled
-  automatically and folded into the system prompt addendum, so the
-  agent doesn't need to explicitly call `memory_recall` to surface
-  background context.
+  Lives next to `Long.Agent.GlobalMemory` (cross-session). The agent
+  reads/writes via GraphQL (`putSessionMemory` mutation /
+  `sessionMemoriesForSession` query). At Loop entry the top-K most
+  relevant rows are auto-injected into the system prompt addendum so
+  the agent rarely needs to query explicitly.
 
   Identity: `(session_id, key)` — upserts by name within a session.
   Cross-session sharing happens via `GlobalMemory` instead.
@@ -17,7 +16,8 @@ defmodule Long.Agent.SessionMemory do
 
   use Ash.Resource,
     domain: Long.Agent,
-    data_layer: AshSqlite.DataLayer
+    data_layer: AshSqlite.DataLayer,
+    extensions: [AshGraphql.Resource]
 
   require Ash.Query
   import Ash.Expr
@@ -31,13 +31,35 @@ defmodule Long.Agent.SessionMemory do
     end
   end
 
+  graphql do
+    type :session_memory
+
+    queries do
+      list :session_memories, :read
+      get :session_memory, :read
+      list :session_memories_for_session, :by_session
+    end
+
+    mutations do
+      create :put_session_memory, :upsert
+      update :update_session_memory, :update
+      destroy :destroy_session_memory, :destroy
+    end
+  end
+
   actions do
-    defaults [:read, :destroy]
+    defaults [:destroy]
+
+    read :read do
+      primary? true
+      pagination keyset?: true, default_limit: 25, max_page_size: 100, required?: false
+    end
 
     read :by_session do
       argument :session_id, :uuid, allow_nil?: false
       filter expr(session_id == ^arg(:session_id))
       prepare build(sort: [importance: :desc, updated_at: :desc])
+      pagination keyset?: true, default_limit: 25, max_page_size: 100, required?: false
     end
 
     create :upsert do
@@ -45,6 +67,10 @@ defmodule Long.Agent.SessionMemory do
       upsert? true
       upsert_identity :session_key
       upsert_fields [:value, :kind, :importance, :updated_at]
+    end
+
+    update :update do
+      accept [:value, :kind, :importance]
     end
 
     update :bump_usage do
@@ -76,8 +102,7 @@ defmodule Long.Agent.SessionMemory do
       public? true
     end
 
-    attribute :kind, :atom do
-      constraints one_of: [:fact, :preference, :goal, :decision]
+    attribute :kind, Long.Agent.Enums.MemoryKind do
       default :fact
       allow_nil? false
       public? true

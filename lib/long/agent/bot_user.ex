@@ -18,7 +18,8 @@ defmodule Long.Agent.BotUser do
 
   use Ash.Resource,
     domain: Long.Agent,
-    data_layer: AshSqlite.DataLayer
+    data_layer: AshSqlite.DataLayer,
+    extensions: [AshGraphql.Resource]
 
   require Ash.Query
   import Ash.Expr
@@ -32,8 +33,25 @@ defmodule Long.Agent.BotUser do
     end
   end
 
+  graphql do
+    # Read-only — bot users are created/managed by platform adapters
+    # (wechat / feishu / telegram workers). The AI can query to see
+    # "who am I talking to and via what channel" but shouldn't write.
+    type :bot_user
+
+    queries do
+      list :bot_users, :read
+      get :bot_user_for_session, :by_session
+    end
+  end
+
   actions do
-    defaults [:read, :destroy]
+    defaults [:destroy]
+
+    read :read do
+      primary? true
+      pagination keyset?: true, default_limit: 25, max_page_size: 100, required?: false
+    end
 
     read :by_session do
       argument :session_id, :uuid, allow_nil?: false
@@ -59,8 +77,7 @@ defmodule Long.Agent.BotUser do
   attributes do
     uuid_primary_key :id
 
-    attribute :platform, :atom do
-      constraints one_of: [:telegram, :feishu, :discord, :wechat, :wecom, :dingtalk, :qq]
+    attribute :platform, Long.Agent.Enums.BotPlatform do
       allow_nil? false
       public? true
     end

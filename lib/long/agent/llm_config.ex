@@ -17,6 +17,11 @@ defmodule Long.Agent.LLMConfig do
   aliases to round-robin/route through (mirrors `llmcore.MixinSession`).
   """
 
+  # Intentionally NOT exposed via AshGraphql — `api_key` is sensitive
+  # and AshGraphql doesn't auto-mask `sensitive?` attributes. The
+  # operator manages LLM configs through `/manage/llms` (ManageLive),
+  # not the AI. Re-exposing it via GraphQL would leak every API key
+  # through the `/graphiql` introspection UI.
   use Ash.Resource,
     domain: Long.Agent,
     data_layer: AshSqlite.DataLayer

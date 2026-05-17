@@ -14,7 +14,8 @@ defmodule Long.Agent.ScheduledTask do
 
   use Ash.Resource,
     domain: Long.Agent,
-    data_layer: AshSqlite.DataLayer
+    data_layer: AshSqlite.DataLayer,
+    extensions: [AshGraphql.Resource]
 
   require Ash.Query
   import Ash.Expr
@@ -28,13 +29,36 @@ defmodule Long.Agent.ScheduledTask do
     end
   end
 
+  graphql do
+    type :scheduled_task
+
+    queries do
+      list :scheduled_tasks, :read
+      get :scheduled_task, :read
+      list :scheduled_tasks_for_session, :by_session
+    end
+
+    mutations do
+      create :create_scheduled_task, :create
+      update :update_scheduled_task, :update
+      update :disable_scheduled_task, :disable
+      destroy :destroy_scheduled_task, :destroy
+    end
+  end
+
   actions do
-    defaults [:read, :destroy]
+    defaults [:destroy]
+
+    read :read do
+      primary? true
+      pagination keyset?: true, default_limit: 25, max_page_size: 100, required?: false
+    end
 
     read :by_session do
       argument :session_id, :uuid, allow_nil?: false
       filter expr(session_id == ^arg(:session_id))
       prepare build(sort: [next_run_at: :asc])
+      pagination keyset?: true, default_limit: 25, max_page_size: 100, required?: false
     end
 
     create :create do
@@ -89,17 +113,7 @@ defmodule Long.Agent.ScheduledTask do
       public? true
     end
 
-    attribute :repeat, :atom do
-      constraints one_of: [
-                    :once,
-                    :daily,
-                    :weekday,
-                    :weekly,
-                    :monthly,
-                    :every_n_hours,
-                    :every_n_minutes
-                  ]
-
+    attribute :repeat, Long.Agent.Enums.ScheduledTaskRepeat do
       default :daily
       allow_nil? false
       public? true

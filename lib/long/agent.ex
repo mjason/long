@@ -8,10 +8,16 @@ defmodule Long.Agent do
   """
 
   use Ash.Domain,
-    extensions: [AshAdmin.Domain]
+    extensions: [AshAdmin.Domain, AshGraphql.Domain]
 
   admin do
     show? true
+  end
+
+  graphql do
+    # Treat the domain as authoritative — let resources declare their
+    # own type names and queries/mutations.
+    authorize? false
   end
 
   resources do

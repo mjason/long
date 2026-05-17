@@ -9,28 +9,24 @@ defmodule Long.Jido.SessionRunner do
 
   @topic_prefix "agent_session:"
 
+  # GraphQL is the single data-access tool for everything stored in
+  # Ash resources (sessions, messages, memories, scheduled tasks,
+  # working checkpoints, LLM configs, search configs, skills index).
+  # Native tools below cover only the capabilities that don't fit a
+  # GraphQL CRUD model — shell, files, web, user IO, skill body read.
   @default_tools [
+    Long.Jido.Tools.GraphQL,
     Long.Jido.Tools.CodeRun,
     Long.Jido.Tools.FileRead,
     Long.Jido.Tools.FileWrite,
     Long.Jido.Tools.FilePatch,
     Long.Jido.Tools.HttpFetch,
-    Long.Jido.Tools.UpdateWorkingCheckpoint,
-    Long.Jido.Tools.MemoryRemember,
-    Long.Jido.Tools.MemoryRecall,
-    Long.Jido.Tools.StartLongTermUpdate,
     Long.Jido.Tools.WebSearch,
     Long.Jido.Tools.WebScan,
     Long.Jido.Tools.WebExecuteJs,
-    Long.Jido.Tools.ScheduleTask,
-    Long.Jido.Tools.ListScheduledTasks,
-    Long.Jido.Tools.CancelScheduledTask,
     Long.Jido.Tools.SendMedia,
     Long.Jido.Tools.AskUser,
-    Long.Jido.Tools.AgentStatus,
-    Long.Jido.Tools.SkillSearch,
-    Long.Jido.Tools.SkillRead,
-    Long.Jido.Tools.SkillReindex
+    Long.Jido.Tools.SkillRead
   ]
 
   def topic(session_id), do: @topic_prefix <> session_id

@@ -3,12 +3,12 @@ defmodule Long.Agent.ToolInventory do
   Renders the "you have these tools right now" preamble that sits at
   the very top of every system prompt.
 
-  Why: even with detailed per-section docs (Web / Memory / Skills /
-  Scheduling), the model often skips ahead and starts writing custom
-  scripts before noticing a built-in tool covers the case (e.g.
-  proposing `cron` while `schedule_task` is in the tool list). A flat
-  inventory at the top + a "tools first" mandate fixes the priority
-  ordering at the prompt level.
+  Why: even with detailed per-section docs (Web / Skills / GraphQL),
+  the model often skips ahead and writes custom scripts before
+  noticing a built-in tool covers the case (e.g. proposing `cron`
+  while `graphql` with `createScheduledTask` is in the tool list).
+  A flat inventory at the top + a "tools first" mandate fixes the
+  priority ordering at the prompt level.
   """
 
   @doc """
@@ -25,6 +25,20 @@ defmodule Long.Agent.ToolInventory do
   structured `tools:` parameter that Anthropic / OpenAI ship.
   """
   def render(tools) when is_list(tools) do
+    key = {__MODULE__, :rendered, :erlang.phash2(tools)}
+
+    case :persistent_term.get(key, nil) do
+      nil ->
+        rendered = do_render(tools)
+        :persistent_term.put(key, rendered)
+        rendered
+
+      cached ->
+        cached
+    end
+  end
+
+  defp do_render(tools) do
     bullets =
       tools
       |> Enum.map(&bullet/1)

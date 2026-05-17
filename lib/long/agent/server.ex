@@ -169,10 +169,6 @@ defmodule Long.Agent.Server do
       tool_results: %{},
       tool_monitors: %{},
 
-      # When non-nil, force the LLM's first tool_call to this tool
-      # (set per-turn by Long.Agent.IntentRouter; consumed in spawn_llm).
-      tool_choice: nil,
-
       # Queued user messages (when stage != :idle)
       inbox: :queue.new(),
 
@@ -364,22 +360,16 @@ defmodule Long.Agent.Server do
 
     tools = default_tools()
 
-    # Strict-intent router: if the user clearly wants a specific tool
-    # (e.g. "每天晚上7点 ..." → schedule_task), force the model's hand
-    # with `tool_choice` and, when relevant, inject a system note that
-    # contradicts any prior turn where the model denied that capability.
-    intent = Long.Agent.IntentRouter.classify(text, tools, history)
-
-    # `tool_inventory` is the flat "you have these tools right now"
-    # preamble + tool-first mandate; put it at the very top so it's
-    # the first thing the model sees every turn. Stops the model from
-    # leaping to custom-script answers when a built-in tool covers it.
+    # Prepend a flat tool inventory + mandate so the model's first
+    # impression every turn is "these are my real tools" rather than
+    # whatever it remembers from training. The system body itself
+    # references `{{session_id}}` in GraphQL cheatsheet examples;
+    # substitute the real id so the model can copy-paste directly.
     system_text =
       [
         Long.Agent.ToolInventory.render(tools),
-        Loop.default_system(),
-        addendum,
-        intent.system_correction
+        Loop.default_system() |> String.replace("{{session_id}}", state.session_id),
+        addendum
       ]
       |> Enum.reject(&(is_nil(&1) or &1 == ""))
       |> Enum.join("\n\n")
@@ -403,7 +393,6 @@ defmodule Long.Agent.Server do
           tool_results: %{},
           pending_tool_calls: %{},
           tool_monitors: %{},
-          tool_choice: intent.tool_choice,
           current_request: short_request(display_text)
       }
 
@@ -416,7 +405,6 @@ defmodule Long.Agent.Server do
     llm_opts =
       build_llm_callbacks(state.tools, state.tool_ctx)
       |> Keyword.put(:llm_alias, state.llm_alias)
-      |> maybe_put_tool_choice(state.tool_choice)
 
     case state.llm_consumer.start(self(), ref, state.messages, state.tools, llm_opts) do
       {:ok, pid} ->
@@ -790,10 +778,6 @@ defmodule Long.Agent.Server do
 
     [tool_callbacks: callbacks]
   end
-
-  defp maybe_put_tool_choice(opts, nil), do: opts
-  defp maybe_put_tool_choice(opts, name) when is_binary(name),
-    do: Keyword.put(opts, :tool_choice, name)
 
   defp tool_name(state, id) do
     case Map.get(state.pending_tool_calls, id) do
