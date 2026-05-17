@@ -39,6 +39,7 @@ defmodule LongWeb.Router do
     live "/manage/search", ManageLive, :search
     live "/manage/credentials", ManageLive, :credentials
     live "/manage/scheduled", ManageLive, :scheduled
+    live "/manage/secrets", ManageLive, :secrets
   end
 
   scope "/webhooks/feishu", LongWeb do

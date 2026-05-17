@@ -111,6 +111,31 @@ defmodule Long.Jido.Loop do
         }) { result { id } errors { message } }
       }
 
+  ### Secrets — for tokens you must not echo back to the user
+
+  Tokens / API keys / cookie strings live in the `Secret` resource,
+  NOT in memory or chat messages. They're stored separately so they
+  don't leak into the conversation context, summaries, or recall.
+
+  Reading a secret to use it in a tool call:
+
+      query { secret(name: "github_personal") { value description } }
+
+  Creating one when the user gives you a token to remember:
+
+      mutation {
+        putSecret(input: {
+          name: "github_personal"
+          value: "ghp_…"
+          description: "GitHub PAT, repo + workflow scopes"
+        }) { result { id name } errors { message } }
+      }
+
+  Rules: never repeat a secret's `value` back in chat output, never
+  store one in `globalMemory` / `sessionMemory`. Use the value inline
+  inside a tool call (e.g. as the `Authorization` header for
+  `http_fetch`) and stop.
+
   Enum fields use uppercase GraphQL enum syntax (no quotes):
     - `kind` ∈ FACT | PREFERENCE | GOAL | DECISION
     - `scope` ∈ GENERAL | INSIGHT

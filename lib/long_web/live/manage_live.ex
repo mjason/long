@@ -30,7 +30,8 @@ defmodule LongWeb.ManageLive do
     {:sessions, "Sessions", "hero-chat-bubble-left-right"},
     {:search, "Search", "hero-magnifying-glass"},
     {:credentials, "Credentials", "hero-key"},
-    {:scheduled, "Scheduled", "hero-clock"}
+    {:scheduled, "Scheduled", "hero-clock"},
+    {:secrets, "Secrets", "hero-lock-closed"}
   ]
 
   # Pull enum values straight from the Ash.Type.Enum modules so the UI
@@ -59,7 +60,8 @@ defmodule LongWeb.ManageLive do
      |> assign(:search_configs, [])
      |> assign(:bot_users, [])
      |> assign(:wechat_credentials, [])
-     |> assign(:scheduled_tasks, [])}
+     |> assign(:scheduled_tasks, [])
+     |> assign(:secrets, [])}
   end
 
   @impl true
@@ -172,13 +174,23 @@ defmodule LongWeb.ManageLive do
     assign(socket, :scheduled_tasks, rows)
   end
 
+  defp load_section(socket, :secrets) do
+    rows =
+      case Agent.list_secrets() do
+        {:ok, list} -> Enum.sort_by(list, & &1.name)
+        _ -> []
+      end
+
+    assign(socket, :secrets, rows)
+  end
+
+  defp load_section(socket, _), do: socket
+
   # Disabled / never-scheduled rows have `next_run_at = nil`; map them
   # to a sentinel far in the future so they sort to the bottom instead
   # of crashing DateTime.compare/2 with a no-clause match.
   defp sort_key_next_run(%{next_run_at: nil}), do: ~U[9999-12-31 23:59:59Z]
   defp sort_key_next_run(%{next_run_at: dt}), do: dt
-
-  defp load_section(socket, _), do: socket
 
   # ── Events: LLMs ─────────────────────────────────────────────────────
 
@@ -539,6 +551,57 @@ defmodule LongWeb.ManageLive do
     end
   end
 
+  # ── Events: Secrets ──────────────────────────────────────────────────
+
+  def handle_event("new_secret", _params, socket) do
+    {:noreply,
+     assign(socket, :editing, %{__action__: :create_secret, name: "", value: "", description: ""})}
+  end
+
+  def handle_event("edit_secret", %{"name" => name}, socket) do
+    case Agent.get_secret_by_name(name) do
+      {:ok, row} ->
+        editing = %{
+          __action__: :edit_secret,
+          id: row.id,
+          name: row.name,
+          value: row.value,
+          description: row.description || ""
+        }
+
+        {:noreply, assign(socket, :editing, editing)}
+
+      _ ->
+        {:noreply, socket}
+    end
+  end
+
+  def handle_event("save_secret", %{"secret" => params}, socket) do
+    attrs = %{
+      name: String.trim(params["name"] || ""),
+      value: params["value"] || "",
+      description: trim_or_nil(params["description"])
+    }
+
+    case Agent.put_secret(attrs) do
+      {:ok, _row} ->
+        {:noreply, socket |> assign(:editing, nil) |> load_section(:secrets)}
+
+      {:error, e} ->
+        {:noreply, put_flash(socket, :error, "Save failed: #{inspect(e)}")}
+    end
+  end
+
+  def handle_event("destroy_secret", %{"name" => name}, socket) do
+    with {:ok, row} <- Agent.get_secret_by_name(name),
+         :ok <- Agent.destroy_secret(row) do
+      {:noreply, load_section(socket, :secrets)}
+    else
+      {:ok, _} -> {:noreply, load_section(socket, :secrets)}
+      {:error, e} -> {:noreply, put_flash(socket, :error, "Delete failed: #{inspect(e)}")}
+    end
+  end
+
   # ── Template ─────────────────────────────────────────────────────────
 
   @impl true
@@ -602,6 +665,7 @@ defmodule LongWeb.ManageLive do
           editing={@editing}
           repeats={scheduled_repeats()}
         />
+        <.secret_modal :if={editing_kind(@editing) == :secret} editing={@editing} />
       </main>
     </div>
     """
@@ -612,6 +676,7 @@ defmodule LongWeb.ManageLive do
   defp editing_kind(%{__action__: :edit_global}), do: :global_memory
   defp editing_kind(%{__action__: a}) when a in [:create_search, :edit_search], do: :search
   defp editing_kind(%{__action__: a}) when a in [:create_scheduled, :edit_scheduled], do: :scheduled
+  defp editing_kind(%{__action__: a}) when a in [:create_secret, :edit_secret], do: :secret
   defp editing_kind(_), do: nil
 
   # ── Section views ────────────────────────────────────────────────────
@@ -623,6 +688,7 @@ defmodule LongWeb.ManageLive do
   defp section_view(%{section: :search} = assigns), do: search_section(assigns)
   defp section_view(%{section: :credentials} = assigns), do: credentials_section(assigns)
   defp section_view(%{section: :scheduled} = assigns), do: scheduled_section(assigns)
+  defp section_view(%{section: :secrets} = assigns), do: secrets_section(assigns)
   defp section_view(assigns), do: placeholder(%{title: section_title(assigns.section)})
 
   defp llm_section(assigns) do
@@ -1264,6 +1330,94 @@ defmodule LongWeb.ManageLive do
     """
   end
 
+  defp secrets_section(assigns) do
+    ~H"""
+    <div class="p-6 space-y-4">
+      <div class="flex items-center gap-3">
+        <h1 class="text-xl font-semibold flex-1">Secrets</h1>
+        <.button phx-click="new_secret" color="primary" icon="hero-plus" rounded="medium" size="small">
+          New secret
+        </.button>
+      </div>
+
+      <p class="text-xs text-zinc-500 max-w-2xl leading-relaxed">
+        Flat key/value store for tokens the agent needs at tool-call time.
+        Stored plaintext (LAN-only) but kept out of memory + chat history.
+        The agent reads these via the <code>graphql</code> tool — ask it to
+        fetch a secret by name when it needs to authenticate against an API.
+      </p>
+
+      <.card variant="bordered" color="natural" rounded="large" padding="none">
+        <table class="w-full text-sm">
+          <thead class="text-xs uppercase text-zinc-500 bg-zinc-50">
+            <tr>
+              <th class="text-left px-4 py-2.5">Name</th>
+              <th class="text-left px-4 py-2.5">Value</th>
+              <th class="text-left px-4 py-2.5">Description</th>
+              <th class="text-left px-4 py-2.5">Updated</th>
+              <th class="text-right px-4 py-2.5">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr :for={s <- @secrets} class="border-t border-zinc-100">
+              <td class="px-4 py-2 font-mono text-zinc-800">{s.name}</td>
+              <td class="px-4 py-2 text-xs font-mono text-zinc-500">
+                {mask_secret(s.value)}
+              </td>
+              <td class="px-4 py-2 text-zinc-600 max-w-md">{Text.preview(s.description || "", 80)}</td>
+              <td class="px-4 py-2 text-xs text-zinc-500">{format_dt(s.updated_at)}</td>
+              <td class="px-4 py-2">
+                <div class="flex justify-end gap-1.5">
+                  <.button
+                    phx-click="edit_secret"
+                    phx-value-name={s.name}
+                    variant="base"
+                    color="natural"
+                    size="extra_small"
+                    icon="hero-pencil-square"
+                    rounded="medium"
+                  />
+                  <.button
+                    phx-click="destroy_secret"
+                    phx-value-name={s.name}
+                    variant="base"
+                    color="danger"
+                    size="extra_small"
+                    icon="hero-trash"
+                    rounded="medium"
+                    data-confirm={"Delete secret \"#{s.name}\"?"}
+                  />
+                </div>
+              </td>
+            </tr>
+            <tr :if={@secrets == []}>
+              <td colspan="5" class="px-4 py-8 text-center text-zinc-400 text-sm">
+                No secrets yet. Click <strong>New secret</strong> to add a token.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </.card>
+    </div>
+    """
+  end
+
+  # Show only the head + tail so an operator glancing at the page sees a
+  # fingerprint without exposing the full token. Click "edit" to see /
+  # change the real value.
+  defp mask_secret(nil), do: "—"
+  defp mask_secret(""), do: "(empty)"
+
+  defp mask_secret(value) when is_binary(value) do
+    len = String.length(value)
+
+    if len <= 8 do
+      String.duplicate("•", len)
+    else
+      String.slice(value, 0, 4) <> "…" <> String.slice(value, -4, 4)
+    end
+  end
+
   # ── Modals ───────────────────────────────────────────────────────────
 
   attr :editing, :map, required: true
@@ -1469,11 +1623,13 @@ defmodule LongWeb.ManageLive do
   defp section_path(:search), do: ~p"/manage/search"
   defp section_path(:credentials), do: ~p"/manage/credentials"
   defp section_path(:scheduled), do: ~p"/manage/scheduled"
+  defp section_path(:secrets), do: ~p"/manage/secrets"
 
   defp section_title(:sessions), do: "Sessions"
   defp section_title(:search), do: "Search providers"
   defp section_title(:credentials), do: "Credentials"
   defp section_title(:scheduled), do: "Scheduled tasks"
+  defp section_title(:secrets), do: "Secrets"
   defp section_title(_), do: "—"
 
   defp llm_to_form(row) do
@@ -1750,6 +1906,65 @@ defmodule LongWeb.ManageLive do
         <label class="flex items-center gap-2 text-sm text-zinc-700 pt-1">
           <input type="checkbox" name="scheduled[enabled]" value="true" checked={@editing.enabled} />
           Enabled
+        </label>
+
+        <div class="flex justify-end gap-2 pt-2">
+          <.button type="button" phx-click="cancel_edit" variant="base" color="natural" rounded="medium" size="small">
+            Cancel
+          </.button>
+          <.button type="submit" color="primary" rounded="medium" size="small">Save</.button>
+        </div>
+      </form>
+    </.modal>
+    """
+  end
+
+  attr :editing, :map, required: true
+
+  defp secret_modal(assigns) do
+    assigns = assign(assigns, :is_new?, assigns.editing.__action__ == :create_secret)
+
+    ~H"""
+    <.modal
+      id="secret-edit-modal"
+      show
+      title={if @is_new?, do: "New secret", else: "Edit #{@editing.name}"}
+      on_cancel={JS.push("cancel_edit")}
+      size="medium"
+    >
+      <form phx-submit="save_secret" class="space-y-3">
+        <label class="block">
+          <span class="text-xs font-medium text-zinc-600">Name</span>
+          <input
+            name="secret[name]"
+            value={@editing.name}
+            required
+            readonly={!@is_new?}
+            class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm font-mono"
+            placeholder="e.g. github_personal"
+          />
+          <span class="text-[11px] text-zinc-500">Stable identifier the agent passes around. Lowercase + underscores recommended.</span>
+        </label>
+
+        <label class="block">
+          <span class="text-xs font-medium text-zinc-600">Value</span>
+          <textarea
+            name="secret[value]"
+            rows="3"
+            required
+            class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm font-mono"
+            placeholder="Paste the token / key / cookie here"
+          >{@editing.value}</textarea>
+        </label>
+
+        <label class="block">
+          <span class="text-xs font-medium text-zinc-600">Description (optional)</span>
+          <input
+            name="secret[description]"
+            value={@editing.description}
+            class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm"
+            placeholder="What is this for? Helps the agent pick the right one."
+          />
         </label>
 
         <div class="flex justify-end gap-2 pt-2">

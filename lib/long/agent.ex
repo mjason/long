@@ -113,6 +113,14 @@ defmodule Long.Agent do
       define :update_wechat_credential_buf, action: :update_buf
       define :destroy_wechat_credential, action: :destroy
     end
+
+    resource Long.Agent.Secret do
+      define :put_secret, action: :upsert
+      define :list_secrets, action: :read
+      define :get_secret_by_name, action: :read, get_by: [:name]
+      define :update_secret, action: :update
+      define :destroy_secret, action: :destroy
+    end
   end
 
   @doc """
