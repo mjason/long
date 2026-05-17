@@ -28,5 +28,12 @@ config :swoosh, local: false
 # Do not print debug messages in production
 config :logger, level: :info
 
+# Tzdata's auto-updater fetches IANA timezone updates over the network
+# and crashes with a MatchError on `{:error, :timeout}` when the
+# download fails — happens regularly on flaky / firewalled networks
+# and floods /errors. We ship a recent tzdata in deps; if the host
+# needs newer data the operator can rebuild after a `mix deps.update`.
+config :tzdata, :autoupdate, :disabled
+
 # Runtime production configuration, including reading
 # of environment variables, is done on config/runtime.exs.

@@ -165,12 +165,18 @@ defmodule LongWeb.ManageLive do
   defp load_section(socket, :scheduled) do
     rows =
       case Agent.list_scheduled_tasks() do
-        {:ok, list} -> Enum.sort_by(list, & &1.next_run_at, {:asc, DateTime})
+        {:ok, list} -> Enum.sort_by(list, &sort_key_next_run/1)
         _ -> []
       end
 
     assign(socket, :scheduled_tasks, rows)
   end
+
+  # Disabled / never-scheduled rows have `next_run_at = nil`; map them
+  # to a sentinel far in the future so they sort to the bottom instead
+  # of crashing DateTime.compare/2 with a no-clause match.
+  defp sort_key_next_run(%{next_run_at: nil}), do: ~U[9999-12-31 23:59:59Z]
+  defp sort_key_next_run(%{next_run_at: dt}), do: dt
 
   defp load_section(socket, _), do: socket
 

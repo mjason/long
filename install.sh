@@ -137,6 +137,12 @@ set -a; source "$ENV_FILE"; set +a
 
 mkdir -p "${LONG_WORKSPACE_ROOT:-${SCRIPT_DIR}/agent}"
 
+# macOS default maxfiles is 256 per process — way too low for a
+# BEAM running Bandit + Obscura + Python subprocesses. Bumps to
+# 10240, capped at the system hard limit. (Linux default is much
+# higher, so this is mostly a no-op there.)
+ulimit -n 10240 2>/dev/null || true
+
 # uv installs to ~/.local/bin by default; PATH it for the release process.
 export PATH="${HOME}/.local/bin:${PATH}"
 
