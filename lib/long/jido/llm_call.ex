@@ -56,13 +56,15 @@ defmodule Long.Jido.LLMCall do
 
     req_tools = Enum.map(tools, &as_req_tool(&1, opts))
 
-    req_opts = [
-      base_url: cfg.base_url,
-      api_key: cfg.api_key,
-      tools: req_tools,
-      max_tokens: Keyword.get(opts, :max_tokens, 4096),
-      temperature: Keyword.get(opts, :temperature, 0.5)
-    ]
+    req_opts =
+      [
+        base_url: cfg.base_url,
+        api_key: cfg.api_key,
+        tools: req_tools,
+        max_tokens: Keyword.get(opts, :max_tokens, 4096),
+        temperature: Keyword.get(opts, :temperature, 0.5)
+      ]
+      |> maybe_put_tool_choice(Keyword.get(opts, :tool_choice))
 
     try do
       case ReqLLM.Generation.stream_text(cfg.model, messages, req_opts) do
@@ -179,6 +181,19 @@ defmodule Long.Jido.LLMCall do
   # overwrite it with the actual callback the caller passes — the Loop
   # one level up dispatches via `Jido.Exec.run/2` anyway, so the callback
   # is only invoked if some caller uses ReqLLM's auto-exec path.
+  # `tool_choice` lets the caller (Long.Agent.IntentRouter) force the
+  # model's first tool_call to a specific tool — useful when the
+  # request's intent is unambiguous (e.g. "每天晚上7点 ..." → must use
+  # `schedule_task`) and we don't want the model to wander.
+  #
+  # ReqLLM normalises the string form to provider-specific shape
+  # (`%{type: "tool", name: …}` for Anthropic, `%{type: "function",
+  # function: %{name: …}}` for OpenAI) so callers just pass the tool
+  # name.
+  defp maybe_put_tool_choice(opts, nil), do: opts
+  defp maybe_put_tool_choice(opts, name) when is_binary(name),
+    do: Keyword.put(opts, :tool_choice, name)
+
   defp as_req_tool(%ReqLLM.Tool{} = t, _opts), do: t
 
   defp as_req_tool(action_mod, opts) when is_atom(action_mod) do

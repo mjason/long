@@ -169,6 +169,10 @@ defmodule Long.Agent.Server do
       tool_results: %{},
       tool_monitors: %{},
 
+      # When non-nil, force the LLM's first tool_call to this tool
+      # (set per-turn by Long.Agent.IntentRouter; consumed in spawn_llm).
+      tool_choice: nil,
+
       # Queued user messages (when stage != :idle)
       inbox: :queue.new(),
 
@@ -358,7 +362,20 @@ defmodule Long.Agent.Server do
     addendum =
       merge_addenda([summary_addendum, memory_addendum, SkillStore.list_names_for_prompt()])
 
-    system_msg = ReqLLM.Context.system(merge_system(Loop.default_system(), addendum))
+    tools = default_tools()
+
+    # Strict-intent router: if the user clearly wants a specific tool
+    # (e.g. "每天晚上7点 ..." → schedule_task), force the model's hand
+    # with `tool_choice` and, when relevant, inject a system note that
+    # contradicts any prior turn where the model denied that capability.
+    intent = Long.Agent.IntentRouter.classify(text, tools, history)
+
+    system_text =
+      [Loop.default_system(), addendum, intent.system_correction]
+      |> Enum.reject(&(is_nil(&1) or &1 == ""))
+      |> Enum.join("\n\n")
+
+    system_msg = ReqLLM.Context.system(system_text)
     btw_msgs = Enum.map(state.btws, &ReqLLM.Context.user("[补充] " <> &1))
     messages = [system_msg | history] ++ [user_msg] ++ btw_msgs
 
@@ -370,13 +387,14 @@ defmodule Long.Agent.Server do
         | stage: :calling_llm,
           turn: turn_no,
           messages: messages,
-          tools: default_tools(),
+          tools: tools,
           tool_ctx: tool_ctx,
           llm_alias: alias_name,
           btws: [],
           tool_results: %{},
           pending_tool_calls: %{},
           tool_monitors: %{},
+          tool_choice: intent.tool_choice,
           current_request: short_request(display_text)
       }
 
@@ -389,6 +407,7 @@ defmodule Long.Agent.Server do
     llm_opts =
       build_llm_callbacks(state.tools, state.tool_ctx)
       |> Keyword.put(:llm_alias, state.llm_alias)
+      |> maybe_put_tool_choice(state.tool_choice)
 
     case state.llm_consumer.start(self(), ref, state.messages, state.tools, llm_opts) do
       {:ok, pid} ->
@@ -769,6 +788,10 @@ defmodule Long.Agent.Server do
 
     [tool_callbacks: callbacks]
   end
+
+  defp maybe_put_tool_choice(opts, nil), do: opts
+  defp maybe_put_tool_choice(opts, name) when is_binary(name),
+    do: Keyword.put(opts, :tool_choice, name)
 
   defp tool_name(state, id) do
     case Map.get(state.pending_tool_calls, id) do
