@@ -13,7 +13,11 @@ defmodule LongWeb.AgentLive.Chat do
   @impl true
   def mount(params, _session, socket) do
     {:ok, session_id} = ensure_session(params)
-    if connected?(socket), do: SessionRunner.subscribe(session_id)
+
+    if connected?(socket) do
+      SessionRunner.subscribe(session_id)
+      Long.Agent.SessionPubSub.subscribe()
+    end
 
     {:ok,
      socket
@@ -145,7 +149,38 @@ defmodule LongWeb.AgentLive.Chat do
   end
 
   def handle_info({:session_updated, session}, socket) do
-    {:noreply, socket |> assign(:session, session) |> assign(:sessions, list_sessions())}
+    socket =
+      if session.id == socket.assigns.session_id do
+        assign(socket, :session, session)
+      else
+        socket
+      end
+
+    {:noreply, assign(socket, :sessions, list_sessions())}
+  end
+
+  def handle_info({:session_created, _session}, socket) do
+    {:noreply, assign(socket, :sessions, list_sessions())}
+  end
+
+  def handle_info({:session_destroyed, id}, socket) do
+    sessions = list_sessions()
+
+    cond do
+      # The session we're currently viewing got destroyed — navigate
+      # to the next available one, or back to the index.
+      id == socket.assigns.session_id ->
+        target =
+          case sessions do
+            [%{id: next} | _] -> ~p"/chat/#{next}"
+            [] -> ~p"/chat"
+          end
+
+        {:noreply, push_navigate(socket, to: target)}
+
+      true ->
+        {:noreply, assign(socket, :sessions, sessions)}
+    end
   end
 
   def handle_info({:turn_start, _n}, socket) do

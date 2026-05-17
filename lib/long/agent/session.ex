@@ -14,10 +14,16 @@ defmodule Long.Agent.Session do
   end
 
   actions do
-    defaults [:read, :destroy]
+    defaults [:read]
+
+    destroy :destroy do
+      primary? true
+      change after_action(&Long.Agent.SessionPubSub.broadcast_destroyed/3)
+    end
 
     create :start do
       accept [:title, :llm_alias]
+      change after_action(&Long.Agent.SessionPubSub.broadcast_created/3)
     end
 
     update :update do
@@ -31,11 +37,14 @@ defmodule Long.Agent.Session do
         :token_usage,
         :ended_at
       ]
+
+      change after_action(&Long.Agent.SessionPubSub.broadcast_updated/3)
     end
 
     update :archive do
       change set_attribute(:status, :archived)
       change set_attribute(:ended_at, &DateTime.utc_now/0)
+      change after_action(&Long.Agent.SessionPubSub.broadcast_updated/3)
     end
   end
 
