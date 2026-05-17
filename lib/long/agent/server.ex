@@ -370,8 +370,17 @@ defmodule Long.Agent.Server do
     # contradicts any prior turn where the model denied that capability.
     intent = Long.Agent.IntentRouter.classify(text, tools, history)
 
+    # `tool_inventory` is the flat "you have these tools right now"
+    # preamble + tool-first mandate; put it at the very top so it's
+    # the first thing the model sees every turn. Stops the model from
+    # leaping to custom-script answers when a built-in tool covers it.
     system_text =
-      [Loop.default_system(), addendum, intent.system_correction]
+      [
+        Long.Agent.ToolInventory.render(tools),
+        Loop.default_system(),
+        addendum,
+        intent.system_correction
+      ]
       |> Enum.reject(&(is_nil(&1) or &1 == ""))
       |> Enum.join("\n\n")
 
@@ -755,13 +764,6 @@ defmodule Long.Agent.Server do
     text
     |> Long.Util.Text.first_line()
     |> Long.Util.Text.preview(40)
-  end
-
-  defp merge_system(base, nil), do: base
-  defp merge_system(base, ""), do: base
-
-  defp merge_system(base, addendum) when is_binary(addendum) do
-    base <> "\n\n# Conversation summary so far (carry-forward context)\n\n" <> addendum
   end
 
   defp merge_addenda(parts) when is_list(parts) do
