@@ -53,6 +53,38 @@ defmodule Long.Jido.HistoryTest do
       assert tc.id == "call_1"
     end
 
+    test "converts tool-role rows into tool messages (post-Server-migration shape)", %{session: session} do
+      # Regression for v0.2.0 → v0.2.2: `Long.Agent.Server` persists
+      # tool results with `role: :tool`, but pre-migration code only
+      # handled `role: :user + tool_results`. The bug caused every
+      # turn's history load to drop tool results and synthesize
+      # `{"error":"tool result missing"}` placeholders.
+      {:ok, _} =
+        Agent.append_message(%{
+          session_id: session.id,
+          role: :assistant,
+          content: "",
+          tool_calls: [%{"id" => "call_x", "name" => "graphql", "input" => %{"query" => "{}"}}],
+          turn: 1
+        })
+
+      {:ok, _} =
+        Agent.append_message(%{
+          session_id: session.id,
+          role: :tool,
+          content: "",
+          tool_results: [%{"tool_use_id" => "call_x", "content" => "real tool result"}],
+          turn: 1
+        })
+
+      [%ReqLLM.Message{role: :assistant}, %ReqLLM.Message{role: :tool} = tool_msg] =
+        History.load(session.id)
+
+      assert tool_msg.tool_call_id == "call_x"
+      # ReqLLM.Context.tool_result/2 wraps the string body as a :text ContentPart.
+      assert [%{type: :text, text: "real tool result"}] = tool_msg.content
+    end
+
     test "converts user tool_results into tool messages", %{session: session} do
       {:ok, _} =
         Agent.append_message(%{

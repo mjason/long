@@ -312,10 +312,10 @@ defmodule LongWeb.ManageLive do
     # `to_existing_atom` blocks the `params -> atom` exhaustion vector;
     # the schema's `one_of` constraints have already loaded these atoms.
     attrs = %{
-      scope: safe_atom(params["scope"], :general, @memory_scopes),
+      scope: safe_atom(params["scope"], :general, memory_scopes()),
       key: String.trim(params["key"] || ""),
       value: params["value"] || "",
-      kind: safe_atom(params["kind"], :fact, @memory_kinds),
+      kind: safe_atom(params["kind"], :fact, memory_kinds()),
       importance: parse_int(params["importance"], 3)
     }
 
@@ -493,7 +493,7 @@ defmodule LongWeb.ManageLive do
     attrs = %{
       name: String.trim(params["name"] || ""),
       prompt: params["prompt"] || "",
-      repeat: safe_atom(params["repeat"], :daily, @scheduled_repeats),
+      repeat: safe_atom(params["repeat"], :daily, scheduled_repeats()),
       schedule_time: String.trim(params["schedule_time"] || "00:00"),
       every_n: parse_int(params["every_n"], 1),
       max_delay_hours: parse_int(params["max_delay_hours"], 6),

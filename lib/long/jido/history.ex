@@ -295,7 +295,12 @@ defmodule Long.Jido.History do
     String.length(content)
   end
 
-  defp to_req_messages(%{role: :user, tool_results: [_ | _] = results}) do
+  # `role: :tool` is the post-Server-migration shape: each tool_result
+  # gets its own row with `role: :tool` and `tool_results: [...]`.
+  # `role: :user + tool_results: [...]` is the legacy bot-loop shape;
+  # both still exist in the DB because we never migrated old rows.
+  defp to_req_messages(%{role: role, tool_results: [_ | _] = results})
+       when role in [:user, :tool] do
     Enum.map(results, fn r ->
       id = Map.get(r, "tool_use_id") || Map.get(r, "id") || ""
       content = Map.get(r, "content", "") |> Utf8.sanitize()

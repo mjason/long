@@ -56,6 +56,8 @@ defmodule Long.Jido.LLMCall do
 
     req_tools = Enum.map(tools, &as_req_tool(&1, opts))
 
+    log_request(alias_name, messages, req_tools, attempt)
+
     req_opts =
       [
         base_url: cfg.base_url,
@@ -70,6 +72,8 @@ defmodule Long.Jido.LLMCall do
       case ReqLLM.Generation.stream_text(cfg.model, messages, req_opts) do
         {:ok, sr} ->
           classification = ReqLLM.StreamResponse.classify(sr)
+
+          log_response(alias_name, classification)
 
           {:ok,
            %{
@@ -181,6 +185,51 @@ defmodule Long.Jido.LLMCall do
   # overwrite it with the actual callback the caller passes — the Loop
   # one level up dispatches via `Jido.Exec.run/2` anyway, so the callback
   # is only invoked if some caller uses ReqLLM's auto-exec path.
+  # Lightweight summary log per LLM call so the operator can verify
+  # what actually reached the model. Only fires when the
+  # `:long, :llm_call_debug` env is truthy; off by default in prod
+  # (turn on with `Application.put_env(:long, :llm_call_debug, true)`
+  # at iex / via remote_console for ad-hoc tracing).
+  defp log_request(alias_name, messages, req_tools, attempt) do
+    if Application.get_env(:long, :llm_call_debug, false) do
+      system_msg = Enum.find(messages, &(&1.role == :system))
+      system_len = if system_msg, do: String.length(extract_text(system_msg.content)), else: 0
+      tool_names = Enum.map(req_tools, & &1.name)
+
+      require Logger
+
+      Logger.info(
+        "[llm_call] alias=#{alias_name} attempt=#{attempt} " <>
+          "system_chars=#{system_len} msg_count=#{length(messages)} " <>
+          "tools=#{inspect(tool_names)}"
+      )
+    end
+  end
+
+  defp log_response(alias_name, classification) do
+    if Application.get_env(:long, :llm_call_debug, false) do
+      tool_call_names = Enum.map(classification.tool_calls || [], & &1.name)
+
+      require Logger
+
+      Logger.info(
+        "[llm_call] alias=#{alias_name} type=#{classification.type} " <>
+          "finish=#{classification.finish_reason} " <>
+          "text_chars=#{String.length(classification.text || "")} " <>
+          "tool_calls=#{inspect(tool_call_names)}"
+      )
+    end
+  end
+
+  defp extract_text(content) when is_binary(content), do: content
+  defp extract_text(parts) when is_list(parts) do
+    Enum.map_join(parts, "", fn
+      %{type: :text, text: t} -> t
+      _ -> ""
+    end)
+  end
+  defp extract_text(_), do: ""
+
   # `tool_choice` forces the model's first tool_call to a specific
   # tool. Kept as plumbing in case a caller needs strict tool routing
   # (none today after the GraphQL migration collapsed the tool list).
