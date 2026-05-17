@@ -69,10 +69,6 @@ config :long, LongWeb.Endpoint,
 # Enable dev routes for dashboard and mailbox
 config :long, dev_routes: true
 
-# Phase B v2 — dev defaults to the jido-based runner. Tests/prod keep the
-# legacy `Long.Agent.SessionRunner` (no config = default).
-config :long, :session_runner, Long.Jido.SessionRunner
-
 # Do not include metadata nor timestamps in development logs
 config :logger, :default_formatter, format: "[$level] $message\n"
 

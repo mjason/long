@@ -7,10 +7,14 @@ defmodule Long.SessionRunner do
 
   Configure with:
 
-      config :long, :session_runner, Long.Jido.SessionRunner   # or Long.Agent.SessionRunner
+      config :long, :session_runner, Long.Agent.SessionRunner   # or Long.Jido.SessionRunner
 
-  Default: `Long.Agent.SessionRunner` (legacy), so existing tests stay
-  green without test.exs changes.
+  Default: `Long.Jido.SessionRunner` — backed by `Long.Agent.Server`
+  (GenServer), so `Long.Agent.SessionClear.clear/1` can actually
+  terminate an in-flight turn. The legacy fire-and-forget Task runner
+  pre-dated `terminate_session/1`; using it in prod left `/clear`
+  unable to stop a running Loop, which kept persisting messages after
+  the wipe.
   """
 
   def topic(session_id), do: impl().topic(session_id)
@@ -41,5 +45,5 @@ defmodule Long.SessionRunner do
   def done_notice(_), do: nil
 
   defp impl,
-    do: Application.get_env(:long, :session_runner, Long.Agent.SessionRunner)
+    do: Application.get_env(:long, :session_runner, Long.Jido.SessionRunner)
 end
