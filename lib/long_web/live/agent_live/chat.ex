@@ -46,6 +46,18 @@ defmodule LongWeb.AgentLive.Chat do
       "" ->
         {:noreply, socket}
 
+      "/clear" ->
+        Long.Agent.SessionClear.clear(socket.assigns.session_id)
+
+        {:noreply,
+         socket
+         |> assign(:messages, load_messages(socket.assigns.session_id))
+         |> assign(:checkpoint, load_checkpoint(socket.assigns.session_id))
+         |> assign(:streaming, nil)
+         |> assign(:loop_running?, false)
+         |> assign(:loop_notice, %{kind: :info, text: "已清空这条会话的历史、摘要、检查点和 session 记忆。"})
+         |> push_event("agent:clear-composer", %{})}
+
       trimmed ->
         SessionRunner.send_user_message(socket.assigns.session_id, trimmed)
 
@@ -146,6 +158,18 @@ defmodule LongWeb.AgentLive.Chat do
 
   def handle_info({:message_persisted, _}, socket) do
     {:noreply, assign(socket, :messages, load_messages(socket.assigns.session_id))}
+  end
+
+  # /clear was issued (here or from a bot platform); messages + summary
+  # + checkpoint were wiped. Reload them so a stale UI doesn't keep
+  # showing the conversation that no longer exists in the DB.
+  def handle_info(:session_cleared, socket) do
+    {:noreply,
+     socket
+     |> assign(:messages, load_messages(socket.assigns.session_id))
+     |> assign(:checkpoint, load_checkpoint(socket.assigns.session_id))
+     |> assign(:streaming, nil)
+     |> assign(:loop_running?, false)}
   end
 
   def handle_info({:session_updated, session}, socket) do

@@ -131,40 +131,14 @@ defmodule Long.Agent.Bots do
   defp clear_session(session_id) do
     {prior_owner_pid, _} = Activity.clear(session_id)
 
-    # Kill in-flight LLM/tool tasks and drop the persisted snapshot
-    # before wiping DB rows underneath the running Server.
-    Long.Agent.Server.terminate_session(session_id)
-
-    Task.Supervisor.start_child(@task_sup, fn ->
-      if is_pid(prior_owner_pid) do
-        _ = Task.Supervisor.terminate_child(@task_sup, prior_owner_pid)
-      end
-
-      wipe_session_rows(session_id)
-    end)
-
-    :ok
-  end
-
-  defp wipe_session_rows(session_id) do
-    _ =
-      Long.Agent.Message
-      |> Ash.Query.filter(session_id == ^session_id)
-      |> Ash.bulk_destroy(:destroy, %{}, strategy: :stream, return_errors?: false)
-
-    _ =
-      Long.Agent.SessionMemory
-      |> Ash.Query.filter(session_id == ^session_id)
-      |> Ash.bulk_destroy(:destroy, %{}, strategy: :stream, return_errors?: false)
-
-    case Agent.get_checkpoint(session_id) do
-      {:ok, checkpoint} -> Ash.destroy(checkpoint)
-      _ -> :ok
+    # Terminate any in-flight watcher synchronously so its DB writes
+    # don't race the wipe. Best-effort: if it's not a child of @task_sup,
+    # terminate_child returns {:error, :not_found} which we ignore.
+    if is_pid(prior_owner_pid) do
+      _ = Task.Supervisor.terminate_child(@task_sup, prior_owner_pid)
     end
 
-    with {:ok, session} <- Agent.get_session(session_id) do
-      Agent.update_session(session, %{summary: nil, summary_through_inserted_at: nil})
-    end
+    Long.Agent.SessionClear.clear(session_id)
   end
 
   defp render_status(%{owner: nil, queue_length: 0, pending_btws: 0}),
