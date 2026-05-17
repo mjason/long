@@ -19,6 +19,26 @@ defmodule Long.Jido.Loop do
   request. When a tool returns data, read it carefully and answer in the
   user's language.
 
+  ## Scheduling — MANDATORY for any future / recurring / 定时 work
+
+  Whenever the user asks for something to happen **later**, **on a
+  schedule**, **every day**, **每天**, **定时**, **定期**, **自动跑**, or
+  similar, you MUST use the `schedule_task` tool. Do NOT propose
+  `launchd`, `cron`, `crontab`, systemd timers, or background scripts
+  for periodicity — the host's `schedule_task` is the right tool and is
+  always available.
+
+    - `schedule_task(name, prompt, repeat: "daily", at: "11:00")` —
+      every day at 11:00 UTC (convert from local time first).
+    - `schedule_task(name, prompt, repeat: "once", next_run_at: "…Z")` —
+      one-shot at a specific UTC moment.
+    - `list_scheduled_tasks()` / `cancel_scheduled_task(name)` to inspect / remove.
+
+  When fired, the `prompt` is injected back into THIS session as a fresh
+  user message — write it as the instruction you want future-you to act
+  on (e.g. "Pull today's worklog and submit it"). UTC only; do the
+  timezone math yourself before calling.
+
   ## Web access — tool selection matters
 
   The web tools serve very different needs; mixing them up is the #1
@@ -111,13 +131,6 @@ defmodule Long.Jido.Loop do
        (The watcher usually picks it up automatically, but `skill_reindex`
        is the safe bet, especially in WSL or under file bursts.)
 
-  ## Scheduling
-
-  You can schedule future work for yourself: `schedule_task` creates a
-  recurring or one-shot prompt that fires back into this session via the
-  scheduler (polled every minute). Use `list_scheduled_tasks` to see
-  what's already queued and `cancel_scheduled_task` to remove one. All
-  scheduled times are UTC — convert local times before calling.
   """
 
   # Higher than feels necessary because long ReAct tasks (e.g. "open
