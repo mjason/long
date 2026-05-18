@@ -167,73 +167,119 @@ defmodule Long.Agent.ServerTest do
     end
 
     test "max_turns opt does not leak across user messages", %{session: session} do
-      # message 1 overrides max_turns: 2 and trips :max_turns. message 2
-      # passes no opt — it must run under the default cap (20), not
-      # inherit the leftover 2 from message 1.
-      Application.put_env(:long, :default_tools, [Long.Test.EchoTool])
-
-      on_exit(fn ->
-        Server.terminate_session(session.id)
-        Application.delete_env(:long, :default_tools)
-      end)
-
+      # Message 1 overrides max_turns: 7 explicitly; message 2 passes
+      # no opt and must run under the default cap, not inherit 7.
+      # We check the snapshot directly because the symptom of a leak
+      # would be silent (next message's cap quietly stays at the old
+      # value), not a visible error.
       Long.Jido.SessionRunner.subscribe(session.id)
 
-      # Message 1: two tool_call responses → trips :max_turns at 2.
-      for i <- 1..2 do
-        LLMConsumerMock.push_response(session.id, %{
-          type: :tool_calls,
-          tool_calls: [%{id: "leak#{i}", name: "echo_tool", arguments: %{text: "#{i}"}}]
-        })
-      end
+      LLMConsumerMock.push_response(session.id, %{type: :final_answer, text: "msg1"})
 
       :ok =
         Server.send_user_message(session.id, "tight",
           llm_consumer: LLMConsumerMock,
-          max_turns: 2
+          max_turns: 7
         )
 
-      assert_receive {:done, %{reason: :max_turns}}, 2_000
       assert_receive :loop_ended, 2_000
+      assert Server.snapshot(session.id).max_turns == 7
 
-      # Message 2: tool then final — needs 2 LLM iterations. If the
-      # `max_turns: 2` from message 1 leaked, the tool round would
-      # again trip :max_turns. With proper scoping we get the full
-      # default cap and finish cleanly.
-      LLMConsumerMock.push_response(session.id, %{
-        type: :tool_calls,
-        tool_calls: [%{id: "noleak", name: "echo_tool", arguments: %{text: "ok"}}]
-      })
-
-      LLMConsumerMock.push_response(session.id, %{type: :final_answer, text: "fresh"})
+      LLMConsumerMock.push_response(session.id, %{type: :final_answer, text: "msg2"})
 
       :ok = Server.send_user_message(session.id, "loose", llm_consumer: LLMConsumerMock)
+      assert_receive :loop_ended, 2_000
 
-      assert_receive {:done, %{reason: :no_tool_call}}, 2_000
+      # Must have reset to the configured default, not stuck at 7.
+      default = Application.get_env(:long, :default_max_turns, 40)
+      assert Server.snapshot(session.id).max_turns == default
     end
 
-    test "still fires :max_turns inside a single user message", %{session: session} do
+    test "hitting iteration cap folds history via Summarizer and continues", %{
+      session: session
+    } do
+      # When iteration hits max_turns we should NOT terminate; instead
+      # the older portion of state.messages gets folded into a summary,
+      # iteration resets, and the loop keeps going. With max_turns: 1
+      # the budget is exhausted right after the first tool round, which
+      # is exactly what triggers compression. After compression resets
+      # iteration, the loop runs a second LLM call that returns
+      # final_answer — overall: tool round → compression → final answer
+      # with no :max_turns trip.
+      test_pid = self()
+
       Application.put_env(:long, :default_tools, [Long.Test.EchoTool])
+      Application.put_env(:long, :summarizer, fn _prior, rows, _alias ->
+        # Forward the rows we were asked to fold so the test can assert
+        # the conversion to row-shape happened correctly.
+        send(test_pid, {:summarizer_called, rows})
+        {:ok, "folded summary of earlier turns"}
+      end)
 
       on_exit(fn ->
         Server.terminate_session(session.id)
         Application.delete_env(:long, :default_tools)
+        Application.delete_env(:long, :summarizer)
       end)
 
       Long.Jido.SessionRunner.subscribe(session.id)
 
-      # With max_turns: 2, two LLM calls are allowed; both return
-      # tool_calls so neither produces a final answer — the second
-      # tool batch must trip :max_turns.
-      for i <- 1..2 do
+      # Round 1: tool_calls trips the iter=1, max=1 budget on completion.
+      LLMConsumerMock.push_response(session.id, %{
+        type: :tool_calls,
+        tool_calls: [%{id: "c1", name: "echo_tool", arguments: %{text: "go"}}]
+      })
+
+      # After compression resets iteration we expect a second LLM call —
+      # give it a final answer this time.
+      LLMConsumerMock.push_response(session.id, %{type: :final_answer, text: "wrapped"})
+
+      :ok =
+        Server.send_user_message(session.id, "compress me",
+          llm_consumer: LLMConsumerMock,
+          max_turns: 1
+        )
+
+      # Summarizer must have been invoked with a non-empty row list
+      # whose first row is the user message ("compress me").
+      assert_receive {:summarizer_called, rows}, 2_000
+      assert [%{role: :user, content: "compress me"} | _] = rows
+
+      assert_receive {:done, %{reason: :no_tool_call}}, 2_000
+      refute_receive {:done, %{reason: :max_turns}}, 100
+    end
+
+    test "falls back to :max_turns after the compression cap", %{session: session} do
+      Application.put_env(:long, :default_tools, [Long.Test.EchoTool])
+      Application.put_env(:long, :summarizer, fn _prior, _rows, _alias ->
+        {:ok, "summary"}
+      end)
+
+      on_exit(fn ->
+        Server.terminate_session(session.id)
+        Application.delete_env(:long, :default_tools)
+        Application.delete_env(:long, :summarizer)
+      end)
+
+      Long.Jido.SessionRunner.subscribe(session.id)
+
+      # With max_turns: 1, each iteration immediately exhausts the budget
+      # and triggers a compression. After 3 compressions the Server must
+      # give up with :max_turns. Push enough tool_calls to feed every
+      # cycle: 1 (initial) + 3 (post-compression) = 4 calls before the
+      # 4th budget exhaustion gives up.
+      for i <- 1..4 do
         LLMConsumerMock.push_response(session.id, %{
           type: :tool_calls,
-          tool_calls: [%{id: "c#{i}", name: "echo_tool", arguments: %{text: "#{i}"}}]
+          tool_calls: [%{id: "loop#{i}", name: "echo_tool", arguments: %{text: "#{i}"}}]
         })
       end
 
       :ok =
-        Server.send_user_message(session.id, "loop forever", llm_consumer: LLMConsumerMock, max_turns: 2)
+        Server.send_user_message(session.id, "loop forever",
+          llm_consumer: LLMConsumerMock,
+          max_turns: 1
+        )
 
       assert_receive {:done, %{reason: :max_turns}}, 2_000
     end

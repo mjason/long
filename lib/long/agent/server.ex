@@ -31,8 +31,16 @@ defmodule Long.Agent.Server do
 
   @topic_prefix "agent_session:"
   @task_sup Long.Agent.TaskSup
-  @default_max_turns 20
+  @default_max_turns 40
   @max_tool_calls_per_turn 4
+  # When `iteration` hits `max_turns` we don't just stop — we fold the
+  # in-flight messages into a summary via `Long.Jido.Summarizer` and
+  # reset the counter so legitimate long tasks (deep research, big
+  # refactors, …) can finish. `compression_count` caps how many times
+  # this rollover can happen per user message; beyond it we fall back
+  # to the original `:max_turns` `end_turn`. Guards against models
+  # genuinely stuck in a loop.
+  @max_in_flight_compressions 3
   @default_tool_timeout_ms 60_000
 
   # ── Client API ────────────────────────────────────────────────────────
@@ -166,6 +174,9 @@ defmodule Long.Agent.Server do
       # and every new message would trip max_turns on the first tool
       # round.
       iteration: 0,
+      # Number of in-flight compressions already triggered for the
+      # current user message. Resets per message alongside `iteration`.
+      compression_count: 0,
       messages: [],
       tools: default_tools(),
       tool_ctx: %{},
@@ -411,6 +422,7 @@ defmodule Long.Agent.Server do
         | stage: :calling_llm,
           turn: turn_no,
           iteration: 1,
+          compression_count: 0,
           messages: messages,
           tools: tools,
           tool_ctx: tool_ctx,
@@ -598,11 +610,152 @@ defmodule Long.Agent.Server do
     }
 
     if state.iteration >= state.max_turns do
-      end_turn(idle(state), {:done, %{reason: :max_turns}})
+      maybe_compress_and_continue(state)
     else
       broadcast(state.session_id, {:turn_start, state.turn + 1})
       spawn_llm(%{state | turn: state.turn + 1, iteration: state.iteration + 1})
     end
+  end
+
+  # Iteration budget exhausted. If we still have compression headroom,
+  # fold the in-flight history into a summary and continue with a
+  # smaller payload + reset iteration. Beyond `@max_in_flight_compressions`
+  # we give up — likely a real loop, not just a long task.
+  defp maybe_compress_and_continue(%{compression_count: n} = state)
+       when n >= @max_in_flight_compressions do
+    end_turn(idle(state), {:done, %{reason: :max_turns}})
+  end
+
+  defp maybe_compress_and_continue(state) do
+    case compress_in_flight(state) do
+      {:ok, compressed_state} ->
+        broadcast(state.session_id, {:turn_start, state.turn + 1})
+
+        spawn_llm(%{
+          compressed_state
+          | turn: state.turn + 1,
+            iteration: 1,
+            compression_count: state.compression_count + 1
+        })
+
+      {:error, reason} ->
+        Logger.warning(
+          "Long.Agent.Server: in-flight compression failed " <>
+            "(session=#{state.session_id}, reason=#{inspect(reason)}); " <>
+            "falling back to :max_turns end_turn"
+        )
+
+        end_turn(idle(state), {:done, %{reason: :max_turns}})
+    end
+  end
+
+  # Build a row-shape list out of state.messages (the in-flight tail)
+  # for the Summarizer, fold the older portion into a fresh summary,
+  # and rebuild state.messages = [augmented_system, recent_tail].
+  defp compress_in_flight(state) do
+    case state.llm_alias || Agent.default_llm_alias() do
+      nil -> {:error, :no_llm_alias}
+      alias_name -> do_compress_in_flight(state, alias_name)
+    end
+  end
+
+  defp do_compress_in_flight(state, alias_name) do
+    {system_msg, body} = split_system(state.messages)
+    {to_fold, tail} = split_at_recent_tool_pair(body)
+
+    if to_fold == [] do
+      {:error, :nothing_to_fold}
+    else
+      rows = Enum.map(to_fold, &req_message_to_row/1)
+
+      case summarizer().(nil, rows, alias_name) do
+        {:ok, summary} ->
+          new_system = augment_system_with_summary(system_msg, summary)
+          {:ok, %{state | messages: [new_system | tail]}}
+
+        err ->
+          err
+      end
+    end
+  end
+
+  # Injectable for tests so they don't hit a real LLM.
+  defp summarizer,
+    do: Application.get_env(:long, :summarizer, &Long.Jido.Summarizer.summarize/3)
+
+  defp split_system([%ReqLLM.Message{role: :system} = sys | rest]), do: {sys, rest}
+  defp split_system(msgs), do: {nil, msgs}
+
+  # Keep the last assistant message that issued tool_calls + its
+  # following tool_results. Everything earlier gets summarised. If
+  # there's no such anchor (no tools yet this turn) keep the tail
+  # half — better than dropping context blind.
+  defp split_at_recent_tool_pair(msgs) do
+    case last_tool_call_index(msgs) do
+      nil ->
+        mid = div(length(msgs), 2)
+        Enum.split(msgs, mid)
+
+      idx ->
+        Enum.split(msgs, idx)
+    end
+  end
+
+  defp last_tool_call_index(msgs) do
+    msgs
+    |> Enum.with_index()
+    |> Enum.reverse()
+    |> Enum.find_value(fn
+      {%ReqLLM.Message{role: :assistant, tool_calls: [_ | _]}, i} -> i
+      _ -> false
+    end)
+  end
+
+  defp augment_system_with_summary(nil, summary) do
+    ReqLLM.Context.system("## Compressed earlier turns\n\n" <> summary)
+  end
+
+  defp augment_system_with_summary(%ReqLLM.Message{content: parts}, summary) do
+    text = extract_text(parts)
+
+    ReqLLM.Context.system(
+      text <> "\n\n## Compressed earlier turns\n\n" <> summary
+    )
+  end
+
+  # ReqLLM.Message → DB-row-shaped map that `Long.Jido.Summarizer`
+  # consumes. The shape mirrors what `persist_message/6` writes to
+  # `Long.Agent.Message`, with string keys on tool_calls/tool_results.
+  # The `:tool` clause re-keys to `role: :user` so the Summarizer's
+  # `[tool_result]` render branch fires (it pattern-matches on
+  # `role: :user` + non-empty `tool_results`).
+  defp req_message_to_row(%ReqLLM.Message{role: :assistant, content: parts, tool_calls: calls}) do
+    %{
+      role: :assistant,
+      content: extract_text(parts),
+      tool_calls:
+        Enum.map(calls || [], fn tc ->
+          %{
+            "id" => tc.id,
+            "name" => ReqLLM.ToolCall.name(tc),
+            "input" => ReqLLM.ToolCall.args_map(tc) || %{}
+          }
+        end),
+      tool_results: []
+    }
+  end
+
+  defp req_message_to_row(%ReqLLM.Message{role: :tool, tool_call_id: id, content: parts}) do
+    %{
+      role: :user,
+      content: "",
+      tool_calls: [],
+      tool_results: [%{"tool_use_id" => id, "content" => extract_text(parts)}]
+    }
+  end
+
+  defp req_message_to_row(%ReqLLM.Message{role: role, content: parts}) do
+    %{role: role, content: extract_text(parts), tool_calls: [], tool_results: []}
   end
 
   defp idle(state), do: %{state | stage: :idle, current_request: nil}
@@ -977,6 +1130,7 @@ defmodule Long.Agent.Server do
     %{
       stage: state.stage,
       turn: state.turn,
+      max_turns: state.max_turns,
       current_request: state.current_request,
       pending_tool_count: map_size(state.pending_tool_calls),
       btw_count: length(state.btws),
