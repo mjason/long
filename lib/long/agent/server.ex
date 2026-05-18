@@ -45,8 +45,9 @@ defmodule Long.Agent.Server do
 
   @doc """
   Cast a new user message. If the Server is busy the message is queued
-  and runs after the current turn. `opts` may carry `:attachments` and
-  `:llm_alias`.
+  and runs after the current turn. `opts` may carry `:attachments`,
+  `:llm_alias`, `:max_turns` (per-message override of the iteration
+  cap), and `:llm_consumer` (test seam).
   """
   def send_user_message(session_id, text, opts \\ [])
       when is_binary(session_id) and is_binary(text) do
@@ -154,7 +155,17 @@ defmodule Long.Agent.Server do
 
       # State-machine fields
       stage: :idle,
+      # `turn` is a session-monotonic counter persisted on every
+      # message row, used for `sort turn: :asc` history ordering and
+      # snapshot semantics.
       turn: 0,
+      # `iteration` counts LLM round-trips *within the current user
+      # message* and resets in `start_llm_turn/4`. This is what the
+      # `max_turns` cap actually compares against — without the reset
+      # an old session would carry its lifetime turn count forward
+      # and every new message would trip max_turns on the first tool
+      # round.
+      iteration: 0,
       messages: [],
       tools: default_tools(),
       tool_ctx: %{},
@@ -178,7 +189,7 @@ defmodule Long.Agent.Server do
       # /status preview of what's being worked on
       current_request: nil,
 
-      max_turns: @default_max_turns,
+      max_turns: Keyword.get(opts, :max_turns, default_max_turns()),
       llm_consumer: Keyword.get(opts, :llm_consumer, default_llm_consumer())
     }
 
@@ -187,6 +198,9 @@ defmodule Long.Agent.Server do
 
   defp default_llm_consumer,
     do: Application.get_env(:long, :llm_consumer, Long.Agent.LLMConsumer)
+
+  defp default_max_turns,
+    do: Application.get_env(:long, :default_max_turns, @default_max_turns)
 
   @impl true
   def handle_continue(:restore_or_idle, state) do
@@ -328,6 +342,17 @@ defmodule Long.Agent.Server do
     alias_name =
       Keyword.get(opts, :llm_alias) || state.llm_alias || Agent.default_llm_alias()
 
+    # Scope `:max_turns` to this message only: a one-off override on
+    # message N must NOT leak into message N+1's cap. Reset to the
+    # config default whenever no opt is supplied.
+    max_turns =
+      case Keyword.get(opts, :max_turns) do
+        n when is_integer(n) and n > 0 -> n
+        _ -> default_max_turns()
+      end
+
+    state = %{state | max_turns: max_turns}
+
     if is_nil(alias_name) do
       # No LLM configured — delegate to the echo fallback runner which
       # owns its own PubSub broadcasts and message persistence.
@@ -385,6 +410,7 @@ defmodule Long.Agent.Server do
         state
         | stage: :calling_llm,
           turn: turn_no,
+          iteration: 1,
           messages: messages,
           tools: tools,
           tool_ctx: tool_ctx,
@@ -571,11 +597,11 @@ defmodule Long.Agent.Server do
         tool_monitors: %{}
     }
 
-    if state.turn >= state.max_turns do
+    if state.iteration >= state.max_turns do
       end_turn(idle(state), {:done, %{reason: :max_turns}})
     else
       broadcast(state.session_id, {:turn_start, state.turn + 1})
-      spawn_llm(%{state | turn: state.turn + 1})
+      spawn_llm(%{state | turn: state.turn + 1, iteration: state.iteration + 1})
     end
   end
 

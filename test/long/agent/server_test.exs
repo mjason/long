@@ -105,6 +105,140 @@ defmodule Long.Agent.ServerTest do
     end
   end
 
+  describe "max_turns scope" do
+    test "max_turns counts iterations within a user message, not session lifetime",
+         %{session: session} do
+      # Two user messages — each does one tool round (two LLM iterations).
+      # With max_turns: 2 explicitly set on BOTH (so the test doesn't
+      # depend on opts leaking between messages), the second message
+      # must still complete: each message gets a fresh iteration budget.
+      # If `state.iteration` weren't reset in start_llm_turn, message 2
+      # would resume at iter=2 and trip :max_turns on its first tool
+      # round.
+      Application.put_env(:long, :default_tools, [Long.Test.EchoTool])
+
+      on_exit(fn ->
+        Server.terminate_session(session.id)
+        Application.delete_env(:long, :default_tools)
+      end)
+
+      Long.Jido.SessionRunner.subscribe(session.id)
+
+      send_tool_then_final = fn id, label ->
+        LLMConsumerMock.push_response(session.id, %{
+          type: :tool_calls,
+          tool_calls: [%{id: id, name: "echo_tool", arguments: %{text: label}}]
+        })
+
+        LLMConsumerMock.push_response(session.id, %{
+          type: :final_answer,
+          text: "#{label} done"
+        })
+      end
+
+      send_tool_then_final.("c1", "round one")
+
+      :ok =
+        Server.send_user_message(session.id, "first",
+          llm_consumer: LLMConsumerMock,
+          max_turns: 2
+        )
+
+      assert_receive {:done, %{reason: :no_tool_call}}, 2_000
+      assert_receive :loop_ended, 2_000
+
+      send_tool_then_final.("c2", "round two")
+
+      :ok =
+        Server.send_user_message(session.id, "second",
+          llm_consumer: LLMConsumerMock,
+          max_turns: 2
+        )
+
+      assert_receive {:done, %{reason: reason}}, 2_000
+
+      assert reason == :no_tool_call,
+             "expected :no_tool_call, got #{inspect(reason)} (iteration reset regressed)"
+
+      assert_receive :loop_ended, 2_000
+
+      snap = Server.snapshot(session.id)
+      assert snap.stage == :idle
+    end
+
+    test "max_turns opt does not leak across user messages", %{session: session} do
+      # message 1 overrides max_turns: 2 and trips :max_turns. message 2
+      # passes no opt — it must run under the default cap (20), not
+      # inherit the leftover 2 from message 1.
+      Application.put_env(:long, :default_tools, [Long.Test.EchoTool])
+
+      on_exit(fn ->
+        Server.terminate_session(session.id)
+        Application.delete_env(:long, :default_tools)
+      end)
+
+      Long.Jido.SessionRunner.subscribe(session.id)
+
+      # Message 1: two tool_call responses → trips :max_turns at 2.
+      for i <- 1..2 do
+        LLMConsumerMock.push_response(session.id, %{
+          type: :tool_calls,
+          tool_calls: [%{id: "leak#{i}", name: "echo_tool", arguments: %{text: "#{i}"}}]
+        })
+      end
+
+      :ok =
+        Server.send_user_message(session.id, "tight",
+          llm_consumer: LLMConsumerMock,
+          max_turns: 2
+        )
+
+      assert_receive {:done, %{reason: :max_turns}}, 2_000
+      assert_receive :loop_ended, 2_000
+
+      # Message 2: tool then final — needs 2 LLM iterations. If the
+      # `max_turns: 2` from message 1 leaked, the tool round would
+      # again trip :max_turns. With proper scoping we get the full
+      # default cap and finish cleanly.
+      LLMConsumerMock.push_response(session.id, %{
+        type: :tool_calls,
+        tool_calls: [%{id: "noleak", name: "echo_tool", arguments: %{text: "ok"}}]
+      })
+
+      LLMConsumerMock.push_response(session.id, %{type: :final_answer, text: "fresh"})
+
+      :ok = Server.send_user_message(session.id, "loose", llm_consumer: LLMConsumerMock)
+
+      assert_receive {:done, %{reason: :no_tool_call}}, 2_000
+    end
+
+    test "still fires :max_turns inside a single user message", %{session: session} do
+      Application.put_env(:long, :default_tools, [Long.Test.EchoTool])
+
+      on_exit(fn ->
+        Server.terminate_session(session.id)
+        Application.delete_env(:long, :default_tools)
+      end)
+
+      Long.Jido.SessionRunner.subscribe(session.id)
+
+      # With max_turns: 2, two LLM calls are allowed; both return
+      # tool_calls so neither produces a final answer — the second
+      # tool batch must trip :max_turns.
+      for i <- 1..2 do
+        LLMConsumerMock.push_response(session.id, %{
+          type: :tool_calls,
+          tool_calls: [%{id: "c#{i}", name: "echo_tool", arguments: %{text: "#{i}"}}]
+        })
+      end
+
+      :ok =
+        Server.send_user_message(session.id, "loop forever", llm_consumer: LLMConsumerMock, max_turns: 2)
+
+      assert_receive {:done, %{reason: :max_turns}}, 2_000
+    end
+  end
+
   describe "inbox queue" do
     test "messages sent while busy are processed after the current turn", %{session: session} do
       # Queue up two LLM responses; we'll send two messages back-to-back.
