@@ -509,13 +509,13 @@ defmodule LongWeb.ManageLive do
       schedule_time: String.trim(params["schedule_time"] || "00:00"),
       every_n: parse_int(params["every_n"], 1),
       max_delay_hours: parse_int(params["max_delay_hours"], 6),
-      enabled: params["enabled"] == "true",
-      session_id: trim_or_nil(params["session_id"])
+      enabled: params["enabled"] == "true"
     }
 
     # ScheduledTask exposes separate `:create` / `:update` actions
     # (unlike LLMConfig / SearchConfig which use upsert), so we have to
-    # dispatch by action explicitly.
+    # dispatch by action explicitly. `session_id` is `:create`-only —
+    # the `:update` action rejects it (NoSuchInput).
     result =
       case socket.assigns.editing do
         %{__action__: :edit_scheduled, id: id} ->
@@ -523,7 +523,7 @@ defmodule LongWeb.ManageLive do
                do: Agent.update_scheduled_task(row, attrs)
 
         _ ->
-          Agent.create_scheduled_task(attrs)
+          Agent.create_scheduled_task(Map.put(attrs, :session_id, trim_or_nil(params["session_id"])))
       end
 
     case result do
