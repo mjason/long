@@ -301,9 +301,23 @@ defmodule Long.Agent.BotsTest do
   end
 
   describe "Telegram GenServer" do
-    test "start_link returns :ignore when no token is configured" do
+    test "start_link succeeds but stays idle when no credential is configured" do
       System.delete_env("TELEGRAM_BOT_TOKEN")
-      assert :ignore = Telegram.start_link([])
+
+      # Resource exists at boot; ensure no enabled DB row either.
+      _ =
+        case Long.Agent.list_telegram_credentials() do
+          {:ok, rows} -> Enum.each(rows, &Long.Agent.destroy_telegram_credential/1)
+          _ -> :ok
+        end
+
+      assert {:ok, pid} = Telegram.start_link(name: :tg_idle_test)
+      assert Process.alive?(pid)
+      # No long-poll task because token resolved to nil. send_message
+      # surfaces the missing-credential state to callers.
+      assert {:error, :no_credential} = Telegram.send_message(:tg_idle_test, "1", "hi")
+
+      GenServer.stop(pid)
     end
 
     test "polls, dispatches messages, and sends a reply back via injected http" do

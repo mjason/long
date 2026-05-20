@@ -60,6 +60,7 @@ defmodule LongWeb.ManageLive do
      |> assign(:search_configs, [])
      |> assign(:bot_users, [])
      |> assign(:wechat_credentials, [])
+     |> assign(:telegram_credentials, [])
      |> assign(:scheduled_tasks, [])
      |> assign(:secrets, [])}
   end
@@ -159,9 +160,16 @@ defmodule LongWeb.ManageLive do
         _ -> []
       end
 
+    telegram =
+      case Agent.list_telegram_credentials() do
+        {:ok, list} -> Enum.sort_by(list, & &1.name)
+        _ -> []
+      end
+
     socket
     |> assign(:bot_users, bot_users)
     |> assign(:wechat_credentials, wechat)
+    |> assign(:telegram_credentials, telegram)
   end
 
   defp load_section(socket, :scheduled) do
@@ -460,6 +468,82 @@ defmodule LongWeb.ManageLive do
     end
   end
 
+  # ── Events: Telegram credentials ─────────────────────────────────────
+
+  def handle_event("new_telegram_credential", _params, socket) do
+    blank = %{
+      __action__: :create_telegram,
+      name: "default",
+      bot_token: "",
+      username: "",
+      enabled: true
+    }
+
+    {:noreply, assign(socket, :editing, blank)}
+  end
+
+  def handle_event("edit_telegram_credential", %{"name" => name}, socket) do
+    case Agent.get_telegram_credential(name) do
+      {:ok, row} ->
+        editing = %{
+          __action__: :edit_telegram,
+          id: row.id,
+          name: row.name,
+          bot_token: row.bot_token,
+          username: row.username || "",
+          enabled: row.enabled
+        }
+
+        {:noreply, assign(socket, :editing, editing)}
+
+      _ ->
+        {:noreply, socket}
+    end
+  end
+
+  def handle_event("save_telegram_credential", %{"telegram" => params}, socket) do
+    attrs = %{
+      name: trim_or_nil(params["name"]) || "default",
+      bot_token: String.trim(params["bot_token"] || ""),
+      username: trim_or_nil(params["username"]),
+      enabled: params["enabled"] == "true"
+    }
+
+    case Agent.upsert_telegram_credential(attrs) do
+      {:ok, _row} ->
+        Long.Agent.Bots.Telegram.reload()
+        {:noreply, socket |> assign(:editing, nil) |> load_section(:credentials)}
+
+      {:error, e} ->
+        {:noreply, put_flash(socket, :error, "Save failed: #{inspect(e)}")}
+    end
+  end
+
+  def handle_event("toggle_telegram_enabled", %{"name" => name}, socket) do
+    with {:ok, row} <- Agent.get_telegram_credential(name),
+         {:ok, _} <- Agent.update_telegram_credential(row, %{enabled: !row.enabled}) do
+      Long.Agent.Bots.Telegram.reload()
+      {:noreply, load_section(socket, :credentials)}
+    else
+      {:error, e} -> {:noreply, put_flash(socket, :error, "Toggle failed: #{inspect(e)}")}
+    end
+  end
+
+  def handle_event("destroy_telegram_credential", %{"name" => name}, socket) do
+    with {:ok, row} <- Agent.get_telegram_credential(name),
+         :ok <- Agent.destroy_telegram_credential(row) do
+      Long.Agent.Bots.Telegram.reload()
+      {:noreply, load_section(socket, :credentials)}
+    else
+      {:ok, _} ->
+        Long.Agent.Bots.Telegram.reload()
+        {:noreply, load_section(socket, :credentials)}
+
+      {:error, e} ->
+        {:noreply, put_flash(socket, :error, "Delete failed: #{inspect(e)}")}
+    end
+  end
+
   # ── Events: Scheduled tasks ──────────────────────────────────────────
 
   def handle_event("new_scheduled", _params, socket) do
@@ -523,7 +607,9 @@ defmodule LongWeb.ManageLive do
                do: Agent.update_scheduled_task(row, attrs)
 
         _ ->
-          Agent.create_scheduled_task(Map.put(attrs, :session_id, trim_or_nil(params["session_id"])))
+          Agent.create_scheduled_task(
+            Map.put(attrs, :session_id, trim_or_nil(params["session_id"]))
+          )
       end
 
     case result do
@@ -666,6 +752,7 @@ defmodule LongWeb.ManageLive do
           repeats={scheduled_repeats()}
         />
         <.secret_modal :if={editing_kind(@editing) == :secret} editing={@editing} />
+        <.telegram_modal :if={editing_kind(@editing) == :telegram} editing={@editing} />
       </main>
     </div>
     """
@@ -675,8 +762,15 @@ defmodule LongWeb.ManageLive do
   defp editing_kind(%{__action__: a}) when a in [:create, :edit_llm], do: :llm
   defp editing_kind(%{__action__: :edit_global}), do: :global_memory
   defp editing_kind(%{__action__: a}) when a in [:create_search, :edit_search], do: :search
-  defp editing_kind(%{__action__: a}) when a in [:create_scheduled, :edit_scheduled], do: :scheduled
+
+  defp editing_kind(%{__action__: a}) when a in [:create_scheduled, :edit_scheduled],
+    do: :scheduled
+
   defp editing_kind(%{__action__: a}) when a in [:create_secret, :edit_secret], do: :secret
+
+  defp editing_kind(%{__action__: a}) when a in [:create_telegram, :edit_telegram],
+    do: :telegram
+
   defp editing_kind(_), do: nil
 
   # ── Section views ────────────────────────────────────────────────────
@@ -728,7 +822,8 @@ defmodule LongWeb.ManageLive do
                   rounded="full"
                   title={
                     if !llm.provider,
-                      do: "Legacy row — set `provider` and `wire_protocol` via Edit to use the new runtime path.",
+                      do:
+                        "Legacy row — set `provider` and `wire_protocol` via Edit to use the new runtime path.",
                       else: nil
                   }
                 >
@@ -738,7 +833,11 @@ defmodule LongWeb.ManageLive do
               <td class="px-4 py-2 text-xs text-zinc-500">{llm.wire_protocol || "—"}</td>
               <td class="px-4 py-2 text-zinc-600 font-mono text-xs">{llm.model}</td>
               <td class="px-4 py-2">
-                <.badge color={if llm.enabled, do: "success", else: "silver"} size="extra_small" rounded="full">
+                <.badge
+                  color={if llm.enabled, do: "success", else: "silver"}
+                  size="extra_small"
+                  rounded="full"
+                >
                   {if llm.enabled, do: "enabled", else: "disabled"}
                 </.badge>
               </td>
@@ -807,7 +906,9 @@ defmodule LongWeb.ManageLive do
       <h1 class="text-xl font-semibold">Memory editor</h1>
 
       <section class="space-y-2">
-        <h2 class="text-sm font-semibold text-zinc-700 uppercase tracking-wide">L1 · Working checkpoints</h2>
+        <h2 class="text-sm font-semibold text-zinc-700 uppercase tracking-wide">
+          L1 · Working checkpoints
+        </h2>
         <.card variant="bordered" color="natural" rounded="large" padding="none">
           <table class="w-full text-sm">
             <thead class="text-xs uppercase text-zinc-500 bg-zinc-50">
@@ -819,8 +920,12 @@ defmodule LongWeb.ManageLive do
             </thead>
             <tbody>
               <tr :for={row <- @checkpoints} class="border-t border-zinc-100">
-                <td class="px-4 py-2 text-xs font-mono text-zinc-500">{row.session.title || row.session.id}</td>
-                <td class="px-4 py-2 text-zinc-700 whitespace-pre-wrap leading-snug">{row.checkpoint.key_info}</td>
+                <td class="px-4 py-2 text-xs font-mono text-zinc-500">
+                  {row.session.title || row.session.id}
+                </td>
+                <td class="px-4 py-2 text-zinc-700 whitespace-pre-wrap leading-snug">
+                  {row.checkpoint.key_info}
+                </td>
                 <td class="px-4 py-2 text-right">
                   <.button
                     phx-click="clear_checkpoint"
@@ -837,7 +942,9 @@ defmodule LongWeb.ManageLive do
                 </td>
               </tr>
               <tr :if={@checkpoints == []}>
-                <td colspan="3" class="px-4 py-6 text-center text-zinc-400 text-sm">(no checkpoints)</td>
+                <td colspan="3" class="px-4 py-6 text-center text-zinc-400 text-sm">
+                  (no checkpoints)
+                </td>
               </tr>
             </tbody>
           </table>
@@ -845,7 +952,9 @@ defmodule LongWeb.ManageLive do
       </section>
 
       <section class="space-y-2">
-        <h2 class="text-sm font-semibold text-zinc-700 uppercase tracking-wide">L2 · Global memory</h2>
+        <h2 class="text-sm font-semibold text-zinc-700 uppercase tracking-wide">
+          L2 · Global memory
+        </h2>
         <.card variant="bordered" color="natural" rounded="large" padding="none">
           <table class="w-full text-sm">
             <thead class="text-xs uppercase text-zinc-500 bg-zinc-50">
@@ -892,7 +1001,9 @@ defmodule LongWeb.ManageLive do
                 </td>
               </tr>
               <tr :if={@globals == []}>
-                <td colspan="6" class="px-4 py-6 text-center text-zinc-400 text-sm">(no global memory)</td>
+                <td colspan="6" class="px-4 py-6 text-center text-zinc-400 text-sm">
+                  (no global memory)
+                </td>
               </tr>
             </tbody>
           </table>
@@ -900,7 +1011,9 @@ defmodule LongWeb.ManageLive do
       </section>
 
       <section class="space-y-2">
-        <h2 class="text-sm font-semibold text-zinc-700 uppercase tracking-wide">L2 · Session memory</h2>
+        <h2 class="text-sm font-semibold text-zinc-700 uppercase tracking-wide">
+          L2 · Session memory
+        </h2>
         <.card variant="bordered" color="natural" rounded="large" padding="none">
           <table class="w-full text-sm">
             <thead class="text-xs uppercase text-zinc-500 bg-zinc-50">
@@ -932,7 +1045,9 @@ defmodule LongWeb.ManageLive do
                 </td>
               </tr>
               <tr :if={@session_memories == []}>
-                <td colspan="5" class="px-4 py-6 text-center text-zinc-400 text-sm">(no session memory)</td>
+                <td colspan="5" class="px-4 py-6 text-center text-zinc-400 text-sm">
+                  (no session memory)
+                </td>
               </tr>
             </tbody>
           </table>
@@ -975,10 +1090,14 @@ defmodule LongWeb.ManageLive do
           <tbody>
             <tr :for={s <- @skills} class="border-t border-zinc-100">
               <td class="px-4 py-2 font-mono text-zinc-800">{s.name}</td>
-              <td class="px-4 py-2 text-zinc-600 leading-snug max-w-md">{Text.preview(s.description || "", 120)}</td>
+              <td class="px-4 py-2 text-zinc-600 leading-snug max-w-md">
+                {Text.preview(s.description || "", 120)}
+              </td>
               <td class="px-4 py-2">
                 <span class="inline-flex gap-1">
-                  <.badge :for={t <- s.tags || []} color="silver" size="extra_small" rounded="full">{t}</.badge>
+                  <.badge :for={t <- s.tags || []} color="silver" size="extra_small" rounded="full">
+                    {t}
+                  </.badge>
                 </span>
               </td>
               <td class="px-4 py-2 text-xs font-mono text-zinc-500">{s.relative_path}</td>
@@ -988,7 +1107,8 @@ defmodule LongWeb.ManageLive do
             <tr :if={@skills == []}>
               <td colspan="6" class="px-4 py-8 text-center text-zinc-400 text-sm">
                 No skills under <code class="text-xs">{SkillStore.root()}</code>. Drop a
-                <code class="text-xs">SKILL.md</code> in there and hit <strong>Reindex</strong>.
+                <code class="text-xs">SKILL.md</code>
+                in there and hit <strong>Reindex</strong>.
               </td>
             </tr>
           </tbody>
@@ -1026,10 +1146,14 @@ defmodule LongWeb.ManageLive do
           <tbody>
             <tr :for={s <- @sessions_rows} class="border-t border-zinc-100">
               <td class="px-4 py-2 font-medium text-zinc-800">
-                <.link navigate={~p"/chat/#{s.id}"} class="hover:underline">{s.title || short(s.id)}</.link>
+                <.link navigate={~p"/chat/#{s.id}"} class="hover:underline">
+                  {s.title || short(s.id)}
+                </.link>
               </td>
               <td class="px-4 py-2">
-                <.badge color={session_status_color(s.status)} size="extra_small" rounded="full">{s.status}</.badge>
+                <.badge color={session_status_color(s.status)} size="extra_small" rounded="full">
+                  {s.status}
+                </.badge>
               </td>
               <td class="px-4 py-2 text-xs font-mono text-zinc-500">{s.llm_alias || "—"}</td>
               <td class="px-4 py-2 text-right text-zinc-600">{s.token_usage || 0}</td>
@@ -1098,7 +1222,11 @@ defmodule LongWeb.ManageLive do
                 <.badge color="info" size="extra_small" rounded="full">{row.provider}</.badge>
               </td>
               <td class="px-4 py-2">
-                <.badge color={if row.enabled, do: "success", else: "silver"} size="extra_small" rounded="full">
+                <.badge
+                  color={if row.enabled, do: "success", else: "silver"}
+                  size="extra_small"
+                  rounded="full"
+                >
                   {if row.enabled, do: "enabled", else: "disabled"}
                 </.badge>
               </td>
@@ -1188,7 +1316,9 @@ defmodule LongWeb.ManageLive do
                 </td>
               </tr>
               <tr :if={@bot_users == []}>
-                <td colspan="5" class="px-4 py-8 text-center text-zinc-400 text-sm">(no bot users)</td>
+                <td colspan="5" class="px-4 py-8 text-center text-zinc-400 text-sm">
+                  (no bot users)
+                </td>
               </tr>
             </tbody>
           </table>
@@ -1196,7 +1326,9 @@ defmodule LongWeb.ManageLive do
       </section>
 
       <section class="space-y-2">
-        <h2 class="text-sm font-semibold text-zinc-700 uppercase tracking-wide">WeChat credentials</h2>
+        <h2 class="text-sm font-semibold text-zinc-700 uppercase tracking-wide">
+          WeChat credentials
+        </h2>
         <.card variant="bordered" color="natural" rounded="large" padding="none">
           <table class="w-full text-sm">
             <thead class="text-xs uppercase text-zinc-500 bg-zinc-50">
@@ -1212,13 +1344,21 @@ defmodule LongWeb.ManageLive do
               <tr :for={c <- @wechat_credentials} class="border-t border-zinc-100">
                 <td class="px-4 py-2 font-medium">{c.name}</td>
                 <td class="px-4 py-2 text-xs">
-                  <.badge color={if c.bot_token, do: "success", else: "silver"} size="extra_small" rounded="full">
+                  <.badge
+                    color={if c.bot_token, do: "success", else: "silver"}
+                    size="extra_small"
+                    rounded="full"
+                  >
                     {if c.bot_token, do: "set", else: "—"}
                   </.badge>
                 </td>
                 <td class="px-4 py-2 text-xs font-mono text-zinc-500">{c.ilink_bot_id || "—"}</td>
                 <td class="px-4 py-2 text-xs">
-                  <.badge color={if c.updates_buf && c.updates_buf != "", do: "info", else: "silver"} size="extra_small" rounded="full">
+                  <.badge
+                    color={if c.updates_buf && c.updates_buf != "", do: "info", else: "silver"}
+                    size="extra_small"
+                    rounded="full"
+                  >
                     {if c.updates_buf && c.updates_buf != "", do: "buffered", else: "empty"}
                   </.badge>
                 </td>
@@ -1237,7 +1377,92 @@ defmodule LongWeb.ManageLive do
               </tr>
               <tr :if={@wechat_credentials == []}>
                 <td colspan="5" class="px-4 py-8 text-center text-zinc-400 text-sm">
-                  No WeChat credentials. Run <code class="text-xs">mix long.wechat.login</code> to create one.
+                  No WeChat credentials. Run <code class="text-xs">mix long.wechat.login</code>
+                  to create one.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </.card>
+      </section>
+
+      <section class="space-y-2">
+        <div class="flex items-center gap-3">
+          <h2 class="text-sm font-semibold text-zinc-700 uppercase tracking-wide flex-1">
+            Telegram credentials
+          </h2>
+          <.button
+            phx-click="new_telegram_credential"
+            color="primary"
+            icon="hero-plus"
+            rounded="medium"
+            size="extra_small"
+          >
+            New Telegram bot
+          </.button>
+        </div>
+        <.card variant="bordered" color="natural" rounded="large" padding="none">
+          <table class="w-full text-sm">
+            <thead class="text-xs uppercase text-zinc-500 bg-zinc-50">
+              <tr>
+                <th class="text-left px-4 py-2.5">Name</th>
+                <th class="text-left px-4 py-2.5">Username</th>
+                <th class="text-left px-4 py-2.5">Token</th>
+                <th class="text-left px-4 py-2.5">Status</th>
+                <th class="text-right px-4 py-2.5">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr :for={c <- @telegram_credentials} class="border-t border-zinc-100">
+                <td class="px-4 py-2 font-medium">{c.name}</td>
+                <td class="px-4 py-2 text-xs font-mono text-zinc-500">{c.username || "—"}</td>
+                <td class="px-4 py-2 text-xs font-mono text-zinc-500">{mask_secret(c.bot_token)}</td>
+                <td class="px-4 py-2">
+                  <.badge
+                    color={if c.enabled, do: "success", else: "silver"}
+                    size="extra_small"
+                    rounded="full"
+                  >
+                    {if c.enabled, do: "enabled", else: "paused"}
+                  </.badge>
+                </td>
+                <td class="px-4 py-2">
+                  <div class="flex justify-end gap-1.5">
+                    <.button
+                      phx-click="toggle_telegram_enabled"
+                      phx-value-name={c.name}
+                      variant="base"
+                      color="natural"
+                      size="extra_small"
+                      icon={if c.enabled, do: "hero-pause", else: "hero-play"}
+                      rounded="medium"
+                    />
+                    <.button
+                      phx-click="edit_telegram_credential"
+                      phx-value-name={c.name}
+                      variant="base"
+                      color="natural"
+                      size="extra_small"
+                      icon="hero-pencil-square"
+                      rounded="medium"
+                    />
+                    <.button
+                      phx-click="destroy_telegram_credential"
+                      phx-value-name={c.name}
+                      variant="base"
+                      color="danger"
+                      size="extra_small"
+                      icon="hero-trash"
+                      rounded="medium"
+                      data-confirm={"Delete Telegram credential \"#{c.name}\"?"}
+                    />
+                  </div>
+                </td>
+              </tr>
+              <tr :if={@telegram_credentials == []}>
+                <td colspan="5" class="px-4 py-8 text-center text-zinc-400 text-sm">
+                  No Telegram credentials. Click <strong>New Telegram bot</strong>
+                  and paste a BotFather token.
                 </td>
               </tr>
             </tbody>
@@ -1253,7 +1478,13 @@ defmodule LongWeb.ManageLive do
     <div class="p-6 space-y-4">
       <div class="flex items-center gap-3">
         <h1 class="text-xl font-semibold flex-1">Scheduled tasks</h1>
-        <.button phx-click="new_scheduled" color="primary" icon="hero-plus" rounded="medium" size="small">
+        <.button
+          phx-click="new_scheduled"
+          color="primary"
+          icon="hero-plus"
+          rounded="medium"
+          size="small"
+        >
           New task
         </.button>
       </div>
@@ -1279,7 +1510,11 @@ defmodule LongWeb.ManageLive do
               </td>
               <td class="px-4 py-2 text-zinc-600 max-w-md">{Text.preview(t.prompt || "", 80)}</td>
               <td class="px-4 py-2">
-                <.badge color={if t.enabled, do: "success", else: "silver"} size="extra_small" rounded="full">
+                <.badge
+                  color={if t.enabled, do: "success", else: "silver"}
+                  size="extra_small"
+                  rounded="full"
+                >
                   {if t.enabled, do: "on", else: "off"}
                 </.badge>
               </td>
@@ -1320,7 +1555,8 @@ defmodule LongWeb.ManageLive do
             </tr>
             <tr :if={@scheduled_tasks == []}>
               <td colspan="7" class="px-4 py-8 text-center text-zinc-400 text-sm">
-                No scheduled tasks. Click <strong>New task</strong> to add one (or let the agent schedule them via GraphQL <code>createScheduledTask</code>).
+                No scheduled tasks. Click <strong>New task</strong>
+                to add one (or let the agent schedule them via GraphQL <code>createScheduledTask</code>).
               </td>
             </tr>
           </tbody>
@@ -1364,7 +1600,9 @@ defmodule LongWeb.ManageLive do
               <td class="px-4 py-2 text-xs font-mono text-zinc-500">
                 {mask_secret(s.value)}
               </td>
-              <td class="px-4 py-2 text-zinc-600 max-w-md">{Text.preview(s.description || "", 80)}</td>
+              <td class="px-4 py-2 text-zinc-600 max-w-md">
+                {Text.preview(s.description || "", 80)}
+              </td>
               <td class="px-4 py-2 text-xs text-zinc-500">{format_dt(s.updated_at)}</td>
               <td class="px-4 py-2">
                 <div class="flex justify-end gap-1.5">
@@ -1477,7 +1715,9 @@ defmodule LongWeb.ManageLive do
               class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm"
             >
               <option value="">(provider default)</option>
-              <option :for={w <- @wire_protocols} value={w} selected={@editing.wire_protocol == w}>{w}</option>
+              <option :for={w <- @wire_protocols} value={w} selected={@editing.wire_protocol == w}>
+                {w}
+              </option>
             </select>
           </label>
         </div>
@@ -1526,7 +1766,14 @@ defmodule LongWeb.ManageLive do
         </div>
 
         <div class="flex justify-end gap-2 pt-2">
-          <.button type="button" phx-click="cancel_edit" variant="base" color="natural" rounded="medium" size="small">
+          <.button
+            type="button"
+            phx-click="cancel_edit"
+            variant="base"
+            color="natural"
+            rounded="medium"
+            size="small"
+          >
             Cancel
           </.button>
           <.button type="submit" color="primary" rounded="medium" size="small">
@@ -1602,7 +1849,14 @@ defmodule LongWeb.ManageLive do
           />
         </label>
         <div class="flex justify-end gap-2 pt-2">
-          <.button type="button" phx-click="cancel_edit" variant="base" color="natural" rounded="medium" size="small">
+          <.button
+            type="button"
+            phx-click="cancel_edit"
+            variant="base"
+            color="natural"
+            rounded="medium"
+            size="small"
+          >
             Cancel
           </.button>
           <.button type="submit" color="primary" rounded="medium" size="small">
@@ -1802,7 +2056,14 @@ defmodule LongWeb.ManageLive do
         </div>
 
         <div class="flex justify-end gap-2 pt-2">
-          <.button type="button" phx-click="cancel_edit" variant="base" color="natural" rounded="medium" size="small">
+          <.button
+            type="button"
+            phx-click="cancel_edit"
+            variant="base"
+            color="natural"
+            rounded="medium"
+            size="small"
+          >
             Cancel
           </.button>
           <.button type="submit" color="primary" rounded="medium" size="small">Save</.button>
@@ -1894,7 +2155,9 @@ defmodule LongWeb.ManageLive do
         </div>
 
         <label class="block">
-          <span class="text-xs font-medium text-zinc-600">Session id (optional — leave blank to fire into a fresh session)</span>
+          <span class="text-xs font-medium text-zinc-600">
+            Session id (optional — leave blank to fire into a fresh session)
+          </span>
           <input
             name="scheduled[session_id]"
             value={@editing.session_id}
@@ -1909,7 +2172,14 @@ defmodule LongWeb.ManageLive do
         </label>
 
         <div class="flex justify-end gap-2 pt-2">
-          <.button type="button" phx-click="cancel_edit" variant="base" color="natural" rounded="medium" size="small">
+          <.button
+            type="button"
+            phx-click="cancel_edit"
+            variant="base"
+            color="natural"
+            rounded="medium"
+            size="small"
+          >
             Cancel
           </.button>
           <.button type="submit" color="primary" rounded="medium" size="small">Save</.button>
@@ -1943,7 +2213,9 @@ defmodule LongWeb.ManageLive do
             class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm font-mono"
             placeholder="e.g. github_personal"
           />
-          <span class="text-[11px] text-zinc-500">Stable identifier the agent passes around. Lowercase + underscores recommended.</span>
+          <span class="text-[11px] text-zinc-500">
+            Stable identifier the agent passes around. Lowercase + underscores recommended.
+          </span>
         </label>
 
         <label class="block">
@@ -1968,7 +2240,92 @@ defmodule LongWeb.ManageLive do
         </label>
 
         <div class="flex justify-end gap-2 pt-2">
-          <.button type="button" phx-click="cancel_edit" variant="base" color="natural" rounded="medium" size="small">
+          <.button
+            type="button"
+            phx-click="cancel_edit"
+            variant="base"
+            color="natural"
+            rounded="medium"
+            size="small"
+          >
+            Cancel
+          </.button>
+          <.button type="submit" color="primary" rounded="medium" size="small">Save</.button>
+        </div>
+      </form>
+    </.modal>
+    """
+  end
+
+  attr :editing, :map, required: true
+
+  defp telegram_modal(assigns) do
+    assigns = assign(assigns, :is_new?, assigns.editing.__action__ == :create_telegram)
+
+    ~H"""
+    <.modal
+      id="telegram-edit-modal"
+      show
+      title={if @is_new?, do: "New Telegram bot", else: "Edit #{@editing.name}"}
+      on_cancel={JS.push("cancel_edit")}
+      size="medium"
+    >
+      <form phx-submit="save_telegram_credential" class="space-y-3">
+        <label class="block">
+          <span class="text-xs font-medium text-zinc-600">Name</span>
+          <input
+            name="telegram[name]"
+            value={@editing.name}
+            required
+            readonly={!@is_new?}
+            class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm font-mono"
+            placeholder="default"
+          />
+          <span class="text-[11px] text-zinc-500">
+            Single-bot deployments leave this as <code>default</code>.
+          </span>
+        </label>
+
+        <label class="block">
+          <span class="text-xs font-medium text-zinc-600">
+            Bot token (from <code>@BotFather</code>)
+          </span>
+          <input
+            type="password"
+            name="telegram[bot_token]"
+            value={@editing.bot_token}
+            required
+            class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm font-mono"
+            placeholder="123456789:ABC-DEF..."
+          />
+        </label>
+
+        <label class="block">
+          <span class="text-xs font-medium text-zinc-600">
+            Username (optional, e.g. <code>@my_long_bot</code>)
+          </span>
+          <input
+            name="telegram[username]"
+            value={@editing.username}
+            class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm font-mono"
+            placeholder="my_long_bot"
+          />
+        </label>
+
+        <label class="flex items-center gap-2 text-sm text-zinc-700 pt-1">
+          <input type="checkbox" name="telegram[enabled]" value="true" checked={@editing.enabled} />
+          Enabled (worker long-polls Telegram)
+        </label>
+
+        <div class="flex justify-end gap-2 pt-2">
+          <.button
+            type="button"
+            phx-click="cancel_edit"
+            variant="base"
+            color="natural"
+            rounded="medium"
+            size="small"
+          >
             Cancel
           </.button>
           <.button type="submit" color="primary" rounded="medium" size="small">Save</.button>

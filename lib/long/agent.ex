@@ -114,6 +114,15 @@ defmodule Long.Agent do
       define :destroy_wechat_credential, action: :destroy
     end
 
+    resource Long.Agent.TelegramCredential do
+      define :upsert_telegram_credential, action: :upsert
+      define :list_telegram_credentials, action: :read
+      define :get_telegram_credential, action: :read, get_by: [:name]
+      define :update_telegram_credential, action: :update
+      define :update_telegram_credential_username, action: :update_username
+      define :destroy_telegram_credential, action: :destroy
+    end
+
     resource Long.Agent.Secret do
       define :put_secret, action: :upsert
       define :list_secrets, action: :read

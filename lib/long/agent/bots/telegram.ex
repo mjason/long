@@ -4,13 +4,18 @@ defmodule Long.Agent.Bots.Telegram do
   for incoming messages, fans them out to `Long.Agent.Bots.run_and_collect/4`,
   and posts the resulting assistant text back via `sendMessage`.
 
-  Returns `:ignore` from `start_link/1` when no token is configured so the
-  adapter can be unconditionally added to the supervision tree without
-  requiring credentials in dev/test.
+  Token resolution (see `Long.Agent.Bots.Telegram.Credential.load/0`):
+
+    1. Enabled `Long.Agent.TelegramCredential` row → use its `bot_token`
+    2. `TELEGRAM_BOT_TOKEN` env var (legacy fallback)
+    3. None → worker stays idle until `reload/0` finds one
+
+  The worker always starts so the manage UI can call `reload/0` after
+  saving a credential without needing supervisor surgery.
 
   ## Options
 
-  - `:token` (or `TELEGRAM_BOT_TOKEN` env) — bot token from BotFather
+  - `:token` — explicit token, bypasses Credential lookup (used in tests)
   - `:http` — `Req`-compatible request function used for both polling and
     sending (defaults to `&Req.request/1`); tests inject a stub
   - `:poll_interval_ms` — sleep before next `getUpdates` after an empty
@@ -24,6 +29,7 @@ defmodule Long.Agent.Bots.Telegram do
   require Logger
 
   alias Long.Agent.Bots
+  alias Long.Agent.Bots.Telegram.Credential
 
   @default_long_poll_timeout 25
   @default_poll_interval_ms 1_000
@@ -31,16 +37,18 @@ defmodule Long.Agent.Bots.Telegram do
   # ── Public API ───────────────────────────────────────────────────────────
 
   def start_link(opts \\ []) do
-    token = Keyword.get(opts, :token) || System.get_env("TELEGRAM_BOT_TOKEN")
+    name = Keyword.get(opts, :name, __MODULE__)
+    GenServer.start_link(__MODULE__, opts, name: name)
+  end
 
-    cond do
-      is_nil(token) or token == "" ->
-        :ignore
-
-      true ->
-        name = Keyword.get(opts, :name, __MODULE__)
-        GenServer.start_link(__MODULE__, Keyword.put(opts, :token, token), name: name)
-    end
+  @doc """
+  Re-read the active `TelegramCredential` (or env var) and switch the
+  running worker over. Called by the manage UI after a credential save
+  / delete; safe to call when no worker exists yet.
+  """
+  def reload(server \\ __MODULE__) do
+    if pid = Process.whereis(server), do: send(pid, :reload)
+    :ok
   end
 
   def send_message(server \\ __MODULE__, chat_id, text) do
@@ -100,8 +108,15 @@ defmodule Long.Agent.Bots.Telegram do
 
   @impl true
   def init(opts) do
+    {token, row} =
+      case Keyword.get(opts, :token) do
+        t when is_binary(t) and t != "" -> {t, nil}
+        _ -> Credential.load() || {nil, nil}
+      end
+
     state = %{
-      token: Keyword.fetch!(opts, :token),
+      token: token,
+      row: row,
       http: Keyword.get(opts, :http, &Req.request/1),
       offset: 0,
       poll_interval_ms: Keyword.get(opts, :poll_interval_ms, @default_poll_interval_ms),
@@ -109,18 +124,54 @@ defmodule Long.Agent.Bots.Telegram do
       run_opts: Keyword.get(opts, :run_opts, [])
     }
 
-    send(self(), :poll)
+    if is_nil(token) do
+      Logger.info("Long.Agent.Bots.Telegram: no credential; idle until configured")
+    else
+      Logger.info("Long.Agent.Bots.Telegram: credential loaded; starting long-poll")
+      send(self(), :poll)
+    end
+
     {:ok, state}
   end
 
   @impl true
+  def handle_info(:poll, %{token: nil} = state), do: {:noreply, state}
+
   def handle_info(:poll, state) do
     new_offset = poll_once(state)
     Process.send_after(self(), :poll, state.poll_interval_ms)
     {:noreply, %{state | offset: new_offset}}
   end
 
+  def handle_info(:reload, state) do
+    case Credential.load() do
+      nil ->
+        if state.token,
+          do: Logger.info("Long.Agent.Bots.Telegram: credential cleared; pausing")
+
+        {:noreply, %{state | token: nil, row: nil}}
+
+      {token, row} ->
+        if state.token == token do
+          # No token change — refresh the row reference so future
+          # username writes target the current record.
+          {:noreply, %{state | row: row}}
+        else
+          Logger.info("Long.Agent.Bots.Telegram: credential changed; resuming long-poll")
+          # Reset offset because the new bot has its own update id space.
+          if is_nil(state.token), do: send(self(), :poll)
+          {:noreply, %{state | token: token, row: row, offset: 0}}
+        end
+    end
+  end
+
+  def handle_info(_other, state), do: {:noreply, state}
+
   @impl true
+  def handle_call({:send_message, _chat_id, _text}, _from, %{token: nil} = state) do
+    {:reply, {:error, :no_credential}, state}
+  end
+
   def handle_call({:send_message, chat_id, text}, _from, state) do
     result = call_send_message(state, chat_id, text)
     {:reply, result, state}
