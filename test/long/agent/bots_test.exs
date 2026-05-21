@@ -361,7 +361,14 @@ defmodule Long.Agent.BotsTest do
             get_response.(opts)
 
           :post ->
-            send(this, {:tg_send, opts})
+            url = Keyword.fetch!(opts, :url)
+
+            cond do
+              url =~ "sendMessage" -> send(this, {:tg_reply, opts})
+              url =~ "sendChatAction" -> send(this, {:tg_typing, opts})
+              true -> :ok
+            end
+
             {:ok, %Req.Response{status: 200, body: %{"ok" => true, "result" => %{}}}}
         end
       end
@@ -378,11 +385,25 @@ defmodule Long.Agent.BotsTest do
       # Allow the spawned Task to use the DB sandbox
       Ecto.Adapters.SQL.Sandbox.allow(Long.Repo, this, pid)
 
-      assert_receive {:tg_send, opts}, 5_000
+      # Typing indicator must fire at least once — it's the user-visible
+      # cue that the bot received the message and is working.
+      assert_receive {:tg_typing, typing_opts}, 5_000
+      typing_body = Keyword.fetch!(typing_opts, :json)
+      assert typing_body[:chat_id] == "7"
+      assert typing_body[:action] == "typing"
+
+      # And the actual reply lands.
+      assert_receive {:tg_reply, opts}, 5_000
 
       body = Keyword.fetch!(opts, :json)
       assert body[:chat_id] == "7"
       assert body[:text] =~ "(echo) ping"
+      # HTML rendering is the whole point of the format rewrite —
+      # plain text replies must still flow through with parse_mode set
+      # so Telegram applies the (no-op) HTML decoder rather than the
+      # default markdown one.
+      assert body[:parse_mode] == "HTML"
+      assert body[:disable_web_page_preview] == true
 
       GenServer.stop(pid)
     end

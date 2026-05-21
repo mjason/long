@@ -45,11 +45,11 @@ defmodule Long.Agent.TelegramCredentialTest do
   end
 
   describe "Credential.load/0 precedence" do
-    test "returns DB row when enabled" do
+    test "returns DB row when enabled (regardless of name)" do
       {:ok, _} =
-        Agent.upsert_telegram_credential(%{name: "default", bot_token: "from-db", enabled: true})
+        Agent.upsert_telegram_credential(%{name: "电报", bot_token: "from-db", enabled: true})
 
-      assert {"from-db", %{name: "default"}} = Credential.load()
+      assert {"from-db", %{name: "电报"}} = Credential.load()
     end
 
     test "skips disabled row and falls back to env" do
@@ -77,6 +77,16 @@ defmodule Long.Agent.TelegramCredentialTest do
       System.put_env("TELEGRAM_BOT_TOKEN", "from-env")
 
       assert {"from-db", _} = Credential.load()
+    end
+
+    test "picks first enabled row by name when multiple exist" do
+      {:ok, _} =
+        Agent.upsert_telegram_credential(%{name: "z-second", bot_token: "second", enabled: true})
+
+      {:ok, _} =
+        Agent.upsert_telegram_credential(%{name: "a-first", bot_token: "first", enabled: true})
+
+      assert {"first", %{name: "a-first"}} = Credential.load()
     end
   end
 
