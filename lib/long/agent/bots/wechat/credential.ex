@@ -4,11 +4,25 @@ defmodule Long.Agent.Bots.Wechat.Credential do
   resource is the source of truth; this module just hides a couple of
   shape conversions so callers don't have to think about the singleton
   row name or build maps with the right keys.
+
+  Also owns the `:wechat_connected` lifecycle PubSub (mirrors
+  `Long.Agent.SessionPubSub`): the QR-login view broadcasts on confirm,
+  the Channels admin page subscribes to refresh its status card.
   """
 
   alias Long.Agent
 
   @default_name "default"
+  @connect_topic "wechat_login"
+
+  @doc "PubSub topic broadcast to on credential connect."
+  def connect_topic, do: @connect_topic
+
+  @doc "Subscribe the calling process to credential-connect events."
+  def subscribe, do: Phoenix.PubSub.subscribe(Long.PubSub, @connect_topic)
+
+  @doc "Announce a freshly-confirmed credential to any subscribers."
+  def broadcast_connected, do: Phoenix.PubSub.broadcast(Long.PubSub, @connect_topic, :wechat_connected)
 
   @doc """
   Return the stored credential as a state map suitable for
@@ -70,5 +84,19 @@ defmodule Long.Agent.Bots.Wechat.Credential do
       %{bot_token: t} when is_binary(t) and t != "" -> true
       _ -> false
     end
+  end
+
+  @doc """
+  Delete the stored credential and reload the worker (so it pauses).
+  Returns `:ok` whether or not a row existed.
+  """
+  @spec delete(String.t()) :: :ok
+  def delete(name \\ @default_name) do
+    with {:ok, row} <- Agent.get_wechat_credential(name) do
+      _ = Agent.destroy_wechat_credential(row)
+      Long.Agent.Bots.Wechat.Worker.reload()
+    end
+
+    :ok
   end
 end

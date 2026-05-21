@@ -29,7 +29,7 @@ defmodule LongWeb.ManageLive do
     {:skills, "Skills", "hero-puzzle-piece"},
     {:sessions, "Sessions", "hero-chat-bubble-left-right"},
     {:search, "Search", "hero-magnifying-glass"},
-    {:credentials, "Credentials", "hero-key"},
+    {:credentials, "Channels", "hero-signal"},
     {:scheduled, "Scheduled", "hero-clock"},
     {:secrets, "Secrets", "hero-lock-closed"}
   ]
@@ -47,10 +47,15 @@ defmodule LongWeb.ManageLive do
 
   @impl true
   def mount(_params, _session, socket) do
+    if connected?(socket) do
+      Long.Agent.Bots.Wechat.Credential.subscribe()
+    end
+
     {:ok,
      socket
      |> assign(:sections, @sections)
      |> assign(:editing, nil)
+     |> assign(:wechat_modal_open?, false)
      |> assign(:llms, [])
      |> assign(:globals, [])
      |> assign(:session_memories, [])
@@ -59,7 +64,7 @@ defmodule LongWeb.ManageLive do
      |> assign(:sessions_rows, [])
      |> assign(:search_configs, [])
      |> assign(:bot_users, [])
-     |> assign(:wechat_credentials, [])
+     |> assign(:wechat_credential, nil)
      |> assign(:telegram_credentials, [])
      |> assign(:scheduled_tasks, [])
      |> assign(:secrets, [])}
@@ -154,10 +159,12 @@ defmodule LongWeb.ManageLive do
         _ -> []
       end
 
+    # Single "default" row in practice; the card shows the one
+    # connection, so we keep just the head rather than sorting a list.
     wechat =
       case Agent.list_wechat_credentials() do
-        {:ok, list} -> Enum.sort_by(list, & &1.name)
-        _ -> []
+        {:ok, list} -> List.first(list)
+        _ -> nil
       end
 
     telegram =
@@ -168,7 +175,7 @@ defmodule LongWeb.ManageLive do
 
     socket
     |> assign(:bot_users, bot_users)
-    |> assign(:wechat_credentials, wechat)
+    |> assign(:wechat_credential, wechat)
     |> assign(:telegram_credentials, telegram)
   end
 
@@ -458,14 +465,20 @@ defmodule LongWeb.ManageLive do
     end
   end
 
-  def handle_event("destroy_wechat_credential", %{"name" => name}, socket) do
-    with {:ok, row} <- Agent.get_wechat_credential(name),
-         :ok <- Agent.destroy_wechat_credential(row) do
-      {:noreply, load_section(socket, :credentials)}
-    else
-      {:ok, _} -> {:noreply, load_section(socket, :credentials)}
-      {:error, e} -> {:noreply, put_flash(socket, :error, "Delete failed: #{inspect(e)}")}
-    end
+  # ── Events: WeChat (QR login modal) ──────────────────────────────────
+
+  def handle_event("open_wechat_login", _params, socket),
+    do: {:noreply, assign(socket, :wechat_modal_open?, true)}
+
+  # Closing the modal never mutates credentials; a confirmed scan
+  # already refreshed the card via the `:wechat_connected` broadcast.
+  # So just hide the modal — no reload.
+  def handle_event("close_wechat_login", _params, socket),
+    do: {:noreply, assign(socket, :wechat_modal_open?, false)}
+
+  def handle_event("destroy_wechat_credential", _params, socket) do
+    :ok = Long.Agent.Bots.Wechat.Credential.delete()
+    {:noreply, load_section(socket, :credentials)}
   end
 
   # ── Events: Telegram credentials ─────────────────────────────────────
@@ -688,6 +701,17 @@ defmodule LongWeb.ManageLive do
     end
   end
 
+  # ── PubSub ───────────────────────────────────────────────────────────
+
+  # Embedded WechatLive.Login broadcasts this when a scan confirms;
+  # refresh the WeChat card so it flips to "connected" without the
+  # operator reopening the page.
+  @impl true
+  def handle_info(:wechat_connected, socket),
+    do: {:noreply, load_section(socket, :credentials)}
+
+  def handle_info(_msg, socket), do: {:noreply, socket}
+
   # ── Template ─────────────────────────────────────────────────────────
 
   @impl true
@@ -753,6 +777,7 @@ defmodule LongWeb.ManageLive do
         />
         <.secret_modal :if={editing_kind(@editing) == :secret} editing={@editing} />
         <.telegram_modal :if={editing_kind(@editing) == :telegram} editing={@editing} />
+        <.wechat_login_modal :if={@wechat_modal_open?} socket={@socket} />
       </main>
     </div>
     """
@@ -1279,7 +1304,53 @@ defmodule LongWeb.ManageLive do
   defp credentials_section(assigns) do
     ~H"""
     <div class="p-6 space-y-6">
-      <h1 class="text-xl font-semibold">Credentials</h1>
+      <h1 class="text-xl font-semibold">Channels</h1>
+
+      <section class="space-y-2">
+        <h2 class="text-sm font-semibold text-zinc-700 uppercase tracking-wide">WeChat</h2>
+        <.card variant="bordered" color="natural" rounded="large" padding="medium">
+          <div class="flex items-center gap-3">
+            <div class="flex-1">
+              <div class="flex items-center gap-2">
+                <.badge
+                  color={if @wechat_credential, do: "success", else: "silver"}
+                  size="extra_small"
+                  rounded="full"
+                >
+                  {if @wechat_credential, do: "已连接", else: "未连接"}
+                </.badge>
+                <span :if={@wechat_credential} class="text-xs font-mono text-zinc-500">
+                  bot_id: {@wechat_credential.ilink_bot_id || "—"}
+                </span>
+              </div>
+              <p class="text-xs text-zinc-400 mt-1">
+                {if @wechat_credential,
+                  do: "Worker 正在 long-poll iLink。",
+                  else: "扫码绑定一个微信账号，私信会进入 agent。"}
+              </p>
+            </div>
+            <.button
+              phx-click="open_wechat_login"
+              color="primary"
+              icon="hero-qr-code"
+              rounded="medium"
+              size="small"
+            >
+              {if @wechat_credential, do: "重新登录", else: "扫码登录"}
+            </.button>
+            <.button
+              :if={@wechat_credential}
+              phx-click="destroy_wechat_credential"
+              variant="base"
+              color="danger"
+              icon="hero-trash"
+              rounded="medium"
+              size="small"
+              data-confirm="确定要删除微信凭证吗？删除后需要重新扫码。"
+            />
+          </div>
+        </.card>
+      </section>
 
       <section class="space-y-2">
         <h2 class="text-sm font-semibold text-zinc-700 uppercase tracking-wide">Bot users</h2>
@@ -1326,70 +1397,9 @@ defmodule LongWeb.ManageLive do
       </section>
 
       <section class="space-y-2">
-        <h2 class="text-sm font-semibold text-zinc-700 uppercase tracking-wide">
-          WeChat credentials
-        </h2>
-        <.card variant="bordered" color="natural" rounded="large" padding="none">
-          <table class="w-full text-sm">
-            <thead class="text-xs uppercase text-zinc-500 bg-zinc-50">
-              <tr>
-                <th class="text-left px-4 py-2.5">Name</th>
-                <th class="text-left px-4 py-2.5">Bot token</th>
-                <th class="text-left px-4 py-2.5">iLink bot id</th>
-                <th class="text-left px-4 py-2.5">Buf</th>
-                <th class="text-right px-4 py-2.5">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr :for={c <- @wechat_credentials} class="border-t border-zinc-100">
-                <td class="px-4 py-2 font-medium">{c.name}</td>
-                <td class="px-4 py-2 text-xs">
-                  <.badge
-                    color={if c.bot_token, do: "success", else: "silver"}
-                    size="extra_small"
-                    rounded="full"
-                  >
-                    {if c.bot_token, do: "set", else: "—"}
-                  </.badge>
-                </td>
-                <td class="px-4 py-2 text-xs font-mono text-zinc-500">{c.ilink_bot_id || "—"}</td>
-                <td class="px-4 py-2 text-xs">
-                  <.badge
-                    color={if c.updates_buf && c.updates_buf != "", do: "info", else: "silver"}
-                    size="extra_small"
-                    rounded="full"
-                  >
-                    {if c.updates_buf && c.updates_buf != "", do: "buffered", else: "empty"}
-                  </.badge>
-                </td>
-                <td class="px-4 py-2 text-right">
-                  <.button
-                    phx-click="destroy_wechat_credential"
-                    phx-value-name={c.name}
-                    variant="base"
-                    color="danger"
-                    size="extra_small"
-                    icon="hero-trash"
-                    rounded="medium"
-                    data-confirm={"Delete WeChat credential \"#{c.name}\"?"}
-                  />
-                </td>
-              </tr>
-              <tr :if={@wechat_credentials == []}>
-                <td colspan="5" class="px-4 py-8 text-center text-zinc-400 text-sm">
-                  No WeChat credentials. Run <code class="text-xs">mix long.wechat.login</code>
-                  to create one.
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </.card>
-      </section>
-
-      <section class="space-y-2">
         <div class="flex items-center gap-3">
           <h2 class="text-sm font-semibold text-zinc-700 uppercase tracking-wide flex-1">
-            Telegram credentials
+            Telegram
           </h2>
           <.button
             phx-click="new_telegram_credential"
@@ -1881,7 +1891,7 @@ defmodule LongWeb.ManageLive do
 
   defp section_title(:sessions), do: "Sessions"
   defp section_title(:search), do: "Search providers"
-  defp section_title(:credentials), do: "Credentials"
+  defp section_title(:credentials), do: "Channels"
   defp section_title(:scheduled), do: "Scheduled tasks"
   defp section_title(:secrets), do: "Secrets"
   defp section_title(_), do: "—"
@@ -2331,6 +2341,29 @@ defmodule LongWeb.ManageLive do
           <.button type="submit" color="primary" rounded="medium" size="small">Save</.button>
         </div>
       </form>
+    </.modal>
+    """
+  end
+
+  attr :socket, :any, required: true
+
+  # The QR scan + status polling is a self-contained live flow, so we
+  # embed the existing `WechatLive.Login` as a nested LiveView instead
+  # of duplicating its logic here. It broadcasts `:wechat_connected` on
+  # success, which `handle_info/2` above turns into a section refresh.
+  defp wechat_login_modal(assigns) do
+    ~H"""
+    <.modal
+      id="wechat-login-modal"
+      show
+      title="微信扫码登录"
+      on_cancel={JS.push("close_wechat_login")}
+      size="medium"
+    >
+      {live_render(@socket, LongWeb.WechatLive.Login,
+        id: "wechat-login-embed",
+        session: %{"embedded" => true}
+      )}
     </.modal>
     """
   end

@@ -2,7 +2,8 @@ defmodule LongWeb.PageHTML do
   @moduledoc """
   Pages rendered by `LongWeb.PageController` — currently just the
   homepage, which is a navigation hub linking to the chat, the manage
-  admin, the WeChat bot console, and the developer dashboards.
+  admin, the channel (WeChat / Telegram) console, and the developer
+  dashboards.
   """
   use LongWeb, :html
 

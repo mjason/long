@@ -14,10 +14,11 @@ defmodule LongWeb.WechatLive.Login do
   @poll_interval_ms 2_000
 
   @impl true
-  def mount(_params, _session, socket) do
+  def mount(_params, session, socket) do
     {:ok,
      socket
      |> assign(:page_title, "WeChat 登录")
+     |> assign(:embedded?, session["embedded"] == true)
      |> assign_credential()
      |> assign(:flow, :idle)
      |> assign(:qr_id, nil)
@@ -53,24 +54,8 @@ defmodule LongWeb.WechatLive.Login do
   end
 
   def handle_event("logout", _params, socket) do
-    case Long.Agent.get_wechat_credential("default") do
-      {:ok, row} ->
-        case Long.Agent.destroy_wechat_credential(row) do
-          :ok ->
-            Worker.reload()
-            {:noreply, socket |> reset() |> assign_credential() |> put_flash(:info, "凭证已删除")}
-
-          {:ok, _} ->
-            Worker.reload()
-            {:noreply, socket |> reset() |> assign_credential() |> put_flash(:info, "凭证已删除")}
-
-          {:error, e} ->
-            {:noreply, put_flash(socket, :error, "删除失败: #{inspect(e)}")}
-        end
-
-      _ ->
-        {:noreply, put_flash(socket, :info, "没有凭证可删除")}
-    end
+    :ok = Credential.delete()
+    {:noreply, socket |> reset() |> assign_credential() |> put_flash(:info, "凭证已删除")}
   end
 
   @impl true
@@ -133,6 +118,7 @@ defmodule LongWeb.WechatLive.Login do
       })
 
     Worker.reload()
+    Credential.broadcast_connected()
   end
 
   defp qr_svg(url) do
@@ -152,8 +138,8 @@ defmodule LongWeb.WechatLive.Login do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="mx-auto max-w-2xl px-4 py-10">
-      <header class="mb-8">
+    <div class={if @embedded?, do: "", else: "mx-auto max-w-2xl px-4 py-10"}>
+      <header :if={!@embedded?} class="mb-8">
         <h1 class="text-2xl font-semibold">微信 iLink Bot 登录</h1>
         <p class="mt-2 text-sm text-zinc-500">
           扫码绑定一个微信账号，之后所有发到这个号的私信都会进入 agent。
