@@ -4,7 +4,7 @@ defmodule Long.MixProject do
   def project do
     [
       app: :long,
-      version: "0.2.10",
+      version: "0.2.11",
       elixir: "~> 1.15",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
@@ -45,9 +45,9 @@ defmodule Long.MixProject do
   end
 
   defp description do
-    "Single-binary LLM agent runtime built on Elixir/OTP: chat UI, " <>
-      "4-tier memory, Anthropic-compatible Skills, scheduled tasks, " <>
-      "multi-provider LLM routing, and platform bots (WeChat / Telegram / Feishu)."
+    "Self-hosted LLM agent runtime on Elixir/OTP — built-in web UI, four-tier memory, " <>
+      "scheduled tasks, 20+ LLM providers, and WeChat / Telegram bots, all in one " <>
+      "self-contained binary you install like a CLI."
   end
 
   defp package do
