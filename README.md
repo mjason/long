@@ -4,124 +4,173 @@
 [![Phoenix](https://img.shields.io/badge/phoenix-1.8-orange.svg)](https://phoenixframework.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-> 一个跑在 Elixir/OTP 上的单进程 LLM Agent 运行时。Phoenix 做 UI，Ash 做数据层，Oban 跑定时任务，ReqLLM 做 provider 抽象。
+**English** · [简体中文](README.zh-CN.md)
 
-Long 是把原先用 Python 写的 GenericAgent 整套搬到 Elixir 的版本——保留了「一个会话 → ReAct 循环 → 工具 + 记忆 + 技能」的核心架构，但落到 BEAM 上后获得了真正的并发 / 容错 / 长连接消息推送能力，不用再围绕 Python 的进程模型自己造监督树。
+> A single-process LLM agent runtime on Elixir/OTP. Phoenix for the UI, Ash for the data layer, Oban for scheduled tasks, ReqLLM for provider abstraction.
 
-## 核心能力
+Long *started* as a port of the Python [GenericAgent](https://github.com/lsdefine/GenericAgent) to Elixir, borrowing its core shape — *one session → ReAct loop → tools + memory + skills*. The design has since diverged substantially: on the BEAM it gets real concurrency, fault tolerance, and long-lived push messaging natively (one supervised GenServer per session rather than a bolted-on Python process model), and the agent's capability layer has been rebuilt on **mature, standard technology rather than a bespoke tool protocol** — most notably **GraphQL as the agent's primary skill** (see below).
 
-- **LiveView 聊天 UI** —— 流式渲染 + 工具调用展示 + 实时记忆侧栏 + AI 自动生成会话标题
-- **四层记忆** ——
-  - L1 `WorkingCheckpoint`（每会话一行 key_info）
-  - L2 `GlobalMemory` / `SessionMemory`（fact / preference / goal / decision，带 importance + recency 衰减）
-  - L3 **Anthropic 兼容 Skills**（`SKILL.md` + scripts/references/assets，文件系统是 source of truth，watcher 驱动的 ETS 索引）
-  - L4 `SessionArchive`（会话归档 + LLM 摘要）
-- **多 Provider LLM 路由** —— ReqLLM 原生 20+ provider（openai / anthropic / google / groq / deepseek / openrouter / mistral / ollama / xai / bedrock / …），wire protocol 可配，单条 alias 设为默认
-- **统一管理后台 `/manage`** —— LLM 配置、记忆编辑、技能浏览、会话管理、搜索 provider、平台凭据、定时任务，全部 LiveView，不依赖 ash_admin
-- **定时任务** —— Oban 驱动，LLM 通过 `schedule_task` 工具自己排，或者在 `/manage/scheduled` 手动建
-- **多平台 Bot** —— WeChat（PCHook）、Telegram、Feishu，统一的 `Bots.Outbound` 调度层
-- **Web 搜索聚合** —— Tavily / Brave API + SERP scraper，RRF 多源合并，provider 通过 `/manage/search` 配置
-- **真实头(headless) 浏览** —— Obscura CLI（Rust 写的 Chromium fork）驱动 `web_scan` / `web_execute_js` 工具
-- **错误可观测** —— ErrorTracker dashboard，`:logger` crash backstop，LLM 调用透明指数退避重试
-- **对话级控制** —— `/clear` 清会话、`/status` 查问 Agent 在干啥、`/btw <note>` 中途插话
+It's **web-first**: you don't run a CLI to talk to it. Open the browser, and chat, configuration, memory, channels, and scheduled tasks are all just pages.
 
-## 架构一览
+## Design philosophy
+
+Long is built to install and run **like a personal CLI tool, not like server infrastructure.** Everything below follows from that one decision.
+
+- **One self-contained binary.** `mix release` bundles the Erlang VM (ERTS) and every BEAM dependency into a single tarball. The target machine needs neither Erlang nor Elixir installed — just untar and run. No Docker image to build, no base image to track.
+- **Installs into one directory, owns nothing else.** `curl | bash` drops everything under `~/.long/` — the binary, the VM, the SQLite database, the config, the agent workspace, the skills. Uninstall is `rm -rf ~/.long`. Upgrades wipe only `bin/ lib/ releases/ erts-*` and **preserve your `env`, `long.db`, and `agent/` data**.
+- **No external services to provision.** Storage is SQLite (a file) plus the filesystem (skills, workspace). No Postgres, no Redis, no message broker. The whole runtime is *one OS process* — the BEAM — internally supervising sessions, bots, the scheduler, and even the headless-browser subprocess.
+- **Userspace, no root.** Install and autostart run entirely as your user. `~/.long/service install` wires up launchd (macOS) or a systemd **user** unit (Linux) so the agent survives reboot — you never write a unit file or `sudo` anything.
+- **One optional runtime dependency: `uv`.** Auto-installed when missing, and only needed for Python-based skills (`code_run`). Skip it and everything except Python skills still works.
+- **LAN-first, not internet-hardened.** Binds `0.0.0.0`, `check_origin` off, no forced SSL — so a freshly installed node is reachable from any device on your home network by IP. Internet exposure is opt-in (`LONG_CHECK_ORIGIN`, a reverse proxy, etc.), never the default that locks you out on first run.
+- **Open-source-friendly delivery.** The installer pulls release tarballs straight from GitHub Releases over plain `curl` — no `gh` CLI, no GitHub account, no auth. Anyone can install with one line.
+
+The result: getting Long onto a Mac mini or a Linux box in the corner is `curl | bash` + paste an API key, and it behaves like an appliance from there.
+
+## GraphQL as the agent's primary skill
+
+Most agent frameworks invent a bespoke tool protocol — one narrow tool per capability (`schedule_task`, `remember_fact`, `update_checkpoint`, …), each with a hand-maintained schema the model has to be taught.
+
+Long takes a different route: **the agent's main capability is a single `graphql` tool** over the entire Ash data layer — sessions, messages, both memory tiers, working checkpoints, scheduled tasks, secrets, LLM/search configs — for **read *and* write** through one uniform interface.
+
+- **The model already speaks it.** GraphQL is in every model's pretraining; there's no custom DSL to explain.
+- **It's self-describing.** The schema is introspectable (`{ __schema { queryType { fields { name } } } }`), so the agent discovers its own capabilities at runtime instead of us maintaining a wall of tool descriptions.
+- **One tool replaces ~10.** Adding a new Ash resource automatically grants the agent CRUD over it — no new tool to write, register, or document.
+
+This is the core bet: lean on mature, introspectable, widely-understood technology (GraphQL) as the agent's capability surface, and let the model's existing fluency do the rest. File-based **Skills** (`SKILL.md` + scripts, below) remain for packaged, code-carrying capabilities; GraphQL is how the agent reads and writes its own world.
+
+## Web UI
+
+Everything is a page — there's no separate CLI you have to learn to operate the agent day to day.
+
+| Page | What it is |
+|---|---|
+| `/chat` | the agent. Streaming replies, live tool-call display, a memory side-rail, AI-named sessions. |
+| `/manage` | everything else. LLMs, memory, skills, sessions, search providers, channels, scheduled tasks — each a LiveView. |
+
+## Features
+
+- **GraphQL capability layer** — one introspectable `graphql` tool gives the agent read/write over its whole data world (see above).
+- **Web-first LiveView UI** — `/chat` (streaming output + tool-call display + live memory side-rail + AI-generated session titles) and `/manage` for everything else.
+- **Four-tier memory:**
+  - L1 `WorkingCheckpoint` (one `key_info` row per session)
+  - L2 `GlobalMemory` / `SessionMemory` (fact / preference / goal / decision, with importance + recency decay)
+  - L3 **Anthropic-compatible Skills** (`SKILL.md` + scripts/references/assets; the filesystem is the source of truth, a watcher drives an ETS index)
+  - L4 `SessionArchive` (session archival + LLM summary)
+- **Multi-provider LLM routing** — ReqLLM speaks 20+ providers natively (openai / anthropic / google / groq / deepseek / openrouter / mistral / ollama / xai / bedrock / …); wire protocol is configurable, one alias is the default.
+- **Unified admin at `/manage`** — LLM configs, memory editing, skill browsing, session management, search providers, channels, scheduled tasks, secrets — all LiveView, no ash_admin dependency.
+- **Scheduled tasks** — Oban-driven; the LLM schedules its own via GraphQL `createScheduledTask`, or you create them by hand at `/manage/scheduled`.
+- **Channels** — WeChat (PCHook) and Telegram, behind a unified `Bots.Outbound` dispatch layer, managed in one place at `/manage/credentials`.
+- **Web search aggregation** — Tavily / Brave API + SERP scrapers, RRF multi-source merge, providers configured at `/manage/search`.
+- **Real headless browsing** — the Obscura CLI (a Rust Chromium fork) powers the `web_scan` / `web_execute_js` tools.
+- **Error observability** — ErrorTracker dashboard, a `:logger` crash backstop, transparent exponential-backoff retry on LLM calls.
+- **In-conversation control** — `/clear` wipes a session, `/status` asks what the agent is doing, `/btw <note>` interjects mid-run.
+
+## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │  Phoenix LiveView ─ /chat ─ /manage ─ navigation hub            │
 ├─────────────────────────────────────────────────────────────────┤
-│  Long.Jido.SessionRunner  ────►  Long.Jido.Loop  (ReAct)        │
+│  Long.Agent.Server (GenServer per session)  ──►  ReAct loop     │
 │   │                                │                            │
-│   ├── on_message → DB persist     ├── tools (file/web/memory/…) │
+│   ├── persist messages → DB       ├── tools (file/web/memory/…) │
 │   └── PubSub stream → LiveView    └── ReqLLM streaming          │
 ├─────────────────────────────────────────────────────────────────┤
 │  Memory  L1 WorkingCheckpoint   L2 Global + Session             │
 │          L3 Skill.Store (FS + watcher + ETS)                    │
 │          L4 SessionArchive                                      │
 ├─────────────────────────────────────────────────────────────────┤
-│  Long.Agent.Bots ─ WeChat │ Telegram │ Feishu                   │
-│  Oban  ─ ScheduledTask runner   ErrorTracker ─ /errors          │
+│  Long.Agent.Bots ─ WeChat │ Telegram                           │
+│  Oban ─ ScheduledTask runner    ErrorTracker ─ /errors          │
 ├─────────────────────────────────────────────────────────────────┤
 │  Storage:  SQLite (Ash) + filesystem (skills, workspace)        │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-依赖核心栈：
+Core stack:
 
-| 依赖 | 用途 |
+| Dependency | Role |
 |---|---|
-| Elixir 1.15+, Phoenix 1.8, Ash 3, AshSqlite | 应用 / 数据层 |
-| Oban + AshOban + Oban Web | 后台任务调度 |
-| ReqLLM | 多 provider LLM 统一接入 |
-| Jido + Jido.AI | Tool 系统 (Zoi 描述 + 自动 JSONSchema) |
-| Mishka Chelekom | 70+ Tailwind LiveView 组件 |
-| Obscura | Rust 编写的无头浏览器 CLI |
-| ErrorTracker | 应用内异常聚合 |
+| Elixir 1.15+, Phoenix 1.8, Ash 3, AshSqlite | App / data layer |
+| Oban + AshOban + Oban Web | Background job scheduling |
+| ReqLLM | Unified multi-provider LLM access |
+| Jido + Jido.AI | Tool system (Zoi schema + auto JSONSchema) |
+| Mishka Chelekom | 70+ Tailwind LiveView components |
+| Obscura | Rust headless-browser CLI |
+| ErrorTracker | In-app exception aggregation |
 
-## 快速开始
+## Quick start
 
-### 一键安装 (macOS / Linux)
+### One-line install (macOS / Linux)
 
-预编译版本支持 `macos-arm64`、`linux-x64`、`linux-arm64`。一行安装：
+Prebuilt releases cover `macos-arm64`, `linux-x64`, and `linux-arm64`:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/mjason/long/main/install.sh | bash
 ```
 
-脚本会：
+The script:
 
-- 从 GitHub Releases 拉取最新 tarball，解压到 `~/.long/`
-- 检测不到 `uv` 时自动装一份（[Astral uv](https://docs.astral.sh/uv/)，`code_run` 工具需要）
-- 首次运行生成 `~/.long/env`（含自动生成的 `SECRET_KEY_BASE`、`DATABASE_PATH` 等）
-- 生成启动脚本 `~/.long/run`
+- pulls the latest tarball from GitHub Releases and extracts it to `~/.long/`,
+- installs [Astral `uv`](https://docs.astral.sh/uv/) if it's missing (needed by the `code_run` tool),
+- on first run generates `~/.long/env` (with an auto-generated `SECRET_KEY_BASE`, `DATABASE_PATH`, …),
+- writes the `~/.long/run` launcher and the `~/.long/service` autostart controller.
 
 ```bash
-$EDITOR ~/.long/env    # 通常无需修改
-~/.long/run            # 启动，访问 http://localhost:4000
+$EDITOR ~/.long/env     # usually nothing to change
+~/.long/run             # start; open http://localhost:4000
 ```
 
-环境变量：
+Make it start on boot (no root, no unit-file editing):
 
-| 变量 | 默认 | 说明 |
+```bash
+~/.long/service install     # enable autostart (launchd / systemd-user)
+~/.long/service status      # is it registered + running?
+~/.long/service logs        # tail run.log
+~/.long/service uninstall   # disable autostart
+```
+
+Installer environment variables:
+
+| Variable | Default | Meaning |
 |---|---|---|
-| `LONG_INSTALL_DIR` | `~/.long` | 安装目录 |
-| `LONG_VERSION` | latest | 指定版本，例如 `v0.1.0` |
+| `LONG_INSTALL_DIR` | `~/.long` | install target |
+| `LONG_VERSION` | latest | pin a version, e.g. `v0.2.9` |
 
-### 从源码运行
+### Run from source
 
-依赖：
+Requirements:
 
 - Elixir 1.15+ / Erlang 26+
 - SQLite 3
-- `uv`（[Astral uv](https://docs.astral.sh/uv/)，给 Skill 的 Python 脚本提供运行时；不用 Python skill 可以不装）
+- `uv` ([Astral uv](https://docs.astral.sh/uv/) — runtime for Skill Python scripts; optional if you don't use Python skills)
 
 ```bash
 git clone https://github.com/mjason/long.git
 cd long
-mix setup            # deps.get + ecto.create + migrate + seeds + 资产构建
+mix setup            # deps.get + ecto.create + migrate + seeds + asset build
 mix phx.server
 ```
 
-浏览器打开 <http://localhost:4004/>，从导航中心进入 `/chat` 或 `/manage/llms`。
+Open <http://localhost:4000/> and enter `/chat` or `/manage/llms` from the navigation hub.
 
-### 配置第一个 LLM
+### Configure your first LLM
 
-打开 `/manage/llms` → **New LLM**：
+Open `/manage/llms` → **New LLM**:
 
-| 字段 | 例 |
+| Field | Example |
 |---|---|
 | Alias | `claude_main` |
 | Provider | `anthropic` |
 | Wire protocol | `anthropic_messages` |
 | Model | `claude-sonnet-4` |
-| API base | `https://api.anthropic.com`（或代理） |
-| API key | `sk-ant-…` 或留空走 `api_key_env_var` |
+| API base | `https://api.anthropic.com` (or a proxy) |
+| API key | `sk-ant-…`, or leave blank to use `api_key_env_var` |
 | Set as default | ✓ |
 
-保存后回到 `/chat`，新会话会自动绑这个 alias。同样的流程适用 OpenAI / Google / Groq / DeepSeek 等任意 ReqLLM 支持的 provider。
+Save, go back to `/chat`, and new sessions bind to this alias automatically. The same flow works for OpenAI / Google / Groq / DeepSeek / any ReqLLM-supported provider.
 
-### 安装第一个 Skill（可选）
+### Install your first Skill (optional)
 
 ```bash
 mkdir -p priv/agent/skills/hello-world/scripts
@@ -129,13 +178,13 @@ mkdir -p priv/agent/skills/hello-world/scripts
 cat > priv/agent/skills/hello-world/SKILL.md <<'MD'
 ---
 name: hello-world
-description: 演示 Skill 接入，接受 `name` 参数，返回问候字符串。
+description: Demo skill — takes a `name` arg, returns a greeting string.
 tags: [demo]
 ---
 
 # hello-world
 
-运行 `scripts/hello.py "<name>"` 即可。
+Run `scripts/hello.py "<name>"`.
 MD
 
 cat > priv/agent/skills/hello-world/scripts/hello.py <<'PY'
@@ -144,100 +193,89 @@ name = (json.loads(sys.argv[1]) if len(sys.argv) > 1 else {}).get("name", "world
 print(json.dumps({"greeting": f"hello, {name}"}, ensure_ascii=False))
 PY
 
-mix long.skill reindex   # 或者重启 server,watcher 也会自动捕获
+mix long.skill reindex   # or restart the server; the watcher also picks it up
 ```
 
-下次对话里 LLM 看到 `# Available skills` 里的 `hello-world` 就能 `skill_search` / `skill_read` 然后 `code_run` 执行。Skill 格式完整兼容 [Anthropic Agent Skills](https://code.claude.com/docs/en/skills)，可以直接 `git clone https://github.com/anthropics/skills priv/agent/skills/` 白嫖官方仓库。
+Next conversation, the LLM sees `hello-world` under `# Available skills` and can `skill_read` then `code_run` it. The format is fully compatible with [Anthropic Agent Skills](https://code.claude.com/docs/en/skills), so you can `git clone https://github.com/anthropics/skills priv/agent/skills/` to grab the official repo wholesale.
 
-## CLI 工具
+## Channels (platform bots)
 
-| 命令 | 用途 |
+Two channels are supported today, both onboarded entirely from the web at **`/manage/credentials`** (the "Channels" page) — no env vars, no restart.
+
+- **WeChat** — click *扫码登录* (scan to log in) to open an inline QR and bind a WeChat account via Tencent's iLink bot API (no desktop hook needed); the credential is stored in the DB and the worker hot-reloads on connect.
+- **Telegram** — paste a [@BotFather](https://t.me/BotFather) token; the worker starts long-polling immediately. Replies render as Telegram HTML, with typing indicators and inbound/outbound media (photos, documents).
+
+## CLI tools
+
+| Command | Purpose |
 |---|---|
-| `mix phx.server` | 启动 web 服务（端口默认 4004） |
-| `mix long.skill list / reindex / remove NAME` | Skill 索引管理 |
-| `mix long.wechat.login` | WeChat 扫码登录 + buf 持久化 |
-| `iex -S mix` | REPL：`Long.Agent.list_sessions()` / `Long.Jido.Loop.run(…)` 等 |
-| `mix test` | 测试套件 |
+| `mix phx.server` | start the web server (default port 4000) |
+| `mix long.skill list / reindex / remove NAME` | skill index management |
+| `mix long.wechat.login` | WeChat QR login + buf persistence |
+| `iex -S mix` | REPL: `Long.Agent.list_sessions()`, etc. |
+| `mix test` | test suite |
 | `mix precommit` | `compile --warnings-as-errors + format + test` |
 
-## 配置
+## Configuration
 
-主要配置项在 `config/config.exs` 下的 `:long, Long.Agent`：
+**Configure from the web, not from files.** Almost everything — LLMs, search providers, channels, scheduled tasks, memory, secrets — lives in the DB and is edited at `/manage`. There's no config file to redeploy for day-to-day changes.
+
+The only file-level config is a handful of filesystem roots, under `:long, Long.Agent` in `config/config.exs` (the installed release reads these from `~/.long/env` instead):
 
 ```elixir
 config :long, Long.Agent,
-  memory_root: "priv/agent/memory",      # 历史 GenericAgent 兼容路径
-  skill_root:  "priv/agent/skills",      # L3 Skill 目录(SKILL.md 在这里)
-  workspace_root: "priv/agent/workspace" # code_run / file_* 工具的根
+  memory_root: "priv/agent/memory",      # legacy GenericAgent-compatible path
+  skill_root:  "priv/agent/skills",      # L3 skill dir (SKILL.md lives here)
+  workspace_root: "priv/agent/workspace" # root for code_run / file_* tools
 ```
 
-LLM / search / bot 等配置走 DB，通过 `/manage` 编辑或 IEx 调用 `Long.Agent.register_llm/1` 等。
+Everything else is a page in `/manage` (or, if you prefer, an IEx call like `Long.Agent.register_llm/1`).
 
-## 平台 Bot
-
-### WeChat
-
-需要[启明 PCHook](https://www.fudankw.cn/)。`mix long.wechat.login` 扫码后凭据存进 DB（`/manage/credentials`）。`Long.Agent.Bots.Wechat.Worker` 自动 attach 一个 session 给每个聊天用户。
-
-### Telegram
-
-`config/dev.exs`：
-
-```elixir
-config :long, :telegram,
-  bot_token: System.get_env("TELEGRAM_BOT_TOKEN"),
-  enabled: true
-```
-
-### Feishu
-
-`POST /webhooks/feishu` 已经接好，配置在 `LongWeb.FeishuController`。
-
-## 开发
+## Development
 
 ```bash
-mix test                                # 单元 + LiveView 测试
-mix test test/long/jido                 # 跑某一组
+mix test                                # unit + LiveView tests
+mix test test/long/jido                 # run one group
 mix format
 mix precommit                           # compile --warnings-as-errors + format + test
-mix usage_rules.docs Ash.Resource       # 查依赖文档
+mix usage_rules.docs Ash.Resource       # look up dependency docs
 ```
 
-`CLAUDE.md` 里有项目级 AI agent 指引（usage rules + skill 入口），如果你在用 Claude Code / Cursor 等 IDE agent 工具会自动加载。
+`CLAUDE.md` carries project-level AI-agent guidance (usage rules + skill entry points), auto-loaded if you use Claude Code / Cursor / similar IDE agents.
 
-## 状态
+## Status
 
-**Alpha — 单用户使用。** 这个项目目前为一个用户（我自己）的日常 AI 助手运行。
+**Alpha — single-user.** This project currently runs as one person's (mine) daily AI assistant.
 
-- 没有多租户 / 权限隔离
-- schema 偶尔会变化，没承诺向后兼容
-- 部分功能（mixin LLM、Feishu / Telegram 全链路）测试覆盖率较低
-- 部署文档目前只跑 single-node
+- No multi-tenancy / permission isolation.
+- The schema changes occasionally; no backward-compat promise.
+- Some paths (mixin LLM, full WeChat / Telegram chains) have light test coverage.
+- Deployment docs are single-node only.
 
-欢迎 issue 报问题、PR 提改进，但目前没有承诺的发布节奏。
+Issues and PRs welcome, but there's no committed release cadence.
 
 ## Roadmap
 
-短期：
+Near-term:
 
-- [ ] Memory editor 改用 `<.text_field>` 等 Mishka 表单组件（目前手写 `<input>`）
-- [ ] AshPhoenix.Form 替换 LLM modal 的手卷转换
-- [ ] 多用户 / 会话隔离（auth + per-user namespace）
+- [ ] Memory editor on Mishka form components (`<.text_field>` etc.) instead of hand-rolled `<input>`s
+- [ ] AshPhoenix.Form to replace the hand-rolled LLM modal conversion
+- [ ] Multi-user / session isolation (auth + per-user namespace)
 
-中长期：
+Longer-term:
 
-- [ ] CRDT-based 多客户端会话同步
-- [ ] 把 `Long.Jido.Loop` 抽成独立 hex lib，让 Loop / Memory / Skill 可以被 Phoenix 之外的项目复用
+- [ ] CRDT-based multi-client session sync
+- [ ] Extract the ReAct loop into a standalone hex lib so Loop / Memory / Skill can be reused outside Phoenix
 
-## 致谢
+## Acknowledgements
 
-- Python 版 GenericAgent 提供了所有架构原型
-- [Ash Framework](https://ash-hq.org) 让数据 + 域逻辑可以一起描述
-- [ReqLLM](https://hexdocs.pm/req_llm/) 让接入新 LLM provider 只需要一行 alias
-- [Mishka Chelekom](https://mishka.tools/chelekom/) 提供了完整的 LiveView 组件库
-- [Anthropic Agent Skills](https://github.com/anthropics/skills) 定义了 SKILL.md 格式
-- [Obscura](https://github.com/h4ckf0r0day/obscura) 把 Chromium fork 成了一个干净的 CLI
+- The Python [GenericAgent](https://github.com/lsdefine/GenericAgent) was the original starting point.
+- [Ash Framework](https://ash-hq.org) lets data + domain logic be described together.
+- [ReqLLM](https://hexdocs.pm/req_llm/) makes onboarding a new LLM provider a one-line alias.
+- [Mishka Chelekom](https://mishka.tools/chelekom/) provides the full LiveView component library.
+- [Anthropic Agent Skills](https://github.com/anthropics/skills) defines the SKILL.md format.
+- [Obscura](https://github.com/h4ckf0r0day/obscura) forked Chromium into a clean CLI.
 
 ## License
 
-MIT — 见 [LICENSE](LICENSE)。
+MIT — see [LICENSE](LICENSE).
