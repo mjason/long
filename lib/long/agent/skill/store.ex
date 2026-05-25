@@ -347,14 +347,18 @@ defmodule Long.Agent.Skill.Store do
   end
 
   defp start_fresh_watcher(state, root) do
+    # `:ignore` is returned when file_system can't find a native backend
+    # (e.g. a Debian box without `inotify-tools`); treat it like an error
+    # and fall back to the mtime poll instead of crashing the Store —
+    # which previously took the whole app down at boot.
     case FileSystem.start_link(dirs: [root], name: nil) do
       {:ok, pid} ->
         FileSystem.subscribe(pid)
         %{state | watcher_pid: pid}
 
-      {:error, reason} ->
+      other ->
         Logger.warning(
-          "Skill.Store: file_system watcher failed (#{inspect(reason)}); " <>
+          "Skill.Store: file_system watcher unavailable (#{inspect(other)}); " <>
             "falling back to 60s mtime poll"
         )
 
