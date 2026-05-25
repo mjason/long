@@ -29,11 +29,15 @@ jobs:
           - target: macos-arm64
             runner: macos-latest
             install: brew
+          # Build on 22.04 (glibc 2.35), not 24.04 (glibc 2.39): glibc is
+          # forward-compatible only, so a binary built against 2.35 runs on
+          # Debian 12 (2.36) and every newer distro. Building on 24.04 made
+          # the release refuse to start on anything older than Ubuntu 24.04.
           - target: linux-x64
-            runner: ubuntu-latest
+            runner: ubuntu-22.04
             install: setup-beam
           - target: linux-arm64
-            runner: ubuntu-24.04-arm
+            runner: ubuntu-22.04-arm
             install: setup-beam
 
     steps:
