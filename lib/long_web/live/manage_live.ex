@@ -503,6 +503,23 @@ defmodule LongWeb.ManageLive do
     {:noreply, load_section(socket, :skills) |> put_flash(:info, "Rescanned skill_root.")}
   end
 
+  def handle_event("new_shared_skill", %{"skill" => p}, socket) do
+    # No member_id → the shared (global) space.
+    case SkillStore.create_skill(p["name"], p["description"], p["body"] || "") do
+      {:ok, _dir} ->
+        {:noreply, socket |> load_section(:skills) |> put_flash(:info, "Created shared skill “#{p["name"]}”.")}
+
+      {:error, :name_taken} ->
+        {:noreply, put_flash(socket, :error, "A skill named “#{p["name"]}” already exists.")}
+
+      {:error, reason} when reason in [:name_required, :description_required] ->
+        {:noreply, put_flash(socket, :error, "Name and description are required.")}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "Create failed: #{inspect(reason)}")}
+    end
+  end
+
   def handle_event("promote_skill", %{"name" => name}, socket) do
     case SkillStore.promote_to_global(name) do
       :ok ->
@@ -1307,6 +1324,40 @@ defmodule LongWeb.ManageLive do
           Reindex
         </.button>
       </div>
+
+      <.card variant="bordered" color="natural" rounded="large" padding="medium">
+        <p class="text-xs text-zinc-500 mb-2">
+          Create a <strong>shared skill</strong> — visible to every member of every household
+          (the independent shared space, separate from members' personal skills).
+        </p>
+        <form phx-submit="new_shared_skill" class="space-y-2">
+          <div class="flex gap-2">
+            <input
+              name="skill[name]"
+              required
+              placeholder="name (e.g. daily-standup)"
+              class="flex-1 border border-zinc-300 rounded-md px-2 py-1.5 text-sm font-mono"
+            />
+            <input
+              name="skill[description]"
+              required
+              placeholder="one-line description"
+              class="flex-[2] border border-zinc-300 rounded-md px-2 py-1.5 text-sm"
+            />
+          </div>
+          <textarea
+            name="skill[body]"
+            rows="3"
+            placeholder="SKILL.md instructions (markdown)…"
+            class="w-full border border-zinc-300 rounded-md px-2 py-1.5 text-sm font-mono"
+          ></textarea>
+          <div class="flex justify-end">
+            <.button type="submit" color="primary" icon="hero-plus" rounded="medium" size="small">
+              Create shared skill
+            </.button>
+          </div>
+        </form>
+      </.card>
 
       <.card variant="bordered" color="natural" rounded="large" padding="none">
         <table class="w-full text-sm">

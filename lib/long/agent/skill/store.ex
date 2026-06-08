@@ -102,6 +102,19 @@ defmodule Long.Agent.Skill.Store do
   def promote_to_global(name) when is_binary(name),
     do: GenServer.call(__MODULE__, {:promote, name})
 
+  @doc """
+  Create a skill from `name` + `description` + `body`, writing its
+  `SKILL.md`. With `opts[:member_id]` it lands in that member's personal
+  space (`members/<id>/`); without, in the **shared** (global) space.
+  Returns `{:ok, dir}`, `{:error, :name_taken}` (a skill by that name
+  already exists), `{:error, :exists}` (dir collision), or a validation
+  error. Reindexes on success so the new skill is immediately live.
+  """
+  @spec create_skill(String.t(), String.t(), String.t(), keyword()) ::
+          {:ok, Path.t()} | {:error, term()}
+  def create_skill(name, description, body, opts \\ []),
+    do: GenServer.call(__MODULE__, {:create, name, description, body, opts})
+
   @doc "Look up one skill by exact name."
   @spec get(String.t()) :: {:ok, map()} | {:error, :not_found}
   def get(name) when is_binary(name) do
@@ -180,6 +193,13 @@ defmodule Long.Agent.Skill.Store do
 
   @impl true
   def handle_call(:reindex, _from, state), do: {:reply, :ok, reload(state)}
+
+  def handle_call({:create, name, description, body, opts}, _from, state) do
+    case do_create(name, description, body, opts) do
+      {:ok, dir} -> {:reply, {:ok, dir}, reload(state)}
+      {:error, _} = err -> {:reply, err, state}
+    end
+  end
 
   def handle_call({:promote, name}, _from, state) do
     case :ets.lookup(@table, name) do
@@ -474,6 +494,66 @@ defmodule Long.Agent.Skill.Store do
         else
           {:error, reason, _file} -> {:error, reason}
         end
+    end
+  end
+
+  # Create a SKILL.md in the shared (global) or a member's personal space.
+  defp do_create(name, description, body, opts) do
+    name = to_string(name) |> String.trim()
+    description = to_string(description) |> String.trim()
+
+    cond do
+      name == "" ->
+        {:error, :name_required}
+
+      description == "" ->
+        {:error, :description_required}
+
+      match?({:ok, _}, get(name)) ->
+        {:error, :name_taken}
+
+      true ->
+        base =
+          case opts[:member_id] do
+            m when is_binary(m) and m != "" -> Path.join([root(), @members_dir, m])
+            _ -> root()
+          end
+
+        dir = Path.join(base, dir_slug(name))
+        skill_md = Path.join(dir, @skill_filename)
+
+        if File.exists?(skill_md) do
+          {:error, :exists}
+        else
+          File.mkdir_p!(dir)
+          File.write!(skill_md, skill_md_content(name, description, body))
+          {:ok, dir}
+        end
+    end
+  end
+
+  defp skill_md_content(name, description, body) do
+    """
+    ---
+    name: #{yaml_str(name)}
+    description: #{yaml_str(description)}
+    ---
+
+    #{String.trim_trailing(to_string(body || ""))}
+    """
+  end
+
+  # Double-quoted YAML scalar, escaping backslashes then quotes.
+  defp yaml_str(s) do
+    escaped = s |> String.replace("\\", "\\\\") |> String.replace("\"", "\\\"")
+    "\"" <> escaped <> "\""
+  end
+
+  # Filesystem-safe directory name; preserves unicode (e.g. Chinese names).
+  defp dir_slug(name) do
+    case name |> String.replace(~r/[\/\\\s]+/, "-") |> String.trim("-") do
+      "" -> "skill-#{System.unique_integer([:positive])}"
+      s -> s
     end
   end
 

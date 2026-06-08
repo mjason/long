@@ -104,6 +104,22 @@ defmodule Long.Copy do
       en: "couldn't deliver to “%{member}” — every channel failed (%{reason}).",
       zh: "没能把消息送达「%{member}」——所有渠道都失败了(%{reason})。"
     },
+    "skill.owner_only" => %{
+      en: "Only the household owner can create a shared skill.",
+      zh: "只有家庭组管理员能创建共享技能。"
+    },
+    "skill.caller_unbound" => %{
+      en: "this chat isn't linked to a family member — bind it first with `/bind <code>`.",
+      zh: "当前会话还没有绑定家庭成员,先用 /bind <绑定码> 绑定后再试。"
+    },
+    "skill.name_taken" => %{
+      en: "a skill named “%{name}” already exists.",
+      zh: "已存在名为「%{name}」的技能。"
+    },
+    "skill.create_failed" => %{
+      en: "couldn't create the skill (%{reason}).",
+      zh: "创建技能失败(%{reason})。"
+    },
     "tool.ask_default" => %{en: "Please provide input:", zh: "请提供输入:"},
     "tool.code_empty" => %{en: "[Status] ❌ failed: code is empty", zh: "[Status] ❌ 失败: code 为空"},
     "tool.file_no_content" => %{

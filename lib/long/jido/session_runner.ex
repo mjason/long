@@ -27,7 +27,8 @@ defmodule Long.Jido.SessionRunner do
     Long.Jido.Tools.SendMedia,
     Long.Jido.Tools.NotifyMember,
     Long.Jido.Tools.AskUser,
-    Long.Jido.Tools.SkillRead
+    Long.Jido.Tools.SkillRead,
+    Long.Jido.Tools.SkillCreate
   ]
 
   def topic(session_id), do: @topic_prefix <> session_id

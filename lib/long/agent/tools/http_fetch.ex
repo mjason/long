@@ -4,10 +4,9 @@ defmodule Long.Agent.Tools.HttpFetch do
   required, no Python deps needed.
 
   Use this instead of `web_scan` when you don't need real-browser behaviour
-  (JS execution, login state, clicks). Use this instead of `code_run` with
-  `urllib`/`requests` when you just need to read a page; saves an
-  `uv add` round-trip and the response goes through the same SimpHtml
-  pipeline the browser tools use.
+  (JS execution, login state, clicks), and instead of writing a `code_run`
+  fetch when you just need to read a page — the response goes through the
+  same SimpHtml pipeline the browser tools use.
   """
 
   @behaviour Long.Agent.Tool

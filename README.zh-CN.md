@@ -20,8 +20,8 @@ Long 的目标是**像装一个个人 CLI 工具那样安装和运行，而不�
 - **只占一个目录，不碰别处。** `curl | bash` 把所有东西放进 `~/.long/`——二进制、虚拟机、SQLite 数据库、配置、Agent 工作区、技能。卸载就是 `rm -rf ~/.long`。升级只清 `bin/ lib/ releases/ erts-*`，**保留你的 `env`、`long.db` 和 `agent/` 数据**。
 - **零外部服务依赖。** 存储就是 SQLite（一个文件）+ 文件系统（技能、工作区）。没有 Postgres、没有 Redis、没有消息队列。整个运行时是*一个操作系统进程*——BEAM——在内部用监督树管住会话、bot、定时器，连无头浏览器子进程都一起管。
 - **用户态，不需要 root。** 安装和开机自启全程以你自己的用户身份运行。`~/.long/service install` 会帮你接好 launchd（macOS）或 systemd **user** 单元（Linux），重启后自动拉起——你不用写 unit 文件，也不用 `sudo`。
-- **唯一可选的运行时依赖是 `uv`。** 缺了会自动装，而且只有 Python 技能（`code_run`）才需要。不装的话，除了 Python 技能以外一切照常。
-- **局域网优先，默认不做公网加固。** 绑 `0.0.0.0`、`check_origin` 关、不强制 SSL——刚装好的节点就能被局域网里任意设备用 IP 直接访问。公网暴露是按需开启的（`LONG_CHECK_ORIGIN`、反向代理等），绝不会出现「首次运行就把自己锁在外面」。
+- **不需要预装任何语言运行时。** `code_run` 在一个沙箱化的 [Deno](https://deno.land/) 二进制里跑 TypeScript/JavaScript，这个二进制由 App 在首次使用时自己下载并托管——不用装 Python、Node 或 `uv`（要执行 shell 命令则用 `bash`）。可选的无头浏览器 Obscura 也是同样方式自动获取。
+- **局域网优先，默认不做公网加固。** 绑 `0.0.0.0`、`check_origin` 关、不强制 SSL——刚装好的节点就能被局域网里任意设备用 IP 直接访问。公网暴露是按需开启的（`LONG_CHECK_ORIGIN`、反向代理等），绝不会出现「首次运行就把自己锁在外面」。同理，`code_run` 的 `bash` 模式拥有服务进程的完整主机权限（只有默认的 Deno 引擎按成员做了沙箱隔离）——这对信任的家庭场景没问题，但不适合不受信任的成员。
 - **对开源友好的分发方式。** 安装脚本直接用普通 `curl` 从 GitHub Releases 拉 tarball——不依赖 `gh` CLI，不需要 GitHub 账号，不需要鉴权。任何人一行命令就能装。
 
 最终效果：把 Long 装到角落里那台 Mac mini 或 Linux 小主机上，就是 `curl | bash` + 粘一个 API key，之后它就像个家电一样自己跑着。
@@ -112,7 +112,6 @@ curl -fsSL https://raw.githubusercontent.com/mjason/long/main/install.sh | bash
 脚本会：
 
 - 从 GitHub Releases 拉取最新 tarball，解压到 `~/.long/`
-- 检测不到 `uv` 时自动装一份（[Astral uv](https://docs.astral.sh/uv/)，`code_run` 工具需要）
 - 首次运行生成 `~/.long/env`（含自动生成的 `SECRET_KEY_BASE`、`DATABASE_PATH` 等）
 - 生成启动脚本 `~/.long/run` 和开机自启控制器 `~/.long/service`
 
@@ -143,7 +142,7 @@ $EDITOR ~/.long/env     # 通常无需修改
 
 - Elixir 1.15+ / Erlang 26+
 - SQLite 3
-- `uv`（[Astral uv](https://docs.astral.sh/uv/)，给 Skill 的 Python 脚本提供运行时；不用 Python skill 可以不装）
+-（Deno 和可选的 Obscura 浏览器都会在运行时自动下载，无需预装。）
 
 ```bash
 git clone https://github.com/mjason/long.git

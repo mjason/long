@@ -20,8 +20,8 @@ Long is built to install and run **like a personal CLI tool, not like server inf
 - **Installs into one directory, owns nothing else.** `curl | bash` drops everything under `~/.long/` — the binary, the VM, the SQLite database, the config, the agent workspace, the skills. Uninstall is `rm -rf ~/.long`. Upgrades wipe only `bin/ lib/ releases/ erts-*` and **preserve your `env`, `long.db`, and `agent/` data**.
 - **No external services to provision.** Storage is SQLite (a file) plus the filesystem (skills, workspace). No Postgres, no Redis, no message broker. The whole runtime is *one OS process* — the BEAM — internally supervising sessions, bots, the scheduler, and even the headless-browser subprocess.
 - **Userspace, no root.** Install and autostart run entirely as your user. `~/.long/service install` wires up launchd (macOS) or a systemd **user** unit (Linux) so the agent survives reboot — you never write a unit file or `sudo` anything.
-- **One optional runtime dependency: `uv`.** Auto-installed when missing, and only needed for Python-based skills (`code_run`). Skip it and everything except Python skills still works.
-- **LAN-first, not internet-hardened.** Binds `0.0.0.0`, `check_origin` off, no forced SSL — so a freshly installed node is reachable from any device on your home network by IP. Internet exposure is opt-in (`LONG_CHECK_ORIGIN`, a reverse proxy, etc.), never the default that locks you out on first run.
+- **No language runtime to provision.** `code_run` executes TypeScript/JavaScript in a sandboxed [Deno](https://deno.land/) binary that the app downloads and manages itself on first use — no Python, Node, or `uv` to install (`bash` is available for shell commands). The optional headless browser, Obscura, is fetched the same way.
+- **LAN-first, not internet-hardened.** Binds `0.0.0.0`, `check_origin` off, no forced SSL — so a freshly installed node is reachable from any device on your home network by IP. Internet exposure is opt-in (`LONG_CHECK_ORIGIN`, a reverse proxy, etc.), never the default that locks you out on first run. In the same spirit, `code_run`'s `bash` mode runs with the server's full host access (only the Deno engine — the default — is sandboxed per-member); that's fine for a trusted household, not for untrusted members.
 - **Open-source-friendly delivery.** The installer pulls release tarballs straight from GitHub Releases over plain `curl` — no `gh` CLI, no GitHub account, no auth. Anyone can install with one line.
 
 The result: getting Long onto a Mac mini or a Linux box in the corner is `curl | bash` + paste an API key, and it behaves like an appliance from there.
@@ -112,7 +112,6 @@ curl -fsSL https://raw.githubusercontent.com/mjason/long/main/install.sh | bash
 The script:
 
 - pulls the latest tarball from GitHub Releases and extracts it to `~/.long/`,
-- installs [Astral `uv`](https://docs.astral.sh/uv/) if it's missing (needed by the `code_run` tool),
 - on first run generates `~/.long/env` (with an auto-generated `SECRET_KEY_BASE`, `DATABASE_PATH`, …),
 - writes the `~/.long/run` launcher and the `~/.long/service` autostart controller.
 
@@ -143,7 +142,7 @@ Requirements:
 
 - Elixir 1.15+ / Erlang 26+
 - SQLite 3
-- `uv` ([Astral uv](https://docs.astral.sh/uv/) — runtime for Skill Python scripts; optional if you don't use Python skills)
+- (Deno and the optional Obscura browser are auto-downloaded at runtime — nothing to pre-install.)
 
 ```bash
 git clone https://github.com/mjason/long.git

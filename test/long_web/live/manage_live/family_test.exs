@@ -99,6 +99,33 @@ defmodule LongWeb.ManageLive.FamilyTest do
     assert Long.Copy.t("bots.btw_ack", %{}, "en") =~ "Got it"
   end
 
+  test "Skills page can create a shared skill via the form", %{conn: conn} do
+    cfg = Application.get_env(:long, Long.Agent, [])
+    tmp = Path.join(System.tmp_dir!(), "webskills_#{System.unique_integer([:positive])}")
+    File.mkdir_p!(tmp)
+    Application.put_env(:long, Long.Agent, Keyword.put(cfg, :skill_root, tmp))
+    Long.Agent.Skill.Store.reindex()
+
+    on_exit(fn ->
+      Application.put_env(:long, Long.Agent, cfg)
+      File.rm_rf!(tmp)
+      Long.Agent.Skill.Store.reindex()
+    end)
+
+    {:ok, view, html} = live(conn, ~p"/manage/skills")
+    assert html =~ "shared skill"
+
+    html =
+      view
+      |> form("form[phx-submit=new_shared_skill]",
+        skill: %{name: "web-shared-skill", description: "made via web", body: "do the thing"}
+      )
+      |> render_submit()
+
+    assert html =~ "Created shared skill"
+    assert {:ok, %{scope: :global}} = Long.Agent.Skill.Store.get("web-shared-skill")
+  end
+
   test "creating a household via the form works", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/manage/households")
 

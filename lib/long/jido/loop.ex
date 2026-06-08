@@ -183,15 +183,19 @@ defmodule Long.Jido.Loop do
     1. Recognise a name in the list that fits the task.
     2. `skill_read(name)` returns the full SKILL.md plus a
        `resources_dir` (absolute path to the skill folder).
-    3. Run companion scripts yourself via `code_run`, matching the
-       script's language — `code_run(type: "bash", code: "python
-       {resources_dir}/scripts/foo.py …")` for a `.py`, the default
-       Deno engine for a `.ts`/`.js`.
+    3. Run companion scripts yourself via `code_run` — pass the script's
+       `path` to run it on Deno (sandboxed), or write the logic inline as
+       TypeScript/JavaScript.
 
-  For ad-hoc computation `code_run` defaults to **Deno** (TS/JS, sandboxed
-  to your workspace). Use `type: "bash"` for shell/system commands (dates,
-  file ops, running an existing script) and `type: "python"` only when you
-  need the Python ecosystem.
+  `code_run` runs on **Deno** (TypeScript/JavaScript) by default, sandboxed
+  to your per-member workspace. Pass code **inline** in `code` (you do not need
+  to save a file first), or run a saved `.ts`/`.js` script by `path`. For any
+  computation, data processing, parsing, or scripting, use Deno — do **not**
+  write a script in another language (Python, Node, Ruby, …) and shell out to
+  its interpreter. Running language runtimes (`python3`, `node`, `bun`, `ruby`,
+  `deno`, …) via `type: "bash"` is blocked, and they would escape the sandbox
+  anyway. `type: "bash"` is only for installed *system* CLIs (`git`, `ffmpeg`,
+  `ls`, `date`, file moves) — never for executing code you wrote.
 
   To install a new skill mid-conversation: `file_write` the
   SKILL.md (frontmatter requires `name` and `description`) plus any

@@ -71,7 +71,7 @@ defmodule Long.Agent.Deno.Engine do
       nil ->
         Logger.warning(
           "Deno.Engine: Deno not installed and auto_install: false. code_run (deno) will error " <>
-            "until you install it (or set type: \"bash\" / \"python\")."
+            "until you install it (or set type: \"bash\")."
         )
 
         {:noreply, %{state | reply: {:error, :failed}}}

@@ -86,13 +86,9 @@ mkdir -p "$INSTALL_DIR"
 rm -rf "${INSTALL_DIR}"/bin "${INSTALL_DIR}"/lib "${INSTALL_DIR}"/releases "${INSTALL_DIR}"/erts-*
 tar xzf "${TMPDIR}/${TARBALL}" -C "$INSTALL_DIR" --strip-components=1
 
-# ── ensure uv is installed (needed for `code_run` tool) ─────────────────
-if ! have uv; then
-  info "未检测到 uv (Python 工具)，自动安装..."
-  $DL https://astral.sh/uv/install.sh | sh
-  export PATH="$HOME/.local/bin:$PATH"
-  have uv || warn "uv 安装可能未生效，重启 shell 后再试"
-fi
+# Code execution (`code_run`) runs on Deno, and the optional headless
+# browser on Obscura — both are auto-downloaded and managed by the app
+# itself on first use. There is no language runtime to install here.
 
 # ── first-run config ────────────────────────────────────────────────────
 CONFIG_FILE="${INSTALL_DIR}/env"
@@ -116,7 +112,7 @@ SECRET_KEY_BASE=${SECRET}
 PORT=4000
 PHX_HOST=localhost
 
-# Agent 工作区根目录 (uv venv / skills / temp / memory)
+# Agent 工作区根目录 (Deno 沙箱工作区 / skills / temp / memory)
 LONG_WORKSPACE_ROOT=${INSTALL_DIR}/agent
 ENVEOF
   info "已生成配置: ${CONFIG_FILE}"
@@ -138,13 +134,10 @@ set -a; source "$ENV_FILE"; set +a
 mkdir -p "${LONG_WORKSPACE_ROOT:-${SCRIPT_DIR}/agent}"
 
 # macOS default maxfiles is 256 per process — way too low for a
-# BEAM running Bandit + Obscura + Python subprocesses. Bumps to
+# BEAM running Bandit + Obscura + Deno subprocesses. Bumps to
 # 10240, capped at the system hard limit. (Linux default is much
 # higher, so this is mostly a no-op there.)
 ulimit -n 10240 2>/dev/null || true
-
-# uv installs to ~/.local/bin by default; PATH it for the release process.
-export PATH="${HOME}/.local/bin:${PATH}"
 
 export PHX_SERVER=true
 exec "${SCRIPT_DIR}/bin/long" start

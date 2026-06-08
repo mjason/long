@@ -28,8 +28,8 @@ defmodule Long.MixProject do
         applications: [runtime_tools: :permanent],
         # Strip beam files to shrink the tarball ~30%.
         strip_beams: Mix.env() == :prod,
-        # `priv/agent/` is the runtime workspace (uv venv, skills, AI
-        # scratch). Dev runs accumulate hundreds of MB there; the
+        # `priv/agent/` is the runtime workspace (Deno sandbox dirs,
+        # skills, AI scratch). Dev runs accumulate hundreds of MB there; the
         # installer recreates whatever's needed under `~/.long/agent`.
         steps: [:assemble, &strip_agent_workspace/1]
       ]
