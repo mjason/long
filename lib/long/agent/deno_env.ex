@@ -44,11 +44,15 @@ defmodule Long.Agent.DenoEnv do
     {:ok, dir}
   end
 
-  @doc "Path to the `deno` binary, or `{:error, :deno_missing}` if not on PATH."
+  @doc """
+  Path to the `deno` binary, or `{:error, :deno_missing}`. Resolved via
+  `Long.Agent.Deno.Engine` (which auto-installs a managed binary at boot),
+  falling back to a no-download PATH/bin-dir lookup.
+  """
   def deno_bin do
-    case System.find_executable("deno") do
-      nil -> {:error, :deno_missing}
-      path -> {:ok, path}
+    case Long.Agent.Deno.Engine.ready_path() do
+      path when is_binary(path) -> {:ok, path}
+      _ -> {:error, :deno_missing}
     end
   end
 end

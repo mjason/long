@@ -104,6 +104,14 @@ config :long, Long.Agent.Browser,
   obscura_bin: "obscura",
   auto_install: true
 
+# Deno runtime for `code_run` (the default code-exec engine). The Engine
+# ensures the binary is on disk at boot, auto-downloading a managed copy
+# (~40 MB, one-time) into `priv/agent/bin/` so the deployment stays
+# self-contained. Set `auto_install: false` to install Deno yourself.
+config :long, Long.Agent.Deno,
+  deno_bin: "deno",
+  auto_install: true
+
 # Configure the endpoint
 config :long, LongWeb.Endpoint,
   url: [host: "localhost"],

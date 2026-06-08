@@ -26,6 +26,7 @@ defmodule Long.Application do
       Long.Agent.Skill.Store,
       Long.Agent.Browser.Cli.Limiter,
       Long.Agent.Browser.Engine,
+      Long.Agent.Deno.Engine,
       # Telegram workers — one per enabled bot credential, keyed by name.
       {Registry, keys: :unique, name: Long.Agent.Bots.Telegram.Registry},
       Long.Agent.Bots.Telegram.WorkerSupervisor,

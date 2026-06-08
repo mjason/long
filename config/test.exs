@@ -7,6 +7,10 @@ config :ash, policies: [show_policy_breakdowns?: true], disable_async?: true
 # and the browser-backed tools return `{:error, :not_installed}`.
 config :long, Long.Agent.Browser, auto_install: false
 
+# Same for Deno — no ~40 MB download in CI; the Engine reports :failed and
+# code_run (deno) errors gracefully (tests use type: "bash" or stubs).
+config :long, Long.Agent.Deno, auto_install: false
+
 # Don't pollute the test sandbox with captured errors.
 config :error_tracker, enabled: false
 
