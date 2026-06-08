@@ -41,38 +41,59 @@ defmodule Long.Agent.Bots.Wechat.Worker do
   # web_scan / code_run rounds routinely exceed 10 minutes.
   @typing_max_lifetime_ms 30 * 60_000
 
-  def start_link(opts \\ []), do: GenServer.start_link(__MODULE__, opts, name: __MODULE__)
+  @registry Long.Agent.Bots.Wechat.Registry
 
   @doc """
-  Re-read the stored credential and resume (or pause) polling. Call
-  this after `mix long.wechat.login` or the LiveView login page saves
-  fresh credentials, so the running worker doesn't need a restart.
+  Start a worker for one hosted WeChat account. `opts` must carry
+  `:name` — the `WechatCredential` name this worker polls. Registered
+  under `name` in `#{inspect(@registry)}` so `Long.Agent.Bots.Wechat.Manager`
+  can run several accounts side by side.
   """
-  def reload, do: send_safe(__MODULE__, :reload)
+  def start_link(opts) do
+    name = Keyword.fetch!(opts, :name)
+    GenServer.start_link(__MODULE__, opts, name: via(name))
+  end
 
-  defp send_safe(server, msg) do
-    case Process.whereis(server) do
-      nil -> :no_worker
-      pid -> send(pid, msg)
+  defp via(name), do: {:via, Registry, {@registry, name}}
+
+  @doc """
+  Re-read the named account's stored credential and resume (or pause)
+  polling — used after a re-login of that same account refreshes its
+  token. Adding/removing accounts is `Manager`'s job, not this.
+  """
+  def reload(name), do: send_safe(name, :reload)
+
+  defp send_safe(name, msg) do
+    case Registry.lookup(@registry, name) do
+      [{pid, _}] -> send(pid, msg)
+      [] -> :no_worker
     end
   end
 
   @impl true
-  def init(_opts) do
+  def init(opts) do
     Process.flag(:trap_exit, true)
+    name = Keyword.fetch!(opts, :name)
 
-    case Credential.load() do
+    case active_credential(name) do
       nil ->
-        Logger.info(
-          "Long.Agent.Bots.Wechat.Worker: no credential; run `mix long.wechat.login` then restart."
-        )
+        Logger.info("Wechat.Worker[#{name}]: no usable token yet; idle until one is saved.")
+        {:ok, %{name: name, token: nil, seen: MapSet.new()}}
 
-        {:ok, %{token: nil, seen: MapSet.new()}}
-
-      tok ->
-        Logger.info("Long.Agent.Bots.Wechat.Worker: credential loaded (bot_id=#{tok.ilink_bot_id})")
+      cred ->
+        Logger.info("Wechat.Worker[#{name}]: credential loaded (bot_id=#{cred.ilink_bot_id})")
         send(self(), :poll)
-        {:ok, %{token: tok, seen: MapSet.new()}}
+        {:ok, %{name: name, token: cred, seen: MapSet.new()}}
+    end
+  end
+
+  # A credential is only pollable once it has a non-empty bot_token — a
+  # row can exist with just a name + assigned member (pre-scan), in which
+  # case the worker stays idle instead of long-polling with an empty token.
+  defp active_credential(name) do
+    case Credential.load(name) do
+      %{bot_token: t} = cred when is_binary(t) and t != "" -> cred
+      _ -> nil
     end
   end
 
@@ -83,14 +104,14 @@ defmodule Long.Agent.Bots.Wechat.Worker do
     state =
       case Client.get_updates(tok, @poll_timeout_seconds) do
         {:ok, %{msgs: msgs, updates_buf: buf, stale_cursor: true}} ->
-          Logger.warning("Wechat: cursor went stale, reset")
-          Credential.save_buf(buf)
+          Logger.warning("Wechat[#{state.name}]: cursor went stale, reset")
+          Credential.save_buf(buf, state.name)
           dispatch_messages(msgs, %{state | token: %{tok | updates_buf: buf}})
 
         {:ok, %{msgs: msgs, updates_buf: buf}} ->
           token =
             if buf != tok.updates_buf do
-              Credential.save_buf(buf)
+              Credential.save_buf(buf, state.name)
               %{tok | updates_buf: buf}
             else
               tok
@@ -112,16 +133,16 @@ defmodule Long.Agent.Bots.Wechat.Worker do
   end
 
   def handle_info(:reload, state) do
-    case Credential.load() do
+    case active_credential(state.name) do
       nil ->
-        Logger.info("Wechat: reload found no credential — pausing")
+        Logger.info("Wechat[#{state.name}]: reload found no usable credential — pausing")
         {:noreply, %{state | token: nil}}
 
-      tok ->
-        Logger.info("Wechat: reload picked up credential (bot_id=#{tok.ilink_bot_id})")
+      cred ->
+        Logger.info("Wechat[#{state.name}]: reload picked up credential (bot_id=#{cred.ilink_bot_id})")
         # Only kick a fresh poll if we weren't already running.
         if is_nil(state.token), do: send(self(), :poll)
-        {:noreply, %{state | token: tok}}
+        {:noreply, %{state | token: cred}}
     end
   end
 
@@ -145,7 +166,15 @@ defmodule Long.Agent.Bots.Wechat.Worker do
 
         true ->
           token = acc.token
-          Task.Supervisor.start_child(Long.Agent.TaskSup, fn -> handle_message(token, msg) end)
+          # member_id lives on the loaded credential map; derive it rather
+          # than caching a second copy in state.
+          member_id = token[:member_id]
+          credential_name = acc.name
+
+          Task.Supervisor.start_child(Long.Agent.TaskSup, fn ->
+            handle_message(token, member_id, credential_name, msg)
+          end)
+
           %{acc | seen: prune(MapSet.put(acc.seen, mid))}
       end
     end)
@@ -163,7 +192,7 @@ defmodule Long.Agent.Bots.Wechat.Worker do
 
   # ── One inbound message → agent → outbound text/media ────────────────
 
-  defp handle_message(token, msg) do
+  defp handle_message(token, member_id, credential_name, msg) do
     text = Client.extract_text(msg) |> String.trim()
     uid = Map.get(msg, "from_user_id", "")
     ctx_token = Map.get(msg, "context_token", "")
@@ -187,6 +216,8 @@ defmodule Long.Agent.Bots.Wechat.Worker do
       result =
         Bots.run_async(:wechat, uid, body,
           session_title: "wechat:#{uid}",
+          member_id: member_id,
+          credential_name: credential_name,
           attachments: image_paths,
           on_complete: fn _bot_user, result ->
             stop_typing(typing)
@@ -223,12 +254,12 @@ defmodule Long.Agent.Bots.Wechat.Worker do
   # the workspace root. Images go through the multimodal path so the
   # LLM actually sees them.
   defp build_body("", []), do: ""
-  defp build_body("", paths), do: Enum.map_join(paths, "\n", &"[用户发送文件: #{&1}]")
+  defp build_body("", paths), do: Enum.map_join(paths, "\n", &Long.Copy.t("chat.file_marker", %{path: &1}))
 
   defp build_body(text, []), do: text
 
   defp build_body(text, paths) do
-    text <> "\n" <> Enum.map_join(paths, "\n", &"[用户发送文件: #{&1}]")
+    text <> "\n" <> Enum.map_join(paths, "\n", &Long.Copy.t("chat.file_marker", %{path: &1}))
   end
 
   defp attach_summary([]), do: ""

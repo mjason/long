@@ -24,19 +24,22 @@ defmodule Long.Agent.Bots.Wechat do
         }
 
   @doc """
-  Push a collected `result` map to a WeChat user. Loads the credential
-  via `Credential.load/0`; returns `{:error, :no_credential}` if none
-  is stored.
+  Push a collected `result` map to a WeChat user via a specific hosted
+  account. `opts[:credential_name]` selects which account's token to
+  send with (default `"default"`); returns `{:error, :no_credential}`
+  when that account has no usable token.
   """
   @spec push(String.t(), push_result(), keyword()) :: :ok | {:error, term()}
   def push(uid, %{} = result, opts \\ []) when is_binary(uid) do
-    case Credential.load() do
-      nil ->
-        Logger.warning("Wechat push to #{uid}: no credential; run `mix long.wechat.login`.")
-        {:error, :no_credential}
+    name = Keyword.get(opts, :credential_name, "default")
 
-      token ->
+    case Credential.load(name) do
+      %{bot_token: t} = token when is_binary(t) and t != "" ->
         push_with_token(token, uid, result, opts)
+
+      _ ->
+        Logger.warning("Wechat push to #{uid}: account #{inspect(name)} has no token.")
+        {:error, :no_credential}
     end
   end
 

@@ -55,7 +55,7 @@ defmodule LongWeb.AgentLive.Chat do
          |> assign(:checkpoint, load_checkpoint(socket.assigns.session_id))
          |> assign(:streaming, nil)
          |> assign(:loop_running?, false)
-         |> assign(:loop_notice, %{kind: :info, text: "已清空这条会话的历史、摘要、检查点和 session 记忆。"})
+         |> assign(:loop_notice, %{kind: :info, text: Long.Copy.t("bots.cleared")})
          |> push_event("agent:clear-composer", %{})}
 
       trimmed ->

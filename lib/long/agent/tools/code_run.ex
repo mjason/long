@@ -87,7 +87,7 @@ defmodule Long.Agent.Tools.CodeRun do
 
     if is_nil(code) or code == "" do
       [
-        {:output, "[Status] ❌ 失败: code 为空\n"},
+        {:output, Long.Copy.t("tool.code_empty") <> "\n"},
         {:outcome, StepOutcome.cont(%{"status" => "error", "msg" => "code missing"})}
       ]
     else

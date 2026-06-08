@@ -30,7 +30,7 @@ defmodule Long.Jido.Tools.AskUser do
     {:ok,
      %{
        ask_user: true,
-       question: params[:question] || "请提供输入：",
+       question: params[:question] || Long.Copy.t("tool.ask_default"),
        candidates: params[:candidates] || []
      }}
   end

@@ -38,6 +38,10 @@ defmodule Long.Agent.Skill.Store do
   @debounce_ms 250
   @tick_ms 60_000
 
+  # Personal skills live under `<root>/members/<member_id>/<skill>/`.
+  # Anything else discovered under `<root>` is a shared/global skill.
+  @members_dir "members"
+
   # ── client API ───────────────────────────────────────────────────────
 
   def start_link(opts \\ []) do
@@ -55,14 +59,48 @@ defmodule Long.Agent.Skill.Store do
     |> Enum.sort_by(& &1.name)
   end
 
-  @doc "System-prompt addendum block listing every skill name."
-  @spec list_names_for_prompt() :: String.t()
-  def list_names_for_prompt do
+  @doc """
+  Every skill visible to `member_id`: all global skills plus that
+  member's own personal skills. `nil` (web chat / unbound session) sees
+  global skills only.
+  """
+  @spec visible_skills(String.t() | nil) :: [map()]
+  def visible_skills(member_id \\ nil) do
+    Enum.filter(list_all(), &visible?(&1, member_id))
+  end
+
+  defp visible?(%{scope: :personal, owner_member_id: owner}, member_id),
+    do: owner == member_id
+
+  defp visible?(_global_or_legacy, _member_id), do: true
+
+  @doc """
+  System-prompt addendum block listing skill names. With no argument (or
+  `nil`) it returns the cached global-only block; with a `member_id` it
+  computes global + that member's personal skills on demand.
+  """
+  @spec list_names_for_prompt(String.t() | nil) :: String.t()
+  def list_names_for_prompt(member_id \\ nil)
+
+  def list_names_for_prompt(nil) do
     case :ets.lookup(@table, @names_block_key) do
       [{@names_block_key, str}] -> str
       [] -> ""
     end
   end
+
+  def list_names_for_prompt(member_id) when is_binary(member_id) do
+    member_id |> visible_skills() |> names_block()
+  end
+
+  @doc """
+  Promote a personal skill to the shared/global set by relocating its
+  directory from `members/<id>/…` up to `<root>/<skill>`. Returns `:ok`,
+  or `{:error, reason}` (`:not_found | :already_global | :name_taken | term`).
+  """
+  @spec promote_to_global(String.t()) :: :ok | {:error, term()}
+  def promote_to_global(name) when is_binary(name),
+    do: GenServer.call(__MODULE__, {:promote, name})
 
   @doc "Look up one skill by exact name."
   @spec get(String.t()) :: {:ok, map()} | {:error, :not_found}
@@ -70,6 +108,19 @@ defmodule Long.Agent.Skill.Store do
     case :ets.lookup(@table, name) do
       [{^name, skill}] -> {:ok, skill}
       _ -> {:error, :not_found}
+    end
+  end
+
+  @doc """
+  Like `get/1`, but only resolves skills visible to `member_id` (global,
+  or personal owned by that member). A `nil` member sees global only.
+  Returns `{:error, :not_found}` for a skill the caller may not see — the
+  same shape as a genuinely missing skill, so callers can't probe names.
+  """
+  @spec get_visible(String.t(), String.t() | nil) :: {:ok, map()} | {:error, :not_found}
+  def get_visible(name, member_id) when is_binary(name) do
+    with {:ok, skill} <- get(name) do
+      if visible?(skill, member_id), do: {:ok, skill}, else: {:error, :not_found}
     end
   end
 
@@ -129,6 +180,30 @@ defmodule Long.Agent.Skill.Store do
 
   @impl true
   def handle_call(:reindex, _from, state), do: {:reply, :ok, reload(state)}
+
+  def handle_call({:promote, name}, _from, state) do
+    case :ets.lookup(@table, name) do
+      [{^name, %{scope: :personal, absolute_path: src}}] ->
+        dest = Path.join(root(), Path.basename(src))
+
+        cond do
+          File.exists?(dest) ->
+            {:reply, {:error, :name_taken}, state}
+
+          true ->
+            case move_dir(src, dest) do
+              :ok -> {:reply, :ok, reload(state)}
+              {:error, reason} -> {:reply, {:error, reason}, state}
+            end
+        end
+
+      [{^name, %{scope: :global}}] ->
+        {:reply, {:error, :already_global}, state}
+
+      _ ->
+        {:reply, {:error, :not_found}, state}
+    end
+  end
 
   def handle_call({:touch, name}, _from, state) do
     case :ets.lookup(@table, name) do
@@ -224,26 +299,26 @@ defmodule Long.Agent.Skill.Store do
     end)
   end
 
+  # The cached default block lists global skills only — personal skills
+  # are added per-member on demand via `list_names_for_prompt/1`.
   defp refresh_names_block do
-    block =
-      case list_all() do
-        [] ->
-          ""
+    global = Enum.filter(list_all(), &(&1.scope == :global))
+    :ets.insert(@table, {@names_block_key, names_block(global)})
+  end
 
-        skills ->
-          body = Enum.map_join(skills, "\n", &"- `#{&1.name}`")
+  defp names_block([]), do: ""
 
-          """
-          # Available skills
+  defp names_block(skills) do
+    body = Enum.map_join(skills, "\n", &"- `#{&1.name}`")
 
-          Call `skill_search(query: …)` for descriptions, then `skill_read(name: …)`
-          for the full SKILL.md instructions.
+    """
+    # Available skills
 
-          #{body}
-          """
-      end
+    Call `skill_search(query: …)` for descriptions, then `skill_read(name: …)`
+    for the full SKILL.md instructions.
 
-    :ets.insert(@table, {@names_block_key, block})
+    #{body}
+    """
   end
 
   defp load_skill(skill_md_path, root) do
@@ -254,12 +329,16 @@ defmodule Long.Agent.Skill.Store do
          :ok <- validate_required(frontmatter),
          {:ok, stat} <- File.stat(skill_md_path) do
       usage = read_usage(skill_dir)
+      relative_path = Path.relative_to(skill_dir, root)
+      {scope, owner_member_id} = classify(relative_path)
 
       {:ok,
        %{
          name: frontmatter["name"],
-         relative_path: Path.relative_to(skill_dir, root),
+         relative_path: relative_path,
          absolute_path: skill_dir,
+         scope: scope,
+         owner_member_id: owner_member_id,
          description: frontmatter["description"],
          tags: list_field(frontmatter, "tags"),
          frontmatter: frontmatter,
@@ -268,6 +347,15 @@ defmodule Long.Agent.Skill.Store do
          last_used_at: usage[:last_used_at],
          mtime: stat.mtime
        }}
+    end
+  end
+
+  # A skill dir at `members/<id>/…` is personal and owned by `<id>`;
+  # everything else is a shared/global skill.
+  defp classify(relative_path) do
+    case Path.split(relative_path) do
+      [@members_dir, member_id | _] -> {:personal, member_id}
+      _ -> {:global, nil}
     end
   end
 
@@ -370,6 +458,23 @@ defmodule Long.Agent.Skill.Store do
     root = root()
     File.mkdir_p!(root)
     root
+  end
+
+  # Relocate a skill directory, preferring an atomic rename and falling
+  # back to copy+remove if rename fails (e.g. across filesystems).
+  defp move_dir(src, dest) do
+    case File.rename(src, dest) do
+      :ok ->
+        :ok
+
+      {:error, _} ->
+        with {:ok, _} <- File.cp_r(src, dest),
+             {:ok, _} <- File.rm_rf(src) do
+          :ok
+        else
+          {:error, reason, _file} -> {:error, reason}
+        end
+    end
   end
 
   defp changed_since_last_scan?(last) do

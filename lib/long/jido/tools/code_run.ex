@@ -11,47 +11,59 @@ defmodule Long.Jido.Tools.CodeRun do
   use Jido.Action,
     name: "code_run",
     description:
-      "Execute a Python or shell snippet. Python runs under a uv-managed workspace " <>
-        "(uv run python). Bare `python`/`python3` also work via PATH shims. If a " <>
-        "library is missing, first call this with type=bash, code='uv add <pkg>', " <>
-        "then call Python.",
+      "Execute code in your personal sandbox. Default engine is Deno " <>
+        "(TypeScript/JavaScript): it runs in a per-member workspace with filesystem " <>
+        "access limited to that directory plus network — a safe multi-user sandbox. " <>
+        "Use type=\"bash\" for a shell snippet. Python is available as an opt-in heavy " <>
+        "mode (type=\"python\", uv-managed) for tasks that need the Python package " <>
+        "ecosystem; install libs via type=bash, code='uv add <pkg>'.",
     category: "code",
-    tags: ["python", "bash", "shell"],
-    vsn: "1.0.0",
+    tags: ["deno", "javascript", "typescript", "bash", "python"],
+    vsn: "2.0.0",
     schema:
       Zoi.object(%{
         code: Zoi.string(description: "Code snippet to execute"),
         type:
-          Zoi.string(description: "python | bash | shell | sh")
+          Zoi.string(description: "deno (default, TS/JS) | bash | python | js | ts")
           |> Zoi.optional()
-          |> Zoi.default("python"),
+          |> Zoi.default("deno"),
         timeout:
           Zoi.integer(description: "Timeout in seconds, default 60")
           |> Zoi.optional()
           |> Zoi.default(60),
         cwd:
-          Zoi.string(description: "Relative to the uv workspace root.")
+          Zoi.string(description: "Relative to your personal workspace root.")
           |> Zoi.optional()
       })
 
-  alias Long.Agent.{PythonEnv, PythonRunner}
+  alias Long.Agent.{DenoEnv, PythonEnv, PythonRunner}
+  alias Long.Jido.Tools.Format
 
   @default_max_output_bytes 10_000
 
   @impl true
   def run(params, ctx) do
     code = params[:code]
-    code_type = PythonRunner.normalize_type(params[:type] || "python")
+    code_type = PythonRunner.normalize_type(params[:type] || "deno")
     timeout_ms = (params[:timeout] || 60) * 1000
     max_bytes = ctx[:max_output_bytes] || @default_max_output_bytes
 
-    case PythonEnv.ensure!(ctx[:workspace_root]) do
-      {:ok, workspace} ->
-        cwd = workspace |> Path.join(params[:cwd] || "./") |> Path.expand()
-        File.mkdir_p!(cwd)
-        execute(code, code_type, timeout_ms, workspace, cwd, max_bytes)
-    end
+    {:ok, workspace} = ensure_workspace(code_type, member_base(ctx))
+    cwd = workspace |> Path.join(params[:cwd] || "./") |> Path.expand()
+    File.mkdir_p!(cwd)
+    execute(code, code_type, timeout_ms, workspace, cwd, max_bytes)
   end
+
+  # The caller's personal workspace dir (members/<id>/), or the shared
+  # base for an unbound / web-chat session with no household member.
+  defp member_base(ctx) do
+    DenoEnv.workspace(ctx[:workspace_root], Format.member_id_for_session(ctx))
+  end
+
+  # Python needs its uv project scaffolding written into the dir; Deno and
+  # bash just need the directory to exist.
+  defp ensure_workspace("python", base), do: PythonEnv.ensure!(base)
+  defp ensure_workspace(_other, base), do: DenoEnv.ensure!(base)
 
   defp execute(code, type, timeout, workspace, cwd, max_bytes) do
     case PythonRunner.build_command(code, type, cwd) do

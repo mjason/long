@@ -33,6 +33,7 @@ defmodule LongWeb.Router do
 
     live "/manage", ManageLive, :llms
     live "/manage/llms", ManageLive, :llms
+    live "/manage/households", ManageLive, :households
     live "/manage/memories", ManageLive, :memories
     live "/manage/skills", ManageLive, :skills
     live "/manage/sessions", ManageLive, :sessions
@@ -40,6 +41,7 @@ defmodule LongWeb.Router do
     live "/manage/credentials", ManageLive, :credentials
     live "/manage/scheduled", ManageLive, :scheduled
     live "/manage/secrets", ManageLive, :secrets
+    live "/manage/phrases", ManageLive, :phrases
   end
 
   scope "/webhooks/feishu", LongWeb do

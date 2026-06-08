@@ -47,7 +47,7 @@ defmodule Long.Agent.Tools.FileWrite do
     case content_from(args, response) do
       nil ->
         Tool.emit(
-          "[Status] ❌ 失败: 未找到内容\n",
+          Long.Copy.t("tool.file_no_content") <> "\n",
           StepOutcome.cont(%{
             "status" => "error",
             "msg" =>

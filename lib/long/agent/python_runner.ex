@@ -6,16 +6,20 @@ defmodule Long.Agent.PythonRunner do
   PATH setup, port cleanup, and output truncation.
   """
 
-  alias Long.Agent.PythonEnv
+  alias Long.Agent.{DenoEnv, PythonEnv}
 
   @type build_result ::
           {:ok, exe :: String.t(), args :: [String.t()], cleanup :: (-> any())}
           | {:error, String.t()}
 
-  @doc "Map `py | shell | sh` aliases to the canonical type. Anything else passes through."
+  @doc "Map language aliases to the canonical type. Anything else passes through."
   def normalize_type("py"), do: "python"
   def normalize_type("shell"), do: "bash"
   def normalize_type("sh"), do: "bash"
+  def normalize_type("js"), do: "deno"
+  def normalize_type("ts"), do: "deno"
+  def normalize_type("javascript"), do: "deno"
+  def normalize_type("typescript"), do: "deno"
   def normalize_type(t), do: t
 
   @doc """
@@ -38,6 +42,19 @@ defmodule Long.Agent.PythonRunner do
     end
   end
 
+  def build_command(code, "deno", cwd) do
+    case DenoEnv.deno_bin() do
+      {:error, :deno_missing} ->
+        {:error,
+         "deno not installed. Install from https://deno.land/ (or `brew install deno`) and retry."}
+
+      {:ok, deno} ->
+        tmp = Path.join(cwd, ".ai_#{System.unique_integer([:positive])}.ts")
+        File.write!(tmp, code)
+        {:ok, deno, deno_args(cwd, tmp), fn -> File.rm(tmp) end}
+    end
+  end
+
   def build_command(code, "bash", _cwd), do: {:ok, "bash", ["-c", code], fn -> :ok end}
 
   def build_command(_code, "powershell", _cwd) do
@@ -49,6 +66,23 @@ defmodule Long.Agent.PythonRunner do
   end
 
   def build_command(_code, type, _cwd), do: {:error, "unsupported code_type: #{type}"}
+
+  # Deno permission flags, scoped to the member's workspace `cwd`. We grant
+  # filesystem read/write only *inside* that directory (multi-member
+  # isolation), plus network; everything else — subprocess (`--allow-run`),
+  # FFI, env — stays denied. `--no-prompt` makes a missing permission a hard
+  # deny instead of a hang waiting on a TTY that isn't there.
+  defp deno_args(cwd, tmp) do
+    [
+      "run",
+      "--quiet",
+      "--no-prompt",
+      "--allow-read=#{cwd}",
+      "--allow-write=#{cwd}",
+      "--allow-net",
+      tmp
+    ]
+  end
 
   @doc """
   PATH env for child processes: prepend the workspace's `.venv/bin` and

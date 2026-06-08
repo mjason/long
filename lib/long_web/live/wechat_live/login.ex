@@ -1,23 +1,29 @@
 defmodule LongWeb.WechatLive.Login do
   @moduledoc """
   Browser-based replacement for `mix long.wechat.login`. Fetches an
-  iLink bot QR, renders it inline as SVG, polls the status endpoint,
-  saves the resulting credential to the database, and (if the worker
-  is already running) hot-reloads it so chat resumes without a server
-  restart.
+  iLink bot QR, renders it inline as SVG, polls the status endpoint, and
+  saves the resulting credential under the account `name` it was opened
+  for (default `"default"`). On confirm it reconciles the workers so the
+  new account starts polling without a server restart.
+
+  Embedded into `/manage` Channels as a nested LiveView; `name` is passed
+  through the session so one page can connect several accounts.
   """
 
   use LongWeb, :live_view
 
-  alias Long.Agent.Bots.Wechat.{Client, Credential, Worker}
+  alias Long.Agent.Bots.Wechat.{Client, Credential, Manager}
 
   @poll_interval_ms 2_000
 
   @impl true
   def mount(_params, session, socket) do
+    name = session["name"] || "default"
+
     {:ok,
      socket
-     |> assign(:page_title, "WeChat 登录")
+     |> assign(:page_title, "WeChat login")
+     |> assign(:name, name)
      |> assign(:embedded?, session["embedded"] == true)
      |> assign_credential()
      |> assign(:flow, :idle)
@@ -42,10 +48,10 @@ defmodule LongWeb.WechatLive.Login do
          |> assign(:error, nil)}
 
       {:ok, _} ->
-        {:noreply, assign(socket, :error, "iLink 响应里没有 qrcode_img_content")}
+        {:noreply, assign(socket, :error, "iLink response had no qrcode image")}
 
       {:error, e} ->
-        {:noreply, assign(socket, :error, "拉取二维码失败: #{inspect(e)}")}
+        {:noreply, assign(socket, :error, "Failed to fetch QR code: #{inspect(e)}")}
     end
   end
 
@@ -54,8 +60,8 @@ defmodule LongWeb.WechatLive.Login do
   end
 
   def handle_event("logout", _params, socket) do
-    :ok = Credential.delete()
-    {:noreply, socket |> reset() |> assign_credential() |> put_flash(:info, "凭证已删除")}
+    :ok = Credential.delete(socket.assigns.name)
+    {:noreply, socket |> reset() |> assign_credential() |> put_flash(:info, "Credential removed")}
   end
 
   @impl true
@@ -64,14 +70,14 @@ defmodule LongWeb.WechatLive.Login do
   def handle_info(:poll_qr, socket) do
     case Client.get_qrcode_status(socket.assigns.qr_id) do
       {:ok, %{"status" => "confirmed"} = body} ->
-        save_and_reload(body)
+        save_and_reload(socket.assigns.name, body)
 
         {:noreply,
          socket
          |> assign(:flow, :done)
          |> assign(:status, "confirmed")
          |> assign_credential()
-         |> put_flash(:info, "登录成功！bot_id=#{Map.get(body, "ilink_bot_id", "")}")}
+         |> put_flash(:info, "Logged in! bot_id=#{Map.get(body, "ilink_bot_id", "")}")}
 
       {:ok, %{"status" => "expired"}} ->
         {:noreply,
@@ -80,7 +86,7 @@ defmodule LongWeb.WechatLive.Login do
          |> assign(:status, "expired")
          |> assign(:qr_svg, nil)
          |> assign(:qr_id, nil)
-         |> assign(:error, "二维码已过期，请重新生成")}
+         |> assign(:error, "QR code expired — generate a new one")}
 
       {:ok, %{"status" => status}} ->
         Process.send_after(self(), :poll_qr, @poll_interval_ms)
@@ -88,7 +94,7 @@ defmodule LongWeb.WechatLive.Login do
 
       {:error, e} ->
         Process.send_after(self(), :poll_qr, @poll_interval_ms)
-        {:noreply, assign(socket, :error, "状态轮询失败: #{inspect(e)}; 重试中…")}
+        {:noreply, assign(socket, :error, "Status poll failed: #{inspect(e)}; retrying…")}
     end
   end
 
@@ -106,18 +112,21 @@ defmodule LongWeb.WechatLive.Login do
   end
 
   defp assign_credential(socket) do
-    assign(socket, :credential, Credential.load())
+    assign(socket, :credential, Credential.load(socket.assigns.name))
   end
 
-  defp save_and_reload(body) do
+  defp save_and_reload(name, body) do
     {:ok, _} =
-      Credential.save(%{
-        bot_token: Map.get(body, "bot_token", ""),
-        ilink_bot_id: Map.get(body, "ilink_bot_id", ""),
-        updates_buf: ""
-      })
+      Credential.save(
+        %{
+          bot_token: Map.get(body, "bot_token", ""),
+          ilink_bot_id: Map.get(body, "ilink_bot_id", ""),
+          updates_buf: ""
+        },
+        name
+      )
 
-    Worker.reload()
+    Manager.reconcile()
     Credential.broadcast_connected()
   end
 
@@ -127,10 +136,10 @@ defmodule LongWeb.WechatLive.Login do
     |> EQRCode.svg(width: 256, color: "#000", background_color: "#fff")
   end
 
-  defp status_label("new"), do: "等待扫码…"
-  defp status_label("scanned"), do: "已扫码，等待手机确认…"
-  defp status_label("confirmed"), do: "已确认！"
-  defp status_label("expired"), do: "二维码已过期"
+  defp status_label("new"), do: "Waiting for scan…"
+  defp status_label("scanned"), do: "Scanned — confirm on your phone…"
+  defp status_label("confirmed"), do: "Confirmed!"
+  defp status_label("expired"), do: "QR code expired"
   defp status_label(other), do: other
 
   # ── view ─────────────────────────────────────────────────────────────
@@ -140,35 +149,39 @@ defmodule LongWeb.WechatLive.Login do
     ~H"""
     <div class={if @embedded?, do: "", else: "mx-auto max-w-2xl px-4 py-10"}>
       <header :if={!@embedded?} class="mb-8">
-        <h1 class="text-2xl font-semibold">微信 iLink Bot 登录</h1>
+        <h1 class="text-2xl font-semibold">WeChat iLink bot login</h1>
         <p class="mt-2 text-sm text-zinc-500">
-          扫码绑定一个微信账号，之后所有发到这个号的私信都会进入 agent。
+          Scan to connect a WeChat account; messages sent to it flow into the agent.
         </p>
       </header>
+
+      <p class="text-xs text-zinc-400 mb-3">
+        Account: <span class="font-mono text-zinc-600">{@name}</span>
+      </p>
 
       <%= if @credential do %>
         <section class="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-sm text-zinc-500">当前已登录</p>
+              <p class="text-sm text-zinc-500">Connected</p>
               <p class="font-mono text-sm mt-1">
                 bot_id: <span class="text-zinc-900">{@credential.ilink_bot_id}</span>
               </p>
-              <p class="text-xs text-zinc-400 mt-1">Worker 正在 long-poll iLink</p>
+              <p class="text-xs text-zinc-400 mt-1">Worker is long-polling iLink</p>
             </div>
             <div class="flex gap-2">
               <button
                 phx-click="start_login"
                 class="rounded-md bg-zinc-100 px-3 py-1.5 text-sm font-medium hover:bg-zinc-200"
               >
-                重新登录
+                Re-login
               </button>
               <button
                 phx-click="logout"
-                data-confirm="确定要删除凭证吗？删除后需要重新扫码。"
+                data-confirm="Remove this credential? You'll need to scan again."
                 class="rounded-md bg-red-50 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-100"
               >
-                退出登录
+                Log out
               </button>
             </div>
           </div>
@@ -181,13 +194,13 @@ defmodule LongWeb.WechatLive.Login do
             <%= if is_nil(@credential) do %>
               <div class="rounded-lg border border-zinc-200 bg-white p-6 shadow-sm text-center">
                 <p class="text-sm text-zinc-600 mb-4">
-                  还未登录任何微信账号。点下面按钮生成扫码二维码。
+                  No WeChat account connected yet. Click below to generate a QR code.
                 </p>
                 <button
                   phx-click="start_login"
                   class="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
                 >
-                  开始登录
+                  Start login
                 </button>
               </div>
             <% end %>
@@ -198,23 +211,18 @@ defmodule LongWeb.WechatLive.Login do
               </div>
               <p class="mt-4 text-sm font-medium">{status_label(@status)}</p>
               <p class="mt-1 text-xs text-zinc-500">
-                用想绑定的微信号 → 扫一扫上面的二维码 → 在手机上确认
+                Open the WeChat account you want to connect → Scan → confirm on your phone
               </p>
               <p class="mt-3 text-xs text-zinc-400">
-                二维码大约 5 分钟过期。过期后点
-                <button phx-click="retry" class="underline">重新生成</button>。
+                The QR expires in ~5 minutes. After that, click
+                <button phx-click="retry" class="underline">regenerate</button>.
               </p>
             </div>
           <% :done -> %>
             <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-6 shadow-sm text-center">
-              <p class="text-emerald-900 font-medium">登录成功！</p>
+              <p class="text-emerald-900 font-medium">Logged in!</p>
               <p class="mt-2 text-sm text-emerald-700">
-                凭证已保存。Worker 已自动重载，可以直接给微信发消息了。
-              </p>
-              <p class="mt-4">
-                <.link navigate={~p"/chat"} class="text-sm font-medium text-emerald-900 underline">
-                  去 chat 页面 →
-                </.link>
+                Credential saved and the worker started — this account is live.
               </p>
             </div>
         <% end %>

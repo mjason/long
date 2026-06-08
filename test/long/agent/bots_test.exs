@@ -99,7 +99,7 @@ defmodule Long.Agent.BotsTest do
         )
 
       assert_receive {:cleared_ack, {:ok, %{text: text}}}, 1_000
-      assert text =~ "已清空"
+      assert text =~ "Cleared"
 
       # Wipe runs on a background task so the ack isn't blocked by DB
       # work; poll until the messages table is empty.
@@ -120,7 +120,7 @@ defmodule Long.Agent.BotsTest do
         )
 
       assert_receive {:status_ack, {:ok, %{text: text}}}, 1_000
-      assert text =~ "空闲"
+      assert text =~ "Idle"
     end
 
     test "`/status` reports owner + queue + btws when busy" do
@@ -147,10 +147,10 @@ defmodule Long.Agent.BotsTest do
         )
 
       assert_receive {:status_ack, {:ok, %{text: text}}}, 1_000
-      assert text =~ "运行中"
+      assert text =~ "running"
       assert text =~ "web_scan"
-      assert text =~ "第 3 轮"
-      assert text =~ "补充 1 条"
+      assert text =~ "turn 3"
+      assert text =~ "1 note(s)"
 
       send(owner, :release)
     end
@@ -169,7 +169,7 @@ defmodule Long.Agent.BotsTest do
         )
 
       assert_receive {:btw_ack, {:ok, %{text: ack}}}, 1_000
-      assert ack =~ "已经加入"
+      assert ack =~ "added"
 
       assert ["注意要 PG-13"] = Long.Agent.Activity.take_btws(sid)
     end

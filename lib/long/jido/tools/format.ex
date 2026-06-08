@@ -17,6 +17,18 @@ defmodule Long.Jido.Tools.Format do
     end
   end
 
+  @doc """
+  The household member id bound to `ctx`'s session, or `nil` for an
+  unbound / web-chat session. Centralizes the session→member lookup that
+  per-member tools (code_run, skill_read) need to scope themselves.
+  """
+  def member_id_for_session(ctx) do
+    case require_session_id(ctx) do
+      {:ok, sid} -> Long.Agent.member_id_for_session(sid)
+      _ -> nil
+    end
+  end
+
   @doc "ISO8601-encode a DateTime; return nil for non-DateTime input."
   def iso8601(%DateTime{} = dt), do: DateTime.to_iso8601(dt)
   def iso8601(_), do: nil

@@ -29,15 +29,51 @@ defmodule Long.Agent.Bots.Wechat.Credential do
   `Long.Agent.Bots.Wechat.Client`, or `nil` if no row has been
   persisted yet.
   """
-  @spec load() :: %{bot_token: String.t(), ilink_bot_id: String.t(), updates_buf: String.t()} | nil
+  @spec load(String.t()) ::
+          %{
+            bot_token: String.t(),
+            ilink_bot_id: String.t(),
+            updates_buf: String.t(),
+            member_id: String.t() | nil
+          }
+          | nil
   def load(name \\ @default_name) do
     case Agent.get_wechat_credential(name) do
       {:ok, row} ->
         %{
           bot_token: row.bot_token || "",
           ilink_bot_id: row.ilink_bot_id || "",
-          updates_buf: row.updates_buf || ""
+          updates_buf: row.updates_buf || "",
+          member_id: row.member_id
         }
+
+      _ ->
+        nil
+    end
+  end
+
+  @doc "Every stored credential's name. One hosted WeChat account per name."
+  @spec names() :: [String.t()]
+  def names do
+    case Agent.list_wechat_credentials() do
+      {:ok, rows} -> Enum.map(rows, & &1.name)
+      _ -> []
+    end
+  end
+
+  @doc """
+  The credential name of the hosted account assigned to `member_id`, or
+  `nil` if no account is bound to that member. Used to route outbound
+  pushes to a member through their own account.
+  """
+  @spec for_member(String.t()) :: String.t() | nil
+  def for_member(member_id) when is_binary(member_id) do
+    case Agent.list_wechat_credentials() do
+      {:ok, rows} ->
+        case Enum.find(rows, &(&1.member_id == member_id)) do
+          nil -> nil
+          row -> row.name
+        end
 
       _ ->
         nil
@@ -94,7 +130,7 @@ defmodule Long.Agent.Bots.Wechat.Credential do
   def delete(name \\ @default_name) do
     with {:ok, row} <- Agent.get_wechat_credential(name) do
       _ = Agent.destroy_wechat_credential(row)
-      Long.Agent.Bots.Wechat.Worker.reload()
+      Long.Agent.Bots.Wechat.Manager.reconcile()
     end
 
     :ok

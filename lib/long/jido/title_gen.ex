@@ -80,13 +80,14 @@ defmodule Long.Jido.TitleGen do
     body =
       snippets
       |> Enum.map_join("\n", fn {role, content} ->
-        prefix = if role == :user, do: "用户", else: "助手"
+        prefix = if role == :user, do: "User", else: "Assistant"
         "#{prefix}: #{Text.preview(content, 200)}"
       end)
 
     prompt = """
-    根据以下对话片段,用 8 个汉字以内的简短短语总结主题,作为这段对话的标题。
-    只回标题文本,不要解释,不要标点,不要引号。
+    Summarize the topic of the conversation below as a short title (at most
+    6 words). Write the title in the SAME language the conversation uses.
+    Reply with the title text only — no explanation, punctuation, or quotes.
 
     #{body}
     """

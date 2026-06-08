@@ -134,8 +134,8 @@ defmodule Long.Agent.ActivityTest do
       info = Activity.lookup(sid)
 
       text = Activity.describe(info)
-      assert text =~ "运行中"
-      assert text =~ "第 4 轮"
+      assert text =~ "running"
+      assert text =~ "turn 4"
       assert text =~ "web_scan"
     end
 
@@ -144,9 +144,9 @@ defmodule Long.Agent.ActivityTest do
       Activity.update(sid, %{request: "帮我找雷欧奥特曼的图片", turn: 2, tool: "web_search"})
 
       text = Activity.describe(Activity.lookup(sid))
-      assert text =~ "处理「帮我找雷欧奥特曼的图片」"
-      assert text =~ "运行"
-      assert text =~ "第 2 轮"
+      assert text =~ "on “帮我找雷欧奥特曼的图片”"
+      assert text =~ "running"
+      assert text =~ "turn 2"
       assert text =~ "web_search"
     end
   end

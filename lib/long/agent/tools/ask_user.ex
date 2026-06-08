@@ -35,7 +35,7 @@ defmodule Long.Agent.Tools.AskUser do
   @impl true
   def run(args, _ctx) do
     payload = %{
-      "question" => args["question"] || "请提供输入：",
+      "question" => args["question"] || Long.Copy.t("tool.ask_default"),
       "candidates" => args["candidates"] || []
     }
 

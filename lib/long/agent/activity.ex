@@ -145,23 +145,29 @@ defmodule Long.Agent.Activity do
   end
 
   @doc "Render a one-line status describing one owner info entry."
-  @spec describe(map()) :: String.t()
-  def describe(info) when is_map(info) do
+  @spec describe(map(), String.t() | nil) :: String.t()
+  def describe(info, locale \\ nil) when is_map(info) do
     prefix =
       case info[:request] do
-        r when is_binary(r) and r != "" -> "处理「#{r}」 · "
+        r when is_binary(r) and r != "" -> Long.Copy.t("status.on_request", %{request: r}, locale)
         _ -> ""
       end
 
-    "#{prefix}运行中 #{Duration.format_zh(Duration.seconds_since(info.since))}#{describe_detail(info[:turn], info[:tool])}"
+    duration = Duration.format(Duration.seconds_since(info.since))
+    running = Long.Copy.t("status.running", %{duration: duration}, locale)
+    prefix <> running <> describe_detail(info[:turn], info[:tool], locale)
   end
 
-  defp describe_detail(nil, nil), do: ""
-  defp describe_detail(turn, nil) when is_integer(turn), do: " · 第 #{turn} 轮"
-  defp describe_detail(nil, tool) when is_binary(tool), do: " · 当前工具 `#{tool}`"
+  defp describe_detail(nil, nil, _locale), do: ""
 
-  defp describe_detail(turn, tool) when is_integer(turn) and is_binary(tool),
-    do: " · 第 #{turn} 轮 · 当前工具 `#{tool}`"
+  defp describe_detail(turn, nil, locale) when is_integer(turn),
+    do: Long.Copy.t("status.turn", %{turn: turn}, locale)
+
+  defp describe_detail(nil, tool, locale) when is_binary(tool),
+    do: Long.Copy.t("status.tool", %{tool: tool}, locale)
+
+  defp describe_detail(turn, tool, locale) when is_integer(turn) and is_binary(tool),
+    do: Long.Copy.t("status.turn_tool", %{turn: turn, tool: tool}, locale)
 
   # ── GenServer ────────────────────────────────────────────────────────
 

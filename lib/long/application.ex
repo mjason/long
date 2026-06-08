@@ -26,11 +26,18 @@ defmodule Long.Application do
       Long.Agent.Skill.Store,
       Long.Agent.Browser.Cli.Limiter,
       Long.Agent.Browser.Engine,
-      Long.Agent.Bots.Telegram,
-      Long.Agent.Bots.Wechat.Worker,
+      # Telegram workers — one per enabled bot credential, keyed by name.
+      {Registry, keys: :unique, name: Long.Agent.Bots.Telegram.Registry},
+      Long.Agent.Bots.Telegram.WorkerSupervisor,
+      Long.Agent.Bots.Telegram.Manager,
       # Start to serve requests, typically the last entry
       {DNSCluster, query: Application.get_env(:long, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Long.PubSub},
+      # WeChat workers (one per hosted account) subscribe to PubSub on
+      # boot via the Manager, so they must start after Long.PubSub.
+      {Registry, keys: :unique, name: Long.Agent.Bots.Wechat.Registry},
+      Long.Agent.Bots.Wechat.WorkerSupervisor,
+      Long.Agent.Bots.Wechat.Manager,
       LongWeb.Endpoint
     ]
 

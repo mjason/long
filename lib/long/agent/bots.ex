@@ -36,6 +36,7 @@ defmodule Long.Agent.Bots do
 
   alias Long.Agent
   alias Long.Agent.Activity
+  alias Long.Copy
   alias Long.SessionRunner
 
   @default_timeout 120_000
@@ -65,15 +66,17 @@ defmodule Long.Agent.Bots do
   `:loop_error` / `:timeout`, so platforms can always push something
   back.
 
-  Three inline magic commands short-circuit the agent loop entirely:
+  Four inline magic commands short-circuit the agent loop entirely:
 
     * `/clear` — wipe history + summary + checkpoint + session memories
     * `/status` — render the current `Activity.snapshot/1`
     * `/btw <note>` — append a mid-flight context note for the running
       agent (picked up via `Long.Jido.Loop`'s `inject_btws/1`)
+    * `/bind <code>` — claim a `HouseholdMember` by its bind code, linking
+      this chat account (`BotUser`) to that family member
 
   Returns `{:ok, %{bot_user, session_id, mode}}` where `mode` is one of
-  `:cleared | :status | :btw | :dispatched`, or `{:error, reason}` if
+  `:cleared | :status | :btw | :bound | :dispatched`, or `{:error, reason}` if
   session resolution / task spawn failed. (Acquire-vs-enqueue happens
   inside the watcher task, so callers see `:dispatched` either way.)
   """
@@ -83,20 +86,27 @@ defmodule Long.Agent.Bots do
 
     with {:ok, %{session_id: session_id, bot_user: user}} <-
            ensure_session(platform, external_id, opts) do
+      locale = locale_for(user)
+
       case parse_magic(text) do
         :clear ->
           clear_session(session_id)
-          on_complete.(user, {:ok, ack("已清空这条会话的历史、摘要、检查点和 session 记忆。可以重新开始了。")})
+          on_complete.(user, {:ok, ack(Copy.t("bots.cleared", %{}, locale))})
           {:ok, %{bot_user: user, session_id: session_id, mode: :cleared}}
 
         :status ->
-          on_complete.(user, {:ok, ack(render_status(Activity.snapshot(session_id)))})
+          on_complete.(user, {:ok, ack(render_status(Activity.snapshot(session_id), locale))})
           {:ok, %{bot_user: user, session_id: session_id, mode: :status}}
 
         {:btw, note} ->
           Activity.add_btw(session_id, note)
-          on_complete.(user, {:ok, ack("好的,已经加入到当前任务的上下文里。")})
+          on_complete.(user, {:ok, ack(Copy.t("bots.btw_ack", %{}, locale))})
           {:ok, %{bot_user: user, session_id: session_id, mode: :btw}}
+
+        {:bind, code} ->
+          {bound, message} = bind_member(user, code, locale)
+          on_complete.(bound, {:ok, ack(message)})
+          {:ok, %{bot_user: bound, session_id: session_id, mode: :bound}}
 
         :normal ->
           dispatch_message(user, session_id, text, watcher_opts, on_complete)
@@ -111,11 +121,47 @@ defmodule Long.Agent.Bots do
       "/clear" -> :clear
       "/status" -> :status
       "/btw " <> note -> {:btw, String.trim(note)}
+      "/bind" -> {:bind, ""}
+      "/bind " <> code -> {:bind, String.trim(code)}
       _ -> :normal
     end
   end
 
   defp parse_magic(_), do: :normal
+
+  # Claim a HouseholdMember by its bind code, linking this chat account
+  # to that member. Returns `{bot_user, ack_message}` — the bot_user is
+  # the updated row on success, the original on failure.
+  defp bind_member(user, "", locale) do
+    {user, Copy.t("bots.bind_usage", %{}, locale)}
+  end
+
+  defp bind_member(user, code, locale) do
+    case Agent.get_member_by_bind_code(code) do
+      {:ok, nil} ->
+        {user, Copy.t("bots.bind_invalid", %{}, locale)}
+
+      {:ok, member} ->
+        member = Ash.load!(member, :household)
+
+        case Agent.bind_bot_user_member(user, %{member_id: member.id}) do
+          {:ok, bound} ->
+            {bound,
+             Copy.t("bots.bind_ok", %{member: member.display_name, household: member.household.name}, locale)}
+
+          {:error, _} ->
+            {user, Copy.t("bots.bind_failed", %{}, locale)}
+        end
+
+      {:error, _} ->
+        {user, Copy.t("bots.bind_failed", %{}, locale)}
+    end
+  end
+
+  # The chat user's locale, captured from the platform (e.g. Telegram
+  # `language_code`) into BotUser metadata; falls back to the default.
+  defp locale_for(%{metadata: meta}) when is_map(meta), do: meta["locale"] || Copy.default_locale()
+  defp locale_for(_), do: Copy.default_locale()
 
   defp ack(text) do
     %{text: text, tool_calls: [], attachments: [], ask: nil, error: nil}
@@ -141,18 +187,22 @@ defmodule Long.Agent.Bots do
     Long.Agent.SessionClear.clear(session_id)
   end
 
-  defp render_status(%{owner: nil, queue_length: 0, pending_btws: 0}),
-    do: "空闲,没有任务在跑。"
+  defp render_status(%{owner: nil, queue_length: 0, pending_btws: 0}, locale),
+    do: Copy.t("status.idle", %{}, locale)
 
-  defp render_status(%{owner: nil, queue_length: q, pending_btws: b}),
-    do: "空闲,但还有 #{q} 条排队消息和 #{b} 条补充。(异常状态,通常 watcher 会立刻接力)"
+  defp render_status(%{owner: nil, queue_length: q, pending_btws: b}, locale),
+    do: Copy.t("status.idle_queue", %{queue: q, btw: b}, locale)
 
-  defp render_status(%{owner: info, queue_length: q, pending_btws: b}) do
-    base = Activity.describe(info)
-    extras = [
-      q > 0 && "排队中 #{q} 条",
-      b > 0 && "补充 #{b} 条"
-    ] |> Enum.filter(& &1) |> Enum.join(" · ")
+  defp render_status(%{owner: info, queue_length: q, pending_btws: b}, locale) do
+    base = Activity.describe(info, locale)
+
+    extras =
+      [
+        q > 0 && Copy.t("status.queued", %{n: q}, locale),
+        b > 0 && Copy.t("status.notes", %{n: b}, locale)
+      ]
+      |> Enum.filter(& &1)
+      |> Enum.join(" · ")
 
     if extras == "", do: base, else: base <> " · " <> extras
   end
@@ -183,7 +233,7 @@ defmodule Long.Agent.Bots do
         # Exit immediately; the current owner's `drain_queue/2` will
         # pop our payload and invoke the closure with the agent's
         # result when it's our turn.
-        on_complete.(user, {:ok, ack("收到,前一条还在处理中,跑完后立刻处理你这条。")})
+        on_complete.(user, {:ok, ack(Copy.t("bots.enqueued_ack", %{}, locale_for(user)))})
     end
   end
 
@@ -305,6 +355,8 @@ defmodule Long.Agent.Bots do
              chat_id: Keyword.get(opts, :chat_id),
              display_name: Keyword.get(opts, :display_name),
              session_id: session.id,
+             member_id: Keyword.get(opts, :member_id),
+             credential_name: Keyword.get(opts, :credential_name),
              metadata: Keyword.get(opts, :metadata, %{})
            }) do
       {:ok, %{bot_user: user, session_id: session.id}}
@@ -325,7 +377,9 @@ defmodule Long.Agent.Bots do
     needs_update? =
       maybe_field(opts, :chat_id, user.chat_id) ||
         maybe_field(opts, :display_name, user.display_name) ||
-        maybe_field(opts, :metadata, user.metadata)
+        maybe_field(opts, :metadata, user.metadata) ||
+        nonempty_change?(opts, :member_id, user.member_id) ||
+        nonempty_change?(opts, :credential_name, user.credential_name)
 
     with {:ok, user} <- maybe_apply_update(user, opts, needs_update?) do
       attach_session(user)
@@ -338,8 +392,21 @@ defmodule Long.Agent.Bots do
     Agent.update_bot_user(user, %{
       chat_id: Keyword.get(opts, :chat_id, user.chat_id),
       display_name: Keyword.get(opts, :display_name, user.display_name),
+      member_id: Keyword.get(opts, :member_id) || user.member_id,
+      credential_name: Keyword.get(opts, :credential_name) || user.credential_name,
       metadata: Map.merge(user.metadata || %{}, Keyword.get(opts, :metadata, %{}))
     })
+  end
+
+  # A dedicated account/bot passes its bound `member_id` (the role) and its
+  # `credential_name` (which channel the chat is on) on every message,
+  # making those authoritative. Only a *non-nil* value counts as a change,
+  # so an unassigned account never clobbers e.g. a `/bind` the user did.
+  defp nonempty_change?(opts, key, current) do
+    case Keyword.get(opts, key) do
+      v when is_binary(v) and v != current -> true
+      _ -> false
+    end
   end
 
   defp attach_session(%{session_id: nil} = user) do
@@ -467,7 +534,7 @@ defmodule Long.Agent.Bots do
   defp apply_error_fallback(%{text: t} = state) when is_binary(t) and t != "", do: state
 
   defp apply_error_fallback(%{error: err} = state) do
-    %{state | text: "出错了:" <> Long.Util.Error.humanize(err)}
+    %{state | text: Copy.t("bots.error", %{reason: Long.Util.Error.humanize(err)})}
   end
 
   @doc "Convenience that walks `tool_calls` into a one-line summary."

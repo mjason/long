@@ -391,8 +391,8 @@ defmodule Long.Agent.Server do
       |> Recall.recall(session_id: state.session_id, limit: 8, bump: false)
       |> Recall.format_for_prompt()
 
-    addendum =
-      merge_addenda([summary_addendum, memory_addendum, SkillStore.list_names_for_prompt()])
+    skill_block = SkillStore.list_names_for_prompt(Agent.member_id_for_session(state.session_id))
+    addendum = merge_addenda([summary_addendum, memory_addendum, skill_block])
 
     tools = default_tools()
 
@@ -411,7 +411,7 @@ defmodule Long.Agent.Server do
       |> Enum.join("\n\n")
 
     system_msg = ReqLLM.Context.system(system_text)
-    btw_msgs = Enum.map(state.btws, &ReqLLM.Context.user("[补充] " <> &1))
+    btw_msgs = Enum.map(state.btws, &ReqLLM.Context.user("[note] " <> &1))
     messages = [system_msg | history] ++ [user_msg] ++ btw_msgs
 
     tool_ctx = %{session_id: state.session_id, workspace_root: workspace_root()}
@@ -909,7 +909,7 @@ defmodule Long.Agent.Server do
 
     case image_names do
       [] -> text
-      names -> "#{text}\n[附件: #{Enum.join(names, ", ")}]"
+      names -> "#{text}\n[attachments: #{Enum.join(names, ", ")}]"
     end
   end
 

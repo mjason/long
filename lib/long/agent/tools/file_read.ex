@@ -88,7 +88,7 @@ defmodule Long.Agent.Tools.FileRead do
 
         body =
           if show?,
-            do: "由于设置了 show_linenos，以下返回信息为：(行号|)内容。\n" <> body,
+            do: "show_linenos is set, so the output below is formatted as (line_no|)content.\n" <> body,
             else: body
 
         StepOutcome.cont(%{"status" => "success", "total_lines" => total, "content" => body})

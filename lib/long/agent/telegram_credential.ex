@@ -1,10 +1,10 @@
 defmodule Long.Agent.TelegramCredential do
   @moduledoc """
   Stored Telegram bot credentials, read by `Long.Agent.Bots.Telegram`
-  at boot and on `:reload`. Single-row by default (identity on `:name`,
-  default `"default"`); schema supports multiple named bots for a
-  future "manage several bots" UX but the worker only consults the
-  default row today.
+  at boot and on `:reload`. One row per bot (identity on `:name`, default
+  `"default"`). Multiple enabled rows are supported so a household can
+  run several bots, each `member_id`-bound to a different role;
+  `Long.Agent.Bots.Telegram.Manager` runs one worker per enabled row.
 
   The token is sensitive — redacted in logs / inspect output. The
   optional `:username` is the bot's `@handle` cached on first
@@ -23,6 +23,10 @@ defmodule Long.Agent.TelegramCredential do
   sqlite do
     table "agent_telegram_credentials"
     repo Long.Repo
+
+    references do
+      reference :member, on_delete: :nilify
+    end
   end
 
   actions do
@@ -31,7 +35,7 @@ defmodule Long.Agent.TelegramCredential do
     create :upsert do
       upsert? true
       upsert_identity :name
-      accept [:name, :bot_token, :username, :enabled]
+      accept [:name, :bot_token, :username, :enabled, :member_id]
     end
 
     update :update do
@@ -40,6 +44,11 @@ defmodule Long.Agent.TelegramCredential do
 
     update :update_username do
       accept [:username]
+    end
+
+    update :set_member do
+      require_atomic? false
+      accept [:member_id]
     end
   end
 
@@ -73,6 +82,14 @@ defmodule Long.Agent.TelegramCredential do
     end
 
     timestamps()
+  end
+
+  relationships do
+    belongs_to :member, Long.Agent.HouseholdMember do
+      description "The household member (role) this bot serves, if assigned."
+      allow_nil? true
+      public? true
+    end
   end
 
   identities do

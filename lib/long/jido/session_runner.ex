@@ -25,6 +25,7 @@ defmodule Long.Jido.SessionRunner do
     Long.Jido.Tools.WebScan,
     Long.Jido.Tools.WebExecuteJs,
     Long.Jido.Tools.SendMedia,
+    Long.Jido.Tools.NotifyMember,
     Long.Jido.Tools.AskUser,
     Long.Jido.Tools.SkillRead
   ]

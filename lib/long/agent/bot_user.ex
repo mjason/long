@@ -30,6 +30,7 @@ defmodule Long.Agent.BotUser do
 
     references do
       reference :session, on_delete: :nilify
+      reference :member, on_delete: :nilify
     end
   end
 
@@ -60,17 +61,31 @@ defmodule Long.Agent.BotUser do
     end
 
     create :create do
-      accept [:platform, :external_id, :chat_id, :display_name, :session_id, :metadata]
+      accept [
+        :platform,
+        :external_id,
+        :chat_id,
+        :display_name,
+        :session_id,
+        :member_id,
+        :credential_name,
+        :metadata
+      ]
     end
 
     update :update do
       require_atomic? false
-      accept [:chat_id, :display_name, :session_id, :metadata]
+      accept [:chat_id, :display_name, :session_id, :member_id, :credential_name, :metadata]
     end
 
     update :rotate_session do
       require_atomic? false
       accept [:session_id]
+    end
+
+    update :bind_member do
+      require_atomic? false
+      accept [:member_id]
     end
   end
 
@@ -91,6 +106,11 @@ defmodule Long.Agent.BotUser do
       public? true
     end
 
+    attribute :credential_name, :string do
+      description "Which hosted account/bot this chat arrived on (the WechatCredential / TelegramCredential `name`). Outbound replies go back via this exact channel."
+      public? true
+    end
+
     attribute :display_name, :string do
       public? true
     end
@@ -105,6 +125,12 @@ defmodule Long.Agent.BotUser do
 
   relationships do
     belongs_to :session, Long.Agent.Session do
+      allow_nil? true
+      public? true
+    end
+
+    belongs_to :member, Long.Agent.HouseholdMember do
+      description "The household member who claimed this chat account, if bound."
       allow_nil? true
       public? true
     end

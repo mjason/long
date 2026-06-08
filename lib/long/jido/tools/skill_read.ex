@@ -23,15 +23,17 @@ defmodule Long.Jido.Tools.SkillRead do
       })
 
   alias Long.Agent.Skill.Store
+  alias Long.Jido.Tools.Format
 
   @impl true
-  def run(params, _ctx) do
+  def run(params, ctx) do
     name = (params[:name] || params["name"] || "") |> to_string() |> String.trim()
+    member_id = Format.member_id_for_session(ctx)
 
     if name == "" do
       {:ok, %{status: "error", msg: "name is required"}}
     else
-      case Store.get(name) do
+      case Store.get_visible(name, member_id) do
         {:ok, skill} ->
           _ = Store.touch(skill.name)
 

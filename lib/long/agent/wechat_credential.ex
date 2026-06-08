@@ -1,9 +1,10 @@
 defmodule Long.Agent.WechatCredential do
   @moduledoc """
   Stored iLink bot credentials and long-poll cursor for the WeChat
-  adapter. Single-row by default (identity on `:name`, default
-  `"default"`), but the schema supports multiple named bots so a
-  future "switch between accounts" UX has somewhere to land.
+  adapter. One row per hosted WeChat account (identity on `:name`,
+  default `"default"`). Multiple rows are supported so a household can
+  connect several accounts, each `member_id`-bound to a different role;
+  `Long.Agent.Bots.Wechat.Manager` runs one worker per row.
 
   Populated by `mix long.wechat.login` after QR confirmation; read on
   every poll cycle by `Long.Agent.Bots.Wechat.Worker`. The
@@ -18,6 +19,10 @@ defmodule Long.Agent.WechatCredential do
   sqlite do
     table "agent_wechat_credentials"
     repo Long.Repo
+
+    references do
+      reference :member, on_delete: :nilify
+    end
   end
 
   actions do
@@ -26,11 +31,16 @@ defmodule Long.Agent.WechatCredential do
     create :upsert do
       upsert? true
       upsert_identity :name
-      accept [:name, :bot_token, :ilink_bot_id, :updates_buf]
+      accept [:name, :bot_token, :ilink_bot_id, :updates_buf, :member_id]
     end
 
     update :update_buf do
       accept [:updates_buf]
+    end
+
+    update :set_member do
+      require_atomic? false
+      accept [:member_id]
     end
   end
 
@@ -62,6 +72,14 @@ defmodule Long.Agent.WechatCredential do
     end
 
     timestamps()
+  end
+
+  relationships do
+    belongs_to :member, Long.Agent.HouseholdMember do
+      description "The household member (role) this hosted WeChat account serves, if assigned."
+      allow_nil? true
+      public? true
+    end
   end
 
   identities do

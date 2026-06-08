@@ -485,7 +485,7 @@ defmodule Long.Jido.Loop do
 
     case image_names do
       [] -> text
-      names -> "#{text}\n[附件: #{Enum.join(names, ", ")}]"
+      names -> "#{text}\n[attachments: #{Enum.join(names, ", ")}]"
     end
   end
 
@@ -530,7 +530,7 @@ defmodule Long.Jido.Loop do
           state
 
         notes ->
-          extras = Enum.map(notes, &ReqLLM.Context.user("[补充] " <> &1))
+          extras = Enum.map(notes, &ReqLLM.Context.user("[note] " <> &1))
           %{state | messages: state.messages ++ extras}
       end
     else

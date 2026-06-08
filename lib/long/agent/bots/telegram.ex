@@ -55,7 +55,8 @@ defmodule Long.Agent.Bots.Telegram do
   / delete; safe to call when no worker exists yet.
   """
   def reload(server \\ __MODULE__) do
-    if pid = Process.whereis(server), do: send(pid, :reload)
+    target = if is_pid(server), do: server, else: Process.whereis(server)
+    if target, do: send(target, :reload)
     :ok
   end
 
@@ -80,10 +81,16 @@ defmodule Long.Agent.Bots.Telegram do
 
     cond do
       body == "" and attachments == [] -> :ok
-      is_nil(Process.whereis(server)) -> {:error, :telegram_worker_not_running}
+      not worker_alive?(server) -> {:error, :telegram_worker_not_running}
       true -> deliver_push(server, chat_id, body, attachments)
     end
   end
+
+  # `server` may be a pid (a per-bot worker resolved by `Outbound`), a
+  # registered name (tests / legacy), or nil (no bot available).
+  defp worker_alive?(pid) when is_pid(pid), do: Process.alive?(pid)
+  defp worker_alive?(nil), do: false
+  defp worker_alive?(name), do: not is_nil(Process.whereis(name))
 
   defp deliver_push(server, chat_id, body, attachments) do
     with {:ok, _} <- maybe_send_text(server, chat_id, body) do
@@ -113,6 +120,7 @@ defmodule Long.Agent.Bots.Telegram do
         user_id: to_string(from["id"]),
         text: text,
         media: media,
+        locale: from["language_code"],
         display_name:
           [from["first_name"], from["last_name"]] |> Enum.reject(&is_nil/1) |> Enum.join(" ")
       }
@@ -125,13 +133,12 @@ defmodule Long.Agent.Bots.Telegram do
 
   @impl true
   def init(opts) do
-    token =
-      case Keyword.get(opts, :token) do
-        t when is_binary(t) and t != "" -> t
-        _ -> resolve_token()
-      end
+    cred_name = Keyword.get(opts, :credential_name)
+    {token, row} = resolve(cred_name, opts)
 
     state = %{
+      credential_name: cred_name,
+      member_id: row && row.member_id,
       token: token,
       http: Keyword.get(opts, :http, &Req.request/1),
       offset: 0,
@@ -144,19 +151,30 @@ defmodule Long.Agent.Bots.Telegram do
     }
 
     if is_nil(token) do
-      Logger.info("Long.Agent.Bots.Telegram: no credential; idle until configured")
+      Logger.info("Long.Agent.Bots.Telegram[#{cred_name || "-"}]: no credential; idle")
     else
-      Logger.info("Long.Agent.Bots.Telegram: credential loaded; starting long-poll")
+      Logger.info("Long.Agent.Bots.Telegram[#{cred_name || "-"}]: credential loaded; long-polling")
       send(self(), :poll)
     end
 
     {:ok, state}
   end
 
-  defp resolve_token do
-    case Credential.load() do
-      {tok, _row} -> tok
-      _ -> nil
+  # `{token, row}` for this worker. An explicit `:token` (tests) wins and
+  # carries no row; otherwise load this worker's own credential by name,
+  # falling back to the first-enabled pick / env var when unnamed.
+  defp resolve(cred_name, opts) do
+    case Keyword.get(opts, :token) do
+      t when is_binary(t) and t != "" ->
+        {t, nil}
+
+      _ ->
+        loaded = if cred_name, do: Credential.load_named(cred_name), else: Credential.load()
+
+        case loaded do
+          {tok, row} -> {tok, row}
+          _ -> {nil, nil}
+        end
     end
   end
 
@@ -170,21 +188,23 @@ defmodule Long.Agent.Bots.Telegram do
   end
 
   def handle_info(:reload, state) do
-    new_token = resolve_token()
+    {new_token, row} = resolve(state.credential_name, [])
+    member_id = row && row.member_id
 
     cond do
       new_token == state.token ->
-        {:noreply, state}
+        # Token unchanged, but the member assignment may have just changed.
+        {:noreply, %{state | member_id: member_id}}
 
       is_nil(new_token) ->
-        Logger.info("Long.Agent.Bots.Telegram: credential cleared; pausing")
-        {:noreply, %{state | token: nil}}
+        Logger.info("Telegram[#{state.credential_name || "-"}]: credential cleared; pausing")
+        {:noreply, %{state | token: nil, member_id: member_id}}
 
       true ->
-        Logger.info("Long.Agent.Bots.Telegram: credential changed; resuming long-poll")
+        Logger.info("Telegram[#{state.credential_name || "-"}]: credential changed; resuming")
         # Reset offset because the new bot has its own update id space.
         if is_nil(state.token), do: send(self(), :poll)
-        {:noreply, %{state | token: new_token, offset: 0}}
+        {:noreply, %{state | token: new_token, member_id: member_id, offset: 0}}
     end
   end
 
@@ -284,8 +304,10 @@ defmodule Long.Agent.Bots.Telegram do
       Keyword.merge(state.run_opts,
         chat_id: msg.chat_id,
         display_name: msg.display_name,
+        member_id: state.member_id,
+        credential_name: state.credential_name,
         attachments: image_paths,
-        metadata: %{"telegram" => true},
+        metadata: %{"telegram" => true, "locale" => msg.locale},
         on_complete: fn _bot_user, result ->
           stop_typing(typing)
 
@@ -330,12 +352,12 @@ defmodule Long.Agent.Bots.Telegram do
   defp compose_body("", []), do: ""
 
   defp compose_body("", paths),
-    do: Enum.map_join(paths, "\n", &"[用户发送文件: #{&1}]")
+    do: Enum.map_join(paths, "\n", &Long.Copy.t("chat.file_marker", %{path: &1}))
 
   defp compose_body(text, []), do: text
 
   defp compose_body(text, paths),
-    do: text <> "\n" <> Enum.map_join(paths, "\n", &"[用户发送文件: #{&1}]")
+    do: text <> "\n" <> Enum.map_join(paths, "\n", &Long.Copy.t("chat.file_marker", %{path: &1}))
 
   @image_exts ~w(.jpg .jpeg .png .gif .webp .bmp)
 
@@ -392,7 +414,7 @@ defmodule Long.Agent.Bots.Telegram do
   defp render_reply(text, _other), do: render_reply(text, nil)
 
   defp render_error(e) do
-    "⚠️ 出错了：" <> Format.to_html(Long.Util.Error.humanize(e))
+    Long.Copy.t("chat.error", %{reason: Format.to_html(Long.Util.Error.humanize(e))})
   end
 
   # Send `text` as one or more HTML-mode messages. Returns the last

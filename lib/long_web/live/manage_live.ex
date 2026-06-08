@@ -25,13 +25,15 @@ defmodule LongWeb.ManageLive do
 
   @sections [
     {:llms, "LLMs", "hero-cpu-chip"},
+    {:households, "Family", "hero-home"},
     {:memories, "Memories", "hero-bookmark"},
     {:skills, "Skills", "hero-puzzle-piece"},
     {:sessions, "Sessions", "hero-chat-bubble-left-right"},
     {:search, "Search", "hero-magnifying-glass"},
     {:credentials, "Channels", "hero-signal"},
     {:scheduled, "Scheduled", "hero-clock"},
-    {:secrets, "Secrets", "hero-lock-closed"}
+    {:secrets, "Secrets", "hero-lock-closed"},
+    {:phrases, "Phrases", "hero-language"}
   ]
 
   # Pull enum values straight from the Ash.Type.Enum modules so the UI
@@ -42,6 +44,9 @@ defmodule LongWeb.ManageLive do
 
   defp scheduled_repeats,
     do: Enum.map(Long.Agent.Enums.ScheduledTaskRepeat.values(), &Atom.to_string/1)
+
+  defp member_relations, do: Enum.map(Long.Agent.Enums.MemberRelation.values(), &Atom.to_string/1)
+  defp member_roles, do: Enum.map(Long.Agent.Enums.MemberRole.values(), &Atom.to_string/1)
 
   defp search_providers, do: SearchConfig.providers()
 
@@ -56,7 +61,11 @@ defmodule LongWeb.ManageLive do
      |> assign(:sections, @sections)
      |> assign(:editing, nil)
      |> assign(:wechat_modal_open?, false)
+     |> assign(:wechat_login_name, "default")
+     |> assign(:wechat_credentials, [])
+     |> assign(:member_options, [])
      |> assign(:llms, [])
+     |> assign(:households, [])
      |> assign(:globals, [])
      |> assign(:session_memories, [])
      |> assign(:checkpoints, [])
@@ -64,10 +73,10 @@ defmodule LongWeb.ManageLive do
      |> assign(:sessions_rows, [])
      |> assign(:search_configs, [])
      |> assign(:bot_users, [])
-     |> assign(:wechat_credential, nil)
      |> assign(:telegram_credentials, [])
      |> assign(:scheduled_tasks, [])
-     |> assign(:secrets, [])}
+     |> assign(:secrets, [])
+     |> assign(:phrase_rows, [])}
   end
 
   @impl true
@@ -82,6 +91,16 @@ defmodule LongWeb.ManageLive do
   end
 
   # ── Loaders ──────────────────────────────────────────────────────────
+
+  defp load_section(socket, :households) do
+    rows =
+      case Agent.list_households(load: [members: [:bot_users]]) do
+        {:ok, hh} -> Enum.sort_by(hh, & &1.inserted_at, DateTime)
+        _ -> []
+      end
+
+    assign(socket, :households, rows)
+  end
 
   defp load_section(socket, :llms) do
     rows =
@@ -129,7 +148,9 @@ defmodule LongWeb.ManageLive do
   end
 
   defp load_section(socket, :skills) do
-    assign(socket, :skills, SkillStore.list_all())
+    socket
+    |> assign(:skills, SkillStore.list_all())
+    |> assign(:skill_owner_names, member_name_map())
   end
 
   defp load_section(socket, :sessions) do
@@ -159,12 +180,10 @@ defmodule LongWeb.ManageLive do
         _ -> []
       end
 
-    # Single "default" row in practice; the card shows the one
-    # connection, so we keep just the head rather than sorting a list.
     wechat =
       case Agent.list_wechat_credentials() do
-        {:ok, list} -> List.first(list)
-        _ -> nil
+        {:ok, list} -> Enum.sort_by(list, & &1.name)
+        _ -> []
       end
 
     telegram =
@@ -175,7 +194,8 @@ defmodule LongWeb.ManageLive do
 
     socket
     |> assign(:bot_users, bot_users)
-    |> assign(:wechat_credential, wechat)
+    |> assign(:wechat_credentials, wechat)
+    |> assign(:member_options, member_options())
     |> assign(:telegram_credentials, telegram)
   end
 
@@ -199,7 +219,62 @@ defmodule LongWeb.ManageLive do
     assign(socket, :secrets, rows)
   end
 
+  defp load_section(socket, :phrases) do
+    overrides =
+      case Agent.list_phrases() do
+        {:ok, rows} -> Map.new(rows, &{{&1.key, &1.locale}, &1.text})
+        _ -> %{}
+      end
+
+    rows =
+      for key <- Long.Copy.keys(), locale <- Long.Copy.locales() do
+        %{
+          key: key,
+          locale: locale,
+          builtin: Long.Copy.builtin(key, locale) || "",
+          override: Map.get(overrides, {key, locale}, "")
+        }
+      end
+
+    assign(socket, :phrase_rows, rows)
+  end
+
   defp load_section(socket, _), do: socket
+
+  # Remove the override row for (key, locale), if any. Returns :ok.
+  defp clear_phrase_override(key, locale) do
+    with {:ok, rows} <- Agent.list_phrases(),
+         %{} = row <- Enum.find(rows, &(&1.key == key and &1.locale == locale)) do
+      _ = Agent.destroy_phrase(row)
+    end
+
+    :ok
+  end
+
+  # member_id → display_name, for labelling personal-skill owners.
+  defp member_name_map do
+    case Agent.list_members() do
+      {:ok, members} -> Map.new(members, &{&1.id, &1.display_name})
+      _ -> %{}
+    end
+  end
+
+  # {id, label} pairs for the per-account member picker on the Channels page.
+  defp member_options do
+    case Agent.list_members(load: [:household]) do
+      {:ok, members} ->
+        Enum.map(members, fn m ->
+          household = if is_struct(m.household), do: m.household.name, else: "—"
+          {m.id, "#{household} · #{m.display_name} (#{m.relation})"}
+        end)
+
+      _ ->
+        []
+    end
+  end
+
+  defp wechat_connected?(%{bot_token: t}) when is_binary(t) and t != "", do: true
+  defp wechat_connected?(_), do: false
 
   # Disabled / never-scheduled rows have `next_run_at = nil`; map them
   # to a sentinel far in the future so they sort to the bottom instead
@@ -275,6 +350,53 @@ defmodule LongWeb.ManageLive do
     else
       {:ok, _} -> {:noreply, load_section(socket, :llms)}
       {:error, e} -> {:noreply, put_flash(socket, :error, "Delete failed: #{inspect(e)}")}
+    end
+  end
+
+  # ── Events: Family ───────────────────────────────────────────────────
+
+  def handle_event("new_household", %{"household" => %{"name" => name}}, socket) do
+    case Agent.create_household(%{name: name}) do
+      {:ok, _} -> {:noreply, socket |> load_section(:households) |> put_flash(:info, "Household created.")}
+      {:error, e} -> {:noreply, put_flash(socket, :error, "Create failed: #{inspect(e)}")}
+    end
+  end
+
+  def handle_event("destroy_household", %{"id" => id}, socket) do
+    with {:ok, hh} <- Agent.get_household(id), :ok <- Agent.destroy_household(hh) do
+      {:noreply, load_section(socket, :households)}
+    else
+      _ -> {:noreply, put_flash(socket, :error, "Delete failed.")}
+    end
+  end
+
+  def handle_event("new_member", %{"member" => params}, socket) do
+    attrs = %{
+      household_id: params["household_id"],
+      display_name: params["display_name"],
+      relation: params["relation"],
+      role: params["role"]
+    }
+
+    case Agent.create_member(attrs) do
+      {:ok, _} -> {:noreply, load_section(socket, :households)}
+      {:error, e} -> {:noreply, put_flash(socket, :error, "Add member failed: #{inspect(e)}")}
+    end
+  end
+
+  def handle_event("destroy_member", %{"id" => id}, socket) do
+    with {:ok, m} <- Agent.get_member(id), :ok <- Agent.destroy_member(m) do
+      {:noreply, load_section(socket, :households)}
+    else
+      _ -> {:noreply, put_flash(socket, :error, "Delete failed.")}
+    end
+  end
+
+  def handle_event("regenerate_bind_code", %{"id" => id}, socket) do
+    with {:ok, m} <- Agent.get_member(id), {:ok, _} <- Agent.regenerate_member_bind_code(m) do
+      {:noreply, socket |> load_section(:households) |> put_flash(:info, "Bind code regenerated.")}
+    else
+      _ -> {:noreply, put_flash(socket, :error, "Operation failed.")}
     end
   end
 
@@ -354,9 +476,47 @@ defmodule LongWeb.ManageLive do
 
   # ── Events: Skills ───────────────────────────────────────────────────
 
+  def handle_event("save_phrase", %{"key" => key, "locale" => locale, "text" => text}, socket) do
+    text = String.trim(text)
+
+    outcome =
+      if text == "",
+        do: clear_phrase_override(key, locale),
+        else: Agent.upsert_phrase(%{key: key, locale: locale, text: text})
+
+    case outcome do
+      {:ok, _} ->
+        Long.Copy.reload()
+        {:noreply, socket |> load_section(:phrases) |> put_flash(:info, "Phrase saved.")}
+
+      :ok ->
+        Long.Copy.reload()
+        {:noreply, socket |> load_section(:phrases) |> put_flash(:info, "Override cleared.")}
+
+      _ ->
+        {:noreply, put_flash(socket, :error, "Save failed.")}
+    end
+  end
+
   def handle_event("skill_reindex", _, socket) do
     :ok = SkillStore.reindex()
     {:noreply, load_section(socket, :skills) |> put_flash(:info, "Rescanned skill_root.")}
+  end
+
+  def handle_event("promote_skill", %{"name" => name}, socket) do
+    case SkillStore.promote_to_global(name) do
+      :ok ->
+        {:noreply, socket |> load_section(:skills) |> put_flash(:info, "Promoted \"#{name}\" to a global skill.")}
+
+      {:error, :name_taken} ->
+        {:noreply, put_flash(socket, :error, "A global skill named \"#{name}\" already exists — rename it first.")}
+
+      {:error, :already_global} ->
+        {:noreply, put_flash(socket, :error, "\"#{name}\" is already a global skill.")}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "Promote failed: #{inspect(reason)}")}
+    end
   end
 
   # ── Events: Sessions ─────────────────────────────────────────────────
@@ -467,17 +627,46 @@ defmodule LongWeb.ManageLive do
 
   # ── Events: WeChat (QR login modal) ──────────────────────────────────
 
-  def handle_event("open_wechat_login", _params, socket),
-    do: {:noreply, assign(socket, :wechat_modal_open?, true)}
+  def handle_event("open_wechat_login", params, socket) do
+    name = params["name"] || "default"
+    {:noreply, socket |> assign(:wechat_login_name, name) |> assign(:wechat_modal_open?, true)}
+  end
 
-  # Closing the modal never mutates credentials; a confirmed scan
-  # already refreshed the card via the `:wechat_connected` broadcast.
-  # So just hide the modal — no reload.
+  # Re-sync the table on close so a freshly-scanned account shows up.
   def handle_event("close_wechat_login", _params, socket),
-    do: {:noreply, assign(socket, :wechat_modal_open?, false)}
+    do: {:noreply, socket |> assign(:wechat_modal_open?, false) |> load_section(:credentials)}
 
-  def handle_event("destroy_wechat_credential", _params, socket) do
-    :ok = Long.Agent.Bots.Wechat.Credential.delete()
+  def handle_event("add_wechat_account", %{"name" => name}, socket) do
+    case Agent.upsert_wechat_credential(%{name: String.trim(name)}) do
+      {:ok, _} ->
+        Long.Agent.Bots.Wechat.Manager.reconcile()
+
+        {:noreply,
+         socket
+         |> assign(:wechat_login_name, String.trim(name))
+         |> assign(:wechat_modal_open?, true)
+         |> load_section(:credentials)}
+
+      {:error, e} ->
+        {:noreply, put_flash(socket, :error, "Could not add account: #{inspect(e)}")}
+    end
+  end
+
+  def handle_event("assign_wechat_member", %{"name" => name, "member_id" => mid}, socket) do
+    member_id = if mid == "", do: nil, else: mid
+
+    with {:ok, row} <- Agent.get_wechat_credential(name),
+         {:ok, _} <- Agent.set_wechat_credential_member(row, %{member_id: member_id}) do
+      # Reconcile so the running worker reloads its member binding live.
+      Long.Agent.Bots.Wechat.Manager.reconcile()
+      {:noreply, socket |> load_section(:credentials) |> put_flash(:info, "Account ↔ member updated.")}
+    else
+      _ -> {:noreply, put_flash(socket, :error, "Could not update member assignment.")}
+    end
+  end
+
+  def handle_event("destroy_wechat_credential", params, socket) do
+    :ok = Long.Agent.Bots.Wechat.Credential.delete(params["name"] || "default")
     {:noreply, load_section(socket, :credentials)}
   end
 
@@ -524,7 +713,7 @@ defmodule LongWeb.ManageLive do
 
     case Agent.upsert_telegram_credential(attrs) do
       {:ok, _row} ->
-        Long.Agent.Bots.Telegram.reload()
+        Long.Agent.Bots.Telegram.Manager.reconcile()
         {:noreply, socket |> assign(:editing, nil) |> load_section(:credentials)}
 
       {:error, e} ->
@@ -532,10 +721,23 @@ defmodule LongWeb.ManageLive do
     end
   end
 
+  def handle_event("assign_telegram_member", %{"name" => name, "member_id" => mid}, socket) do
+    member_id = if mid == "", do: nil, else: mid
+
+    with {:ok, row} <- Agent.get_telegram_credential(name),
+         {:ok, _} <- Agent.set_telegram_credential_member(row, %{member_id: member_id}) do
+      # Reconcile so the running worker reloads its member binding live.
+      Long.Agent.Bots.Telegram.Manager.reconcile()
+      {:noreply, socket |> load_section(:credentials) |> put_flash(:info, "Bot ↔ member updated.")}
+    else
+      _ -> {:noreply, put_flash(socket, :error, "Could not update member assignment.")}
+    end
+  end
+
   def handle_event("toggle_telegram_enabled", %{"name" => name}, socket) do
     with {:ok, row} <- Agent.get_telegram_credential(name),
          {:ok, _} <- Agent.update_telegram_credential(row, %{enabled: !row.enabled}) do
-      Long.Agent.Bots.Telegram.reload()
+      Long.Agent.Bots.Telegram.Manager.reconcile()
       {:noreply, load_section(socket, :credentials)}
     else
       {:error, e} -> {:noreply, put_flash(socket, :error, "Toggle failed: #{inspect(e)}")}
@@ -545,11 +747,11 @@ defmodule LongWeb.ManageLive do
   def handle_event("destroy_telegram_credential", %{"name" => name}, socket) do
     with {:ok, row} <- Agent.get_telegram_credential(name),
          :ok <- Agent.destroy_telegram_credential(row) do
-      Long.Agent.Bots.Telegram.reload()
+      Long.Agent.Bots.Telegram.Manager.reconcile()
       {:noreply, load_section(socket, :credentials)}
     else
       {:ok, _} ->
-        Long.Agent.Bots.Telegram.reload()
+        Long.Agent.Bots.Telegram.Manager.reconcile()
         {:noreply, load_section(socket, :credentials)}
 
       {:error, e} ->
@@ -777,7 +979,11 @@ defmodule LongWeb.ManageLive do
         />
         <.secret_modal :if={editing_kind(@editing) == :secret} editing={@editing} />
         <.telegram_modal :if={editing_kind(@editing) == :telegram} editing={@editing} />
-        <.wechat_login_modal :if={@wechat_modal_open?} socket={@socket} />
+        <.wechat_login_modal
+          :if={@wechat_modal_open?}
+          socket={@socket}
+          login_name={@wechat_login_name}
+        />
       </main>
     </div>
     """
@@ -801,6 +1007,7 @@ defmodule LongWeb.ManageLive do
   # ── Section views ────────────────────────────────────────────────────
 
   defp section_view(%{section: :llms} = assigns), do: llm_section(assigns)
+  defp section_view(%{section: :households} = assigns), do: households_section(assigns)
   defp section_view(%{section: :memories} = assigns), do: memory_section(assigns)
   defp section_view(%{section: :skills} = assigns), do: skill_section(assigns)
   defp section_view(%{section: :sessions} = assigns), do: sessions_section(assigns)
@@ -808,6 +1015,7 @@ defmodule LongWeb.ManageLive do
   defp section_view(%{section: :credentials} = assigns), do: credentials_section(assigns)
   defp section_view(%{section: :scheduled} = assigns), do: scheduled_section(assigns)
   defp section_view(%{section: :secrets} = assigns), do: secrets_section(assigns)
+  defp section_view(%{section: :phrases} = assigns), do: phrases_section(assigns)
   defp section_view(assigns), do: placeholder(%{title: section_title(assigns.section)})
 
   defp llm_section(assigns) do
@@ -1105,16 +1313,18 @@ defmodule LongWeb.ManageLive do
           <thead class="text-xs uppercase text-zinc-500 bg-zinc-50">
             <tr>
               <th class="text-left px-4 py-2.5">Name</th>
+              <th class="text-left px-4 py-2.5">Scope</th>
               <th class="text-left px-4 py-2.5">Description</th>
               <th class="text-left px-4 py-2.5">Tags</th>
               <th class="text-left px-4 py-2.5">Path</th>
               <th class="text-right px-4 py-2.5">Used</th>
-              <th class="text-right px-4 py-2.5">Last used</th>
+              <th class="text-right px-4 py-2.5">Actions</th>
             </tr>
           </thead>
           <tbody>
             <tr :for={s <- @skills} class="border-t border-zinc-100">
               <td class="px-4 py-2 font-mono text-zinc-800">{s.name}</td>
+              <td class="px-4 py-2"><.skill_scope_badge skill={s} owners={@skill_owner_names} /></td>
               <td class="px-4 py-2 text-zinc-600 leading-snug max-w-md">
                 {Text.preview(s.description || "", 120)}
               </td>
@@ -1127,10 +1337,26 @@ defmodule LongWeb.ManageLive do
               </td>
               <td class="px-4 py-2 text-xs font-mono text-zinc-500">{s.relative_path}</td>
               <td class="px-4 py-2 text-right text-zinc-600">{s.use_count}</td>
-              <td class="px-4 py-2 text-right text-xs text-zinc-500">{format_dt(s.last_used_at)}</td>
+              <td class="px-4 py-2">
+                <div class="flex justify-end">
+                  <.button
+                    :if={s[:scope] == :personal}
+                    phx-click="promote_skill"
+                    phx-value-name={s.name}
+                    variant="outline"
+                    color="primary"
+                    size="extra_small"
+                    icon="hero-arrow-up-on-square"
+                    rounded="medium"
+                    data-confirm={"把个人技能「#{s.name}」提升为全局?所有成员都能用,目录会移动到全局区。"}
+                  >
+                    提升为全局
+                  </.button>
+                </div>
+              </td>
             </tr>
             <tr :if={@skills == []}>
-              <td colspan="6" class="px-4 py-8 text-center text-zinc-400 text-sm">
+              <td colspan="7" class="px-4 py-8 text-center text-zinc-400 text-sm">
                 No skills under <code class="text-xs">{SkillStore.root()}</code>. Drop a
                 <code class="text-xs">SKILL.md</code>
                 in there and hit <strong>Reindex</strong>.
@@ -1140,6 +1366,21 @@ defmodule LongWeb.ManageLive do
         </table>
       </.card>
     </div>
+    """
+  end
+
+  attr :skill, :map, required: true
+  attr :owners, :map, required: true
+
+  defp skill_scope_badge(assigns) do
+    ~H"""
+    <%= if @skill[:scope] == :personal do %>
+      <.badge color="warning" size="extra_small" rounded="full">
+        Personal · {@owners[@skill.owner_member_id] || "unknown"}
+      </.badge>
+    <% else %>
+      <.badge color="success" size="extra_small" rounded="full">Global</.badge>
+    <% end %>
     """
   end
 
@@ -1307,48 +1548,108 @@ defmodule LongWeb.ManageLive do
       <h1 class="text-xl font-semibold">Channels</h1>
 
       <section class="space-y-2">
-        <h2 class="text-sm font-semibold text-zinc-700 uppercase tracking-wide">WeChat</h2>
-        <.card variant="bordered" color="natural" rounded="large" padding="medium">
-          <div class="flex items-center gap-3">
-            <div class="flex-1">
-              <div class="flex items-center gap-2">
-                <.badge
-                  color={if @wechat_credential, do: "success", else: "silver"}
-                  size="extra_small"
-                  rounded="full"
-                >
-                  {if @wechat_credential, do: "已连接", else: "未连接"}
-                </.badge>
-                <span :if={@wechat_credential} class="text-xs font-mono text-zinc-500">
-                  bot_id: {@wechat_credential.ilink_bot_id || "—"}
-                </span>
-              </div>
-              <p class="text-xs text-zinc-400 mt-1">
-                {if @wechat_credential,
-                  do: "Worker 正在 long-poll iLink。",
-                  else: "扫码绑定一个微信账号，私信会进入 agent。"}
-              </p>
-            </div>
-            <.button
-              phx-click="open_wechat_login"
-              color="primary"
-              icon="hero-qr-code"
-              rounded="medium"
-              size="small"
-            >
-              {if @wechat_credential, do: "重新登录", else: "扫码登录"}
+        <h2 class="text-sm font-semibold text-zinc-700 uppercase tracking-wide">WeChat accounts</h2>
+        <p class="text-xs text-zinc-500 max-w-2xl">
+          Connect one or more WeChat accounts. Assign each to a household member so every
+          message arriving on that account runs as that role.
+        </p>
+
+        <.card variant="bordered" color="natural" rounded="large" padding="none">
+          <table class="w-full text-sm">
+            <thead class="text-xs uppercase text-zinc-500 bg-zinc-50">
+              <tr>
+                <th class="text-left px-4 py-2">Account</th>
+                <th class="text-left px-4 py-2">Status</th>
+                <th class="text-left px-4 py-2">Member (role)</th>
+                <th class="text-right px-4 py-2">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr :for={c <- @wechat_credentials} class="border-t border-zinc-100">
+                <td class="px-4 py-2 font-mono text-zinc-800">{c.name}</td>
+                <td class="px-4 py-2">
+                  <div class="flex items-center gap-2">
+                    <.badge
+                      color={if wechat_connected?(c), do: "success", else: "silver"}
+                      size="extra_small"
+                      rounded="full"
+                    >
+                      {if wechat_connected?(c), do: "connected", else: "no token"}
+                    </.badge>
+                    <span :if={c.ilink_bot_id} class="text-xs font-mono text-zinc-400">
+                      {c.ilink_bot_id}
+                    </span>
+                  </div>
+                </td>
+                <td class="px-4 py-2">
+                  <form phx-change="assign_wechat_member">
+                    <input type="hidden" name="name" value={c.name} />
+                    <select
+                      name="member_id"
+                      class="border border-zinc-300 rounded-md px-2 py-1.5 text-sm"
+                    >
+                      <option value="">— unassigned —</option>
+                      <option
+                        :for={{id, label} <- @member_options}
+                        value={id}
+                        selected={id == c.member_id}
+                      >
+                        {label}
+                      </option>
+                    </select>
+                  </form>
+                </td>
+                <td class="px-4 py-2">
+                  <div class="flex justify-end gap-1.5">
+                    <.button
+                      phx-click="open_wechat_login"
+                      phx-value-name={c.name}
+                      variant="base"
+                      color="primary"
+                      size="extra_small"
+                      icon="hero-qr-code"
+                      rounded="medium"
+                    >
+                      {if wechat_connected?(c), do: "Re-login", else: "Scan"}
+                    </.button>
+                    <.button
+                      phx-click="destroy_wechat_credential"
+                      phx-value-name={c.name}
+                      variant="base"
+                      color="danger"
+                      size="extra_small"
+                      icon="hero-trash"
+                      rounded="medium"
+                      data-confirm={"Delete WeChat account \"#{c.name}\"? You'll need to scan again to reconnect."}
+                    />
+                  </div>
+                </td>
+              </tr>
+              <tr :if={@wechat_credentials == []}>
+                <td colspan="4" class="px-4 py-6 text-center text-zinc-400 text-sm">
+                  No WeChat accounts yet — add one below.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+
+          <form
+            phx-submit="add_wechat_account"
+            class="flex items-end gap-2 px-4 py-3 border-t border-zinc-200 bg-zinc-50"
+          >
+            <label class="flex-1 block">
+              <span class="text-xs font-medium text-zinc-600">New account name</span>
+              <input
+                name="name"
+                required
+                placeholder="e.g. dad-phone"
+                class="mt-1 w-full border border-zinc-300 rounded-md px-2 py-1.5 text-sm"
+              />
+            </label>
+            <.button type="submit" color="primary" icon="hero-plus" rounded="medium" size="small">
+              Add &amp; scan
             </.button>
-            <.button
-              :if={@wechat_credential}
-              phx-click="destroy_wechat_credential"
-              variant="base"
-              color="danger"
-              icon="hero-trash"
-              rounded="medium"
-              size="small"
-              data-confirm="确定要删除微信凭证吗？删除后需要重新扫码。"
-            />
-          </div>
+          </form>
         </.card>
       </section>
 
@@ -1417,6 +1718,7 @@ defmodule LongWeb.ManageLive do
               <tr>
                 <th class="text-left px-4 py-2.5">Name</th>
                 <th class="text-left px-4 py-2.5">Username</th>
+                <th class="text-left px-4 py-2.5">Member (role)</th>
                 <th class="text-left px-4 py-2.5">Token</th>
                 <th class="text-left px-4 py-2.5">Status</th>
                 <th class="text-right px-4 py-2.5">Actions</th>
@@ -1426,6 +1728,24 @@ defmodule LongWeb.ManageLive do
               <tr :for={c <- @telegram_credentials} class="border-t border-zinc-100">
                 <td class="px-4 py-2 font-medium">{c.name}</td>
                 <td class="px-4 py-2 text-xs font-mono text-zinc-500">{c.username || "—"}</td>
+                <td class="px-4 py-2">
+                  <form phx-change="assign_telegram_member">
+                    <input type="hidden" name="name" value={c.name} />
+                    <select
+                      name="member_id"
+                      class="border border-zinc-300 rounded-md px-2 py-1.5 text-sm"
+                    >
+                      <option value="">— unassigned —</option>
+                      <option
+                        :for={{id, label} <- @member_options}
+                        value={id}
+                        selected={id == c.member_id}
+                      >
+                        {label}
+                      </option>
+                    </select>
+                  </form>
+                </td>
                 <td class="px-4 py-2 text-xs font-mono text-zinc-500">{mask_secret(c.bot_token)}</td>
                 <td class="px-4 py-2">
                   <.badge
@@ -1470,7 +1790,7 @@ defmodule LongWeb.ManageLive do
                 </td>
               </tr>
               <tr :if={@telegram_credentials == []}>
-                <td colspan="5" class="px-4 py-8 text-center text-zinc-400 text-sm">
+                <td colspan="6" class="px-4 py-8 text-center text-zinc-400 text-sm">
                   No Telegram credentials. Click <strong>New Telegram bot</strong>
                   and paste a BotFather token.
                 </td>
@@ -1567,6 +1887,236 @@ defmodule LongWeb.ManageLive do
               <td colspan="7" class="px-4 py-8 text-center text-zinc-400 text-sm">
                 No scheduled tasks. Click <strong>New task</strong>
                 to add one (or let the agent schedule them via GraphQL <code>createScheduledTask</code>).
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </.card>
+    </div>
+    """
+  end
+
+  defp households_section(assigns) do
+    ~H"""
+    <div class="p-6 space-y-6">
+      <div class="flex items-center gap-3">
+        <h1 class="text-xl font-semibold flex-1">Family</h1>
+      </div>
+
+      <div class="rounded-lg border border-blue-200 bg-blue-50 p-4 text-xs text-zinc-600 max-w-3xl leading-relaxed space-y-2">
+        <p class="font-medium text-zinc-800">How members link their WeChat / Telegram</p>
+        <p>
+          <span class="font-medium">Set up once (owner):</span>
+          on the <.link navigate={~p"/manage/credentials"} class="text-blue-700 underline">Channels</.link>
+          page, scan the WeChat QR to host the household's <em>single</em> WeChat account, and/or add a
+          Telegram bot. This is a one-time login — members do <em>not</em> each scan a QR.
+        </p>
+        <p>Then each member links their own chat to that shared bot:</p>
+        <ul class="list-disc list-inside space-y-1">
+          <li><span class="font-medium">Telegram</span> — open the bot and send it any message (native multi-user; each Telegram account is separate).</li>
+          <li><span class="font-medium">WeChat</span> — add the hosted account as a friend, then DM it. Each contact is recognized separately by their WeChat id.</li>
+        </ul>
+        <p>
+          Finally the member sends <code class="bg-white px-1 rounded">/bind &lt;code&gt;</code>
+          (the per-member command below). One member can link both WeChat and Telegram; once bound,
+          members can reach each other (e.g. ask the agent to "notify my spouse …").
+        </p>
+      </div>
+
+      <.card variant="bordered" color="natural" rounded="large" padding="none">
+        <form phx-submit="new_household" class="flex items-end gap-3 p-4">
+          <label class="flex-1 block">
+            <span class="text-xs font-medium text-zinc-600">New household</span>
+            <input
+              name="household[name]"
+              required
+              placeholder="e.g. My Home"
+              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm"
+            />
+          </label>
+          <.button type="submit" color="primary" icon="hero-plus" rounded="medium" size="small">
+            Create
+          </.button>
+        </form>
+      </.card>
+
+      <.card
+        :for={hh <- @households}
+        variant="bordered"
+        color="natural"
+        rounded="large"
+        padding="none"
+      >
+        <div class="flex items-center gap-2 px-4 py-3 border-b border-zinc-200 bg-zinc-50">
+          <.icon name="hero-home" class="size-4 text-zinc-500" />
+          <span class="font-semibold flex-1">{hh.name}</span>
+          <.button
+            phx-click="destroy_household"
+            phx-value-id={hh.id}
+            variant="base"
+            color="danger"
+            size="extra_small"
+            icon="hero-trash"
+            rounded="medium"
+            data-confirm={"Delete household \"#{hh.name}\"? Its members and their bindings are removed too."}
+          />
+        </div>
+
+        <table class="w-full text-sm">
+          <thead class="text-xs uppercase text-zinc-500 bg-white">
+            <tr>
+              <th class="text-left px-4 py-2">Member</th>
+              <th class="text-left px-4 py-2">Relation</th>
+              <th class="text-left px-4 py-2">Role</th>
+              <th class="text-left px-4 py-2">Bind command</th>
+              <th class="text-left px-4 py-2">Bound accounts</th>
+              <th class="text-right px-4 py-2">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr :for={m <- hh.members} class="border-t border-zinc-100">
+              <td class="px-4 py-2 text-zinc-800">{m.display_name}</td>
+              <td class="px-4 py-2 text-zinc-600">{relation_label(m.relation)}</td>
+              <td class="px-4 py-2 text-xs text-zinc-500">{m.role}</td>
+              <td class="px-4 py-2">
+                <div class="flex items-center gap-1.5">
+                  <code class="text-xs font-mono bg-zinc-100 px-1.5 py-0.5 rounded">/bind {m.bind_code}</code>
+                  <.button
+                    phx-click="regenerate_bind_code"
+                    phx-value-id={m.id}
+                    variant="base"
+                    color="natural"
+                    size="extra_small"
+                    icon="hero-arrow-path"
+                    rounded="medium"
+                    title="Regenerate bind code"
+                  />
+                </div>
+              </td>
+              <td class="px-4 py-2 text-xs">{bound_accounts(m)}</td>
+              <td class="px-4 py-2">
+                <div class="flex justify-end">
+                  <.button
+                    phx-click="destroy_member"
+                    phx-value-id={m.id}
+                    variant="base"
+                    color="danger"
+                    size="extra_small"
+                    icon="hero-trash"
+                    rounded="medium"
+                    data-confirm={"Delete member \"#{m.display_name}\"?"}
+                  />
+                </div>
+              </td>
+            </tr>
+            <tr :if={hh.members == []}>
+              <td colspan="6" class="px-4 py-6 text-center text-zinc-400 text-sm">
+                No members yet — add one below.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <form phx-submit="new_member" class="flex items-end gap-2 px-4 py-3 border-t border-zinc-200 bg-zinc-50">
+          <input type="hidden" name="member[household_id]" value={hh.id} />
+          <label class="flex-1 block">
+            <span class="text-xs font-medium text-zinc-600">Name</span>
+            <input
+              name="member[display_name]"
+              required
+              placeholder="e.g. Alex"
+              class="mt-1 w-full border border-zinc-300 rounded-md px-2 py-1.5 text-sm"
+            />
+          </label>
+          <label class="block">
+            <span class="text-xs font-medium text-zinc-600">Relation</span>
+            <select name="member[relation]" class="mt-1 border border-zinc-300 rounded-md px-2 py-1.5 text-sm">
+              <option :for={r <- member_relations()} value={r}>{relation_label(r)}</option>
+            </select>
+          </label>
+          <label class="block">
+            <span class="text-xs font-medium text-zinc-600">Role</span>
+            <select name="member[role]" class="mt-1 border border-zinc-300 rounded-md px-2 py-1.5 text-sm">
+              <option :for={r <- member_roles()} value={r}>{r}</option>
+            </select>
+          </label>
+          <.button type="submit" color="primary" icon="hero-plus" rounded="medium" size="small">
+            Add member
+          </.button>
+        </form>
+      </.card>
+
+      <div :if={@households == []} class="text-center text-zinc-400 text-sm py-8">
+        No households yet — create one above.
+      </div>
+    </div>
+    """
+  end
+
+  # Display label for a member relation. Accepts the enum atom or its
+  # string form (the <select> options round-trip as strings).
+  defp relation_label(r) when r in [:self, "self"], do: "Self"
+  defp relation_label(r) when r in [:spouse, "spouse"], do: "Spouse"
+  defp relation_label(r) when r in [:child, "child"], do: "Child"
+  defp relation_label(r) when r in [:parent, "parent"], do: "Parent"
+  defp relation_label(_), do: "Other"
+
+  # Comma-joined platforms this member has bound, or a placeholder.
+  defp bound_accounts(%{bot_users: bus}) when is_list(bus) and bus != [],
+    do: bus |> Enum.map(&to_string(&1.platform)) |> Enum.join(" · ")
+
+  defp bound_accounts(_), do: "Not bound"
+
+  defp phrases_section(assigns) do
+    ~H"""
+    <div class="p-6 space-y-4">
+      <h1 class="text-xl font-semibold">Phrases</h1>
+      <p class="text-xs text-zinc-500 max-w-3xl leading-relaxed">
+        Central catalog of bot / system copy, per locale. Each phrase has a built-in default;
+        set an <strong>override</strong> here to customize the wording.
+        <code>%&#123;name&#125;</code>
+        placeholders are filled at runtime — keep them. Leave an override blank to fall back to
+        the built-in default. (The agent's own replies are written by the LLM in the user's
+        language; this controls only the fixed system messages.)
+      </p>
+
+      <.card variant="bordered" color="natural" rounded="large" padding="none">
+        <table class="w-full text-sm">
+          <thead class="text-xs uppercase text-zinc-500 bg-zinc-50">
+            <tr>
+              <th class="text-left px-4 py-2">Key</th>
+              <th class="text-left px-4 py-2">Locale</th>
+              <th class="text-left px-4 py-2">Built-in default</th>
+              <th class="text-left px-4 py-2">Override</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr :for={r <- @phrase_rows} class="border-t border-zinc-100 align-top">
+              <td class="px-4 py-2 font-mono text-xs text-zinc-800">{r.key}</td>
+              <td class="px-4 py-2 text-xs">{r.locale}</td>
+              <td class="px-4 py-2 text-xs text-zinc-500 max-w-xs whitespace-pre-wrap">{r.builtin}</td>
+              <td class="px-4 py-2">
+                <form
+                  phx-submit="save_phrase"
+                  id={"ph-#{String.replace(r.key, ".", "-")}-#{r.locale}"}
+                  class="flex items-start gap-1.5"
+                >
+                  <input type="hidden" name="key" value={r.key} />
+                  <input type="hidden" name="locale" value={r.locale} />
+                  <textarea
+                    name="text"
+                    rows="1"
+                    placeholder="(uses default)"
+                    class="w-64 border border-zinc-300 rounded-md px-2 py-1 text-xs font-mono"
+                  >{r.override}</textarea>
+                  <.button
+                    type="submit"
+                    color="primary"
+                    size="extra_small"
+                    icon="hero-check"
+                    rounded="medium"
+                  />
+                </form>
               </td>
             </tr>
           </tbody>
@@ -1881,6 +2431,7 @@ defmodule LongWeb.ManageLive do
   # ── Helpers ──────────────────────────────────────────────────────────
 
   defp section_path(:llms), do: ~p"/manage/llms"
+  defp section_path(:households), do: ~p"/manage/households"
   defp section_path(:memories), do: ~p"/manage/memories"
   defp section_path(:skills), do: ~p"/manage/skills"
   defp section_path(:sessions), do: ~p"/manage/sessions"
@@ -1888,6 +2439,7 @@ defmodule LongWeb.ManageLive do
   defp section_path(:credentials), do: ~p"/manage/credentials"
   defp section_path(:scheduled), do: ~p"/manage/scheduled"
   defp section_path(:secrets), do: ~p"/manage/secrets"
+  defp section_path(:phrases), do: ~p"/manage/phrases"
 
   defp section_title(:sessions), do: "Sessions"
   defp section_title(:search), do: "Search providers"
@@ -2346,6 +2898,7 @@ defmodule LongWeb.ManageLive do
   end
 
   attr :socket, :any, required: true
+  attr :login_name, :string, required: true
 
   # The QR scan + status polling is a self-contained live flow, so we
   # embed the existing `WechatLive.Login` as a nested LiveView instead
@@ -2356,13 +2909,13 @@ defmodule LongWeb.ManageLive do
     <.modal
       id="wechat-login-modal"
       show
-      title="微信扫码登录"
+      title={"WeChat login — #{@login_name}"}
       on_cancel={JS.push("close_wechat_login")}
       size="medium"
     >
       {live_render(@socket, LongWeb.WechatLive.Login,
-        id: "wechat-login-embed",
-        session: %{"embedded" => true}
+        id: "wechat-login-embed-#{@login_name}",
+        session: %{"embedded" => true, "name" => @login_name}
       )}
     </.modal>
     """
