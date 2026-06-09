@@ -2,7 +2,7 @@
 # only thing you must provide is a SECRET_KEY_BASE.
 #
 #   export SECRET_KEY_BASE=$(openssl rand -base64 48)
-#   docker compose up -d            # build + run
+#   docker compose up -d            # pull + run
 #   open http://localhost:4000
 #
 # Data (SQLite DB, skills, agent workspace, memory) persists in the
@@ -10,9 +10,9 @@
 
 services:
   long:
-    build: .
-    # Or pull a prebuilt image instead of building:
-    # image: ghcr.io/mjason/long:latest
+    image: ghcr.io/mjason/long:latest
+    # Or build locally instead of pulling — comment `image:` and uncomment:
+    # build: .
     ports:
       - "4000:4000"
     environment:

@@ -146,7 +146,7 @@ $EDITOR ~/.long/env     # 通常无需修改
 ```yaml
 services:
   long:
-    build: .                              # 或：image: ghcr.io/mjason/long:latest
+    image: ghcr.io/mjason/long:latest     # 或本地构建：build: .
     ports: ["4000:4000"]
     environment:
       SECRET_KEY_BASE: ${SECRET_KEY_BASE}  # 生成一次：openssl rand -base64 48

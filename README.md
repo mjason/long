@@ -146,7 +146,7 @@ A self-contained image bakes in the `mix release` **plus** Deno and Obscura — 
 ```yaml
 services:
   long:
-    build: .                              # or: image: ghcr.io/mjason/long:latest
+    image: ghcr.io/mjason/long:latest     # or build locally: build: .
     ports: ["4000:4000"]
     environment:
       SECRET_KEY_BASE: ${SECRET_KEY_BASE}  # generate once: openssl rand -base64 48
