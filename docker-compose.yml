@@ -1,0 +1,30 @@
+# Run Long in Docker. Deno + Obscura are baked into the image, so the
+# only thing you must provide is a SECRET_KEY_BASE.
+#
+#   export SECRET_KEY_BASE=$(openssl rand -base64 48)
+#   docker compose up -d            # build + run
+#   open http://localhost:4000
+#
+# Data (SQLite DB, skills, agent workspace, memory) persists in the
+# `long_data` volume across restarts/upgrades.
+
+services:
+  long:
+    build: .
+    # Or pull a prebuilt image instead of building:
+    # image: ghcr.io/mjason/long:latest
+    ports:
+      - "4000:4000"
+    environment:
+      # Required — generate once: `openssl rand -base64 48`
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE:?set SECRET_KEY_BASE, e.g. openssl rand -base64 48}
+      # Hostname/IP you'll reach it at (LAN-first; default is fine locally)
+      PHX_HOST: ${PHX_HOST:-localhost}
+      # Lock down Origin checks only when exposing to the internet:
+      # LONG_CHECK_ORIGIN: "true"
+    volumes:
+      - long_data:/data
+    restart: unless-stopped
+
+volumes:
+  long_data:

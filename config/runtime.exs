@@ -65,6 +65,14 @@ if config_env() == :prod do
 
   config :long, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
 
+  # Pre-installed Deno / Obscura (e.g. baked into the Docker image)? Turn
+  # off the runtime auto-download. The Engines still locate the binaries
+  # on PATH; this only disables fetch-on-miss.
+  if System.get_env("LONG_AUTO_INSTALL_BINARIES") == "false" do
+    config :long, Long.Agent.Deno, auto_install: false
+    config :long, Long.Agent.Browser, auto_install: false
+  end
+
   config :long, LongWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],
     http: [

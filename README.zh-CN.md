@@ -139,6 +139,18 @@ $EDITOR ~/.long/env     # 通常无需修改
 | `LONG_INSTALL_DIR` | `~/.long` | 安装目录 |
 | `LONG_VERSION` | latest | 指定版本，例如 `v0.2.9` |
 
+### Docker
+
+自包含镜像把 `mix release` **连同** Deno 和 Obscura 一起打进去——首次运行不下载任何东西：
+
+```bash
+export SECRET_KEY_BASE=$(openssl rand -base64 48)
+docker compose up -d          # 构建镜像并运行
+# → http://localhost:4000
+```
+
+SQLite 库、技能、Agent 工作区、记忆都持久化在 `long_data` 卷里，重启不丢。公网暴露时设 `PHX_HOST` + `LONG_CHECK_ORIGIN=true`。手动构建：`docker build -t long .`。
+
 ### 从源码运行
 
 依赖：

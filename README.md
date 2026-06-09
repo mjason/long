@@ -139,6 +139,18 @@ Installer environment variables:
 | `LONG_INSTALL_DIR` | `~/.long` | install target |
 | `LONG_VERSION` | latest | pin a version, e.g. `v0.2.9` |
 
+### Docker
+
+A self-contained image bakes in the `mix release` **plus** Deno and Obscura — nothing is downloaded on first run:
+
+```bash
+export SECRET_KEY_BASE=$(openssl rand -base64 48)
+docker compose up -d          # builds the image, then runs it
+# → http://localhost:4000
+```
+
+The SQLite DB, skills, agent workspace, and memory persist in the `long_data` volume across restarts. For an internet-exposed deploy set `PHX_HOST` and `LONG_CHECK_ORIGIN=true`. Build by hand with `docker build -t long .`.
+
 ### Run from source
 
 Requirements:
