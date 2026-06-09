@@ -3,6 +3,7 @@
 [![Elixir](https://img.shields.io/badge/elixir-1.15%2B-purple.svg)](https://elixir-lang.org)
 [![Phoenix](https://img.shields.io/badge/phoenix-1.8-orange.svg)](https://phoenixframework.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![ghcr.io](https://img.shields.io/badge/ghcr.io-mjason%2Flong-2496ED?logo=docker&logoColor=white)](https://github.com/mjason/long/pkgs/container/long)
 
 **English** · [简体中文](README.zh-CN.md)
 
