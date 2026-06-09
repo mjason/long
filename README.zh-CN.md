@@ -141,15 +141,32 @@ $EDITOR ~/.long/env     # 通常无需修改
 
 ### Docker
 
-自包含镜像把 `mix release` **连同** Deno 和 Obscura 一起打进去——首次运行不下载任何东西：
+自包含镜像把 `mix release` **连同** Deno 和 Obscura 一起打进去——首次运行不下载任何东西。仓库自带现成的 `docker-compose.yml`：
+
+```yaml
+services:
+  long:
+    build: .                              # 或：image: ghcr.io/mjason/long:latest
+    ports: ["4000:4000"]
+    environment:
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE}  # 生成一次：openssl rand -base64 48
+      PHX_HOST: ${PHX_HOST:-localhost}
+      # LONG_CHECK_ORIGIN: "true"          # 公网暴露时设
+    volumes: ["long_data:/data"]          # SQLite 库 + 技能 + 工作区 + 记忆
+    restart: unless-stopped
+volumes:
+  long_data:
+```
+
+在 clone 下来的仓库目录里：
 
 ```bash
 export SECRET_KEY_BASE=$(openssl rand -base64 48)
-docker compose up -d          # 构建镜像并运行
+docker compose up -d          # 构建并运行
 # → http://localhost:4000
 ```
 
-SQLite 库、技能、Agent 工作区、记忆都持久化在 `long_data` 卷里，重启不丢。公网暴露时设 `PHX_HOST` + `LONG_CHECK_ORIGIN=true`。手动构建：`docker build -t long .`。
+数据（SQLite 库、技能、Agent 工作区、记忆）持久化在 `long_data` 卷里，重启/升级不丢。想要纯镜像？`docker build -t long .`。
 
 ### 从源码运行
 

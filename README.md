@@ -141,15 +141,32 @@ Installer environment variables:
 
 ### Docker
 
-A self-contained image bakes in the `mix release` **plus** Deno and Obscura — nothing is downloaded on first run:
+A self-contained image bakes in the `mix release` **plus** Deno and Obscura — nothing is downloaded on first run. The repo ships a ready `docker-compose.yml`:
+
+```yaml
+services:
+  long:
+    build: .                              # or: image: ghcr.io/mjason/long:latest
+    ports: ["4000:4000"]
+    environment:
+      SECRET_KEY_BASE: ${SECRET_KEY_BASE}  # generate once: openssl rand -base64 48
+      PHX_HOST: ${PHX_HOST:-localhost}
+      # LONG_CHECK_ORIGIN: "true"          # set when exposing to the internet
+    volumes: ["long_data:/data"]          # SQLite DB + skills + workspace + memory
+    restart: unless-stopped
+volumes:
+  long_data:
+```
+
+From a clone of the repo:
 
 ```bash
 export SECRET_KEY_BASE=$(openssl rand -base64 48)
-docker compose up -d          # builds the image, then runs it
+docker compose up -d          # build + run
 # → http://localhost:4000
 ```
 
-The SQLite DB, skills, agent workspace, and memory persist in the `long_data` volume across restarts. For an internet-exposed deploy set `PHX_HOST` and `LONG_CHECK_ORIGIN=true`. Build by hand with `docker build -t long .`.
+Data (SQLite DB, skills, agent workspace, memory) persists in the `long_data` volume across restarts and upgrades. Prefer a bare image? `docker build -t long .`.
 
 ### Run from source
 
