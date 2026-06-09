@@ -129,8 +129,8 @@ defmodule Long.Agent.BotUser do
       public? true
     end
 
-    belongs_to :member, Long.Agent.HouseholdMember do
-      description "The household member who claimed this chat account, if bound."
+    belongs_to :member, Long.Agent.Member do
+      description "The group member who claimed this chat account, if bound."
       allow_nil? true
       public? true
     end

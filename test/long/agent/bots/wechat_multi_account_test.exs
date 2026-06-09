@@ -46,9 +46,9 @@ defmodule Long.Agent.Bots.WechatMultiAccountTest do
 
   describe "inbound binds a chat to the account's member" do
     test "a dedicated account's member_id is authoritative; an unassigned account never clobbers it" do
-      {:ok, hh} = Agent.create_household(%{name: "H"})
-      {:ok, m1} = Agent.create_member(%{household_id: hh.id, display_name: "A", relation: :self})
-      {:ok, m2} = Agent.create_member(%{household_id: hh.id, display_name: "B", relation: :spouse})
+      {:ok, hh} = Agent.create_group(%{name: "H"})
+      {:ok, m1} = Agent.create_member(%{group_id: hh.id, display_name: "A", relation: :self})
+      {:ok, m2} = Agent.create_member(%{group_id: hh.id, display_name: "B", relation: :other})
       ext = "wx-#{System.unique_integer([:positive])}"
 
       {:ok, %{bot_user: u1}} = Bots.ensure_session(:wechat, ext, member_id: m1.id)
@@ -64,7 +64,7 @@ defmodule Long.Agent.Bots.WechatMultiAccountTest do
 
       Agent.destroy_bot_user!(u3)
       Agent.destroy_session!(sid)
-      Agent.destroy_household!(hh)
+      Agent.destroy_group!(hh)
     end
 
     test "records and updates the chat's credential_name (channel), without clobbering on nil" do
@@ -88,8 +88,8 @@ defmodule Long.Agent.Bots.WechatMultiAccountTest do
 
   describe "outbound routing per account" do
     test "for_member resolves the account assigned to a member" do
-      {:ok, hh} = Agent.create_household(%{name: "H"})
-      {:ok, m} = Agent.create_member(%{household_id: hh.id, display_name: "Dad", relation: :parent})
+      {:ok, hh} = Agent.create_group(%{name: "H"})
+      {:ok, m} = Agent.create_member(%{group_id: hh.id, display_name: "Dad", relation: :other})
       name = "acct-#{System.unique_integer([:positive])}"
       {:ok, _} = Agent.upsert_wechat_credential(%{name: name, member_id: m.id})
 
@@ -99,7 +99,7 @@ defmodule Long.Agent.Bots.WechatMultiAccountTest do
       {:ok, row} = Agent.get_wechat_credential(name)
       Agent.destroy_wechat_credential!(row)
       Manager.reconcile()
-      Agent.destroy_household!(hh)
+      Agent.destroy_group!(hh)
     end
 
     test "push to an account with no token errors instead of sending" do

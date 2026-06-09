@@ -1,13 +1,14 @@
-defmodule Long.Agent.HouseholdMember do
+defmodule Long.Agent.Member do
   @moduledoc """
-  A person inside a `Household`. Identified within the family by
-  `relation` (self / spouse / child / …) plus a free-form `display_name`,
-  and optionally a `:owner`/`:member` `role`.
+  A person inside a `Group`, identified by a free-form `display_name`, a
+  neutral `relation` tag (`:self` for the owner's own record, else
+  `:other`), and an optional `:owner`/`:member` `role`.
 
   A member binds one or more chat accounts by sending their `bind_code`
   to the bot; each binding becomes a `BotUser` row pointing back here
   (`BotUser.member_id`), so one member can be reached across both WeChat
-  and Telegram, and other members can address them (e.g. "notify my spouse …").
+  and Telegram, and other members can address them by name (e.g. "notify
+  Alex …").
 
   `bind_code` is a short random token minted on create. It is the only
   secret needed to claim a member, so `regenerate_bind_code` exists to
@@ -19,11 +20,11 @@ defmodule Long.Agent.HouseholdMember do
     data_layer: AshSqlite.DataLayer
 
   sqlite do
-    table "agent_household_members"
+    table "agent_members"
     repo Long.Repo
 
     references do
-      reference :household, on_delete: :delete
+      reference :group, on_delete: :delete
     end
   end
 
@@ -31,8 +32,8 @@ defmodule Long.Agent.HouseholdMember do
     defaults [:read, :destroy]
 
     create :create do
-      accept [:household_id, :display_name, :relation, :role, :locale]
-      change {Long.Agent.HouseholdMember.Changes.EnsureBindCode, []}
+      accept [:group_id, :display_name, :relation, :role, :locale]
+      change {Long.Agent.Member.Changes.EnsureBindCode, []}
     end
 
     update :update do
@@ -41,7 +42,7 @@ defmodule Long.Agent.HouseholdMember do
 
     update :regenerate_bind_code do
       require_atomic? false
-      change {Long.Agent.HouseholdMember.Changes.EnsureBindCode, force: true}
+      change {Long.Agent.Member.Changes.EnsureBindCode, force: true}
     end
 
     read :by_bind_code do
@@ -50,9 +51,9 @@ defmodule Long.Agent.HouseholdMember do
       get? true
     end
 
-    read :by_household do
-      argument :household_id, :uuid, allow_nil?: false
-      filter expr(household_id == ^arg(:household_id))
+    read :by_group do
+      argument :group_id, :uuid, allow_nil?: false
+      filter expr(group_id == ^arg(:group_id))
     end
   end
 
@@ -82,7 +83,7 @@ defmodule Long.Agent.HouseholdMember do
     end
 
     attribute :locale, :string do
-      description "This member's preferred language (e.g. \"en\"), overriding the household default. Nil = inherit."
+      description "This member's preferred language (e.g. \"en\"), overriding the group default. Nil = inherit."
       public? true
     end
 
@@ -90,7 +91,7 @@ defmodule Long.Agent.HouseholdMember do
   end
 
   relationships do
-    belongs_to :household, Long.Agent.Household do
+    belongs_to :group, Long.Agent.Group do
       allow_nil? false
       public? true
     end
@@ -109,7 +110,7 @@ defmodule Long.Agent.HouseholdMember do
   @doc """
   Generate a short, URL/chat-safe bind code. Base32 (Crockford-ish via
   the standard alphabet, padding stripped) over a few random bytes is
-  enough entropy for a family-scale namespace while staying easy to type
+  enough entropy for a group-scale namespace while staying easy to type
   from a phone.
   """
   @spec gen_bind_code() :: String.t()

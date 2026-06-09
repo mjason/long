@@ -2,7 +2,7 @@ defmodule Long.Agent.TelegramCredential do
   @moduledoc """
   Stored Telegram bot credentials, read by `Long.Agent.Bots.Telegram`
   at boot and on `:reload`. One row per bot (identity on `:name`, default
-  `"default"`). Multiple enabled rows are supported so a household can
+  `"default"`). Multiple enabled rows are supported so a group can
   run several bots, each `member_id`-bound to a different role;
   `Long.Agent.Bots.Telegram.Manager` runs one worker per enabled row.
 
@@ -87,7 +87,7 @@ defmodule Long.Agent.TelegramCredential do
     end
 
     attribute :locale, :string do
-      description "Language for this bot's outbound copy (e.g. \"zh\"), overriding member/household. Nil = inherit."
+      description "Language for this bot's outbound copy (e.g. \"zh\"), overriding member/group. Nil = inherit."
       public? true
     end
 
@@ -95,8 +95,8 @@ defmodule Long.Agent.TelegramCredential do
   end
 
   relationships do
-    belongs_to :member, Long.Agent.HouseholdMember do
-      description "The household member (role) this bot serves, if assigned."
+    belongs_to :member, Long.Agent.Member do
+      description "The group member (role) this bot serves, if assigned."
       allow_nil? true
       public? true
     end

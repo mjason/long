@@ -2,7 +2,7 @@ defmodule Long.Agent.Bots.Wechat.Manager do
   @moduledoc """
   Reconciles running `Long.Agent.Bots.Wechat.Worker`s against stored
   `Long.Agent.WechatCredential` rows — exactly one worker per hosted
-  account. This is what lets a household connect several WeChat accounts,
+  account. This is what lets a group connect several WeChat accounts,
   each `member_id`-bound to a different role.
 
   Reconciliation runs on boot, on an explicit `reconcile/0`, and whenever

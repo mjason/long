@@ -116,8 +116,8 @@ defmodule Long.Agent.CodeRunnerTest do
     end
 
     test "each member gets an isolated members/<id> workspace", %{base: base} do
-      {:ok, hh} = Agent.create_household(%{name: "H"})
-      {:ok, m} = Agent.create_member(%{household_id: hh.id, display_name: "Me", relation: :self})
+      {:ok, hh} = Agent.create_group(%{name: "H"})
+      {:ok, m} = Agent.create_member(%{group_id: hh.id, display_name: "Me", relation: :self})
       sess = Agent.start_session!(%{title: "t"})
 
       {:ok, _} =

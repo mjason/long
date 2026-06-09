@@ -33,7 +33,7 @@ defmodule LongWeb.Router do
 
     live "/manage", ManageLive, :llms
     live "/manage/llms", ManageLive, :llms
-    live "/manage/households", ManageLive, :households
+    live "/manage/groups", ManageLive, :groups
     live "/manage/memories", ManageLive, :memories
     live "/manage/skills", ManageLive, :skills
     live "/manage/sessions", ManageLive, :sessions

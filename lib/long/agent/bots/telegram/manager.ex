@@ -2,7 +2,7 @@ defmodule Long.Agent.Bots.Telegram.Manager do
   @moduledoc """
   Reconciles running `Long.Agent.Bots.Telegram` workers against stored
   `Long.Agent.TelegramCredential` rows — one worker per enabled bot. This
-  is what lets a household run several bots, each `member_id`-bound to a
+  is what lets a group run several bots, each `member_id`-bound to a
   different role (mirrors `Long.Agent.Bots.Wechat.Manager`).
 
   Workers are keyed by credential name in `Long.Agent.Bots.Telegram.Registry`;

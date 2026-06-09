@@ -6,12 +6,12 @@ defmodule Long.Jido.Tools.NotifyMemberTest do
   alias Long.Agent
   alias Long.Jido.Tools.NotifyMember
 
-  # Caller is "爱人" (spouse); `others` is a list of {name, relation, bound?}.
-  defp setup_family(others) do
-    {:ok, hh} = Agent.create_household(%{name: "Fam-#{uniq()}"})
+  # Caller is "爱人" (the owner); `others` is a list of {name, relation, bound?}.
+  defp setup_group(others) do
+    {:ok, hh} = Agent.create_group(%{name: "Fam-#{uniq()}"})
 
     {:ok, caller} =
-      Agent.create_member(%{household_id: hh.id, display_name: "爱人", relation: :spouse, role: :owner})
+      Agent.create_member(%{group_id: hh.id, display_name: "爱人", relation: :other, role: :owner})
 
     sess = Agent.start_session!(%{title: "t"})
 
@@ -24,7 +24,7 @@ defmodule Long.Jido.Tools.NotifyMemberTest do
       })
 
     for {name, rel, bound?} <- others do
-      {:ok, m} = Agent.create_member(%{household_id: hh.id, display_name: name, relation: rel})
+      {:ok, m} = Agent.create_member(%{group_id: hh.id, display_name: name, relation: rel})
 
       if bound? do
         {:ok, _} =
@@ -43,9 +43,9 @@ defmodule Long.Jido.Tools.NotifyMemberTest do
   defp uniq, do: System.unique_integer([:positive])
   defp run(target, sid), do: NotifyMember.run(%{target: target, message: "好的"}, %{session_id: sid})
 
-  describe "2-person household — any target reaches the one other member (any language)" do
+  describe "2-person group — any target reaches the one other member (any language)" do
     setup do
-      {:ok, sid: setup_family([{"太子", :self, true}])}
+      {:ok, sid: setup_group([{"太子", :self, true}])}
     end
 
     test "a pronoun in any language reaches them", %{sid: sid} do
@@ -66,30 +66,30 @@ defmodule Long.Jido.Tools.NotifyMemberTest do
   end
 
   describe "several other members — needs a specific match, English diagnostics" do
-    test "a relation keyword resolves uniquely" do
-      sid = setup_family([{"太子", :child, true}, {"奶奶", :parent, true}])
-      assert {:ok, %{to: "奶奶"}} = run("parent", sid)
+    test "a display name resolves uniquely" do
+      sid = setup_group([{"太子", :other, true}, {"奶奶", :other, true}])
+      assert {:ok, %{to: "奶奶"}} = run("奶奶", sid)
     end
 
     test "a partial display name resolves uniquely" do
-      sid = setup_family([{"Alice", :child, true}, {"Bob", :child, true}])
+      sid = setup_group([{"Alice", :other, true}, {"Bob", :other, true}])
       assert {:ok, %{to: "Alice"}} = run("ali", sid)
     end
 
-    test "an ambiguous relation lists the candidates" do
-      sid = setup_family([{"Alice", :child, true}, {"Bob", :child, true}])
-      assert {:ok, %{status: "error", msg: msg}} = run("child", sid)
-      assert msg =~ "Alice" and msg =~ "Bob" and msg =~ "match"
+    test "an ambiguous partial name lists the candidates" do
+      sid = setup_group([{"Alice", :other, true}, {"Alicia", :other, true}])
+      assert {:ok, %{status: "error", msg: msg}} = run("ali", sid)
+      assert msg =~ "Alice" and msg =~ "Alicia"
     end
 
     test "an unknown target lists who's available" do
-      sid = setup_family([{"Alice", :child, true}, {"Bob", :child, true}])
+      sid = setup_group([{"Alice", :other, true}, {"Bob", :other, true}])
       assert {:ok, %{status: "error", msg: msg}} = run("Zoe", sid)
       assert msg =~ "Alice" and msg =~ "Bob"
     end
 
     test "an empty target asks which member" do
-      sid = setup_family([{"Alice", :child, true}, {"Bob", :child, true}])
+      sid = setup_group([{"Alice", :other, true}, {"Bob", :other, true}])
       assert {:ok, %{status: "error", msg: msg}} = run("", sid)
       assert msg =~ "which member"
     end
@@ -97,13 +97,13 @@ defmodule Long.Jido.Tools.NotifyMemberTest do
 
   describe "edge cases" do
     test "errors when the caller is the only member" do
-      sid = setup_family([])
+      sid = setup_group([])
       assert {:ok, %{status: "error", msg: msg}} = run("他", sid)
       assert msg =~ "only member"
     end
 
     test "errors when the target has no bound channel" do
-      sid = setup_family([{"太子", :self, false}])
+      sid = setup_group([{"太子", :self, false}])
       assert {:ok, %{status: "error", msg: msg}} = run("太子", sid)
       assert msg =~ "no linked chat account"
     end
@@ -117,13 +117,13 @@ defmodule Long.Jido.Tools.NotifyMemberTest do
 
   describe "delivery (injectable — no live worker needed)" do
     setup do
-      {:ok, hh} = Agent.create_household(%{name: "D-#{uniq()}"})
+      {:ok, hh} = Agent.create_group(%{name: "D-#{uniq()}"})
 
       {:ok, _caller} =
-        Agent.create_member(%{household_id: hh.id, display_name: "Me", relation: :self, role: :owner})
+        Agent.create_member(%{group_id: hh.id, display_name: "Me", relation: :self, role: :owner})
 
       {:ok, target} =
-        Agent.create_member(%{household_id: hh.id, display_name: "Spouse", relation: :spouse})
+        Agent.create_member(%{group_id: hh.id, display_name: "Spouse", relation: :other})
 
       sess = Agent.start_session!(%{title: "t"})
 
@@ -132,7 +132,7 @@ defmodule Long.Jido.Tools.NotifyMemberTest do
           platform: :wechat,
           external_id: "caller-#{uniq()}",
           session_id: sess.id,
-          member_id: (Agent.list_members!() |> Enum.find(&(&1.relation == :self and &1.household_id == hh.id))).id
+          member_id: (Agent.list_members!() |> Enum.find(&(&1.relation == :self and &1.group_id == hh.id))).id
         })
 
       {:ok, sid: sess.id, target: target}

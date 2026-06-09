@@ -1,12 +1,12 @@
-defmodule Long.Agent.HouseholdMember.Changes.EnsureBindCode do
+defmodule Long.Agent.Member.Changes.EnsureBindCode do
   @moduledoc """
-  Mint a `bind_code` for a `HouseholdMember`. On create it fills the code
+  Mint a `bind_code` for a `Member`. On create it fills the code
   only when absent; with `force: true` (the `regenerate_bind_code` action)
   it always overwrites, rotating the token.
   """
   use Ash.Resource.Change
 
-  alias Long.Agent.HouseholdMember
+  alias Long.Agent.Member
 
   @impl true
   def change(changeset, opts, _context) do
@@ -23,5 +23,5 @@ defmodule Long.Agent.HouseholdMember.Changes.EnsureBindCode do
   end
 
   defp force(changeset),
-    do: Ash.Changeset.force_change_attribute(changeset, :bind_code, HouseholdMember.gen_bind_code())
+    do: Ash.Changeset.force_change_attribute(changeset, :bind_code, Member.gen_bind_code())
 end

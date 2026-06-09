@@ -35,8 +35,8 @@ defmodule Long.Agent.Bots.TelegramMultiBotTest do
     end
 
     test "for_member resolves the bot assigned to a member" do
-      {:ok, hh} = Agent.create_household(%{name: "H"})
-      {:ok, m} = Agent.create_member(%{household_id: hh.id, display_name: "Kid", relation: :child})
+      {:ok, hh} = Agent.create_group(%{name: "H"})
+      {:ok, m} = Agent.create_member(%{group_id: hh.id, display_name: "Kid", relation: :other})
       name = "bot-#{System.unique_integer([:positive])}"
       {:ok, _} = Agent.upsert_telegram_credential(%{name: name, bot_token: "t", member_id: m.id})
 
@@ -44,15 +44,15 @@ defmodule Long.Agent.Bots.TelegramMultiBotTest do
       assert Credential.for_member("00000000-0000-0000-0000-000000000000") == nil
 
       cleanup([name])
-      Agent.destroy_household!(hh)
+      Agent.destroy_group!(hh)
     end
   end
 
   describe "inbound binds the chat to the bot's member" do
     test "a dedicated bot's member_id is authoritative; an unassigned bot never clobbers it" do
-      {:ok, hh} = Agent.create_household(%{name: "H"})
-      {:ok, m1} = Agent.create_member(%{household_id: hh.id, display_name: "A", relation: :self})
-      {:ok, m2} = Agent.create_member(%{household_id: hh.id, display_name: "B", relation: :spouse})
+      {:ok, hh} = Agent.create_group(%{name: "H"})
+      {:ok, m1} = Agent.create_member(%{group_id: hh.id, display_name: "A", relation: :self})
+      {:ok, m2} = Agent.create_member(%{group_id: hh.id, display_name: "B", relation: :other})
       uid = "tg-#{System.unique_integer([:positive])}"
 
       {:ok, %{bot_user: u1}} = Bots.ensure_session(:telegram, uid, member_id: m1.id)
@@ -66,7 +66,7 @@ defmodule Long.Agent.Bots.TelegramMultiBotTest do
 
       Agent.destroy_bot_user!(u3)
       Agent.destroy_session!(sid)
-      Agent.destroy_household!(hh)
+      Agent.destroy_group!(hh)
     end
   end
 

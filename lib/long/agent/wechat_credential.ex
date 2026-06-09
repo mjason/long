@@ -2,7 +2,7 @@ defmodule Long.Agent.WechatCredential do
   @moduledoc """
   Stored iLink bot credentials and long-poll cursor for the WeChat
   adapter. One row per hosted WeChat account (identity on `:name`,
-  default `"default"`). Multiple rows are supported so a household can
+  default `"default"`). Multiple rows are supported so a group can
   connect several accounts, each `member_id`-bound to a different role;
   `Long.Agent.Bots.Wechat.Manager` runs one worker per row.
 
@@ -77,7 +77,7 @@ defmodule Long.Agent.WechatCredential do
     end
 
     attribute :locale, :string do
-      description "Language for this account's outbound copy (e.g. \"zh\"), overriding member/household. Nil = inherit."
+      description "Language for this account's outbound copy (e.g. \"zh\"), overriding member/group. Nil = inherit."
       public? true
     end
 
@@ -85,8 +85,8 @@ defmodule Long.Agent.WechatCredential do
   end
 
   relationships do
-    belongs_to :member, Long.Agent.HouseholdMember do
-      description "The household member (role) this hosted WeChat account serves, if assigned."
+    belongs_to :member, Long.Agent.Member do
+      description "The group member (role) this hosted WeChat account serves, if assigned."
       allow_nil? true
       public? true
     end

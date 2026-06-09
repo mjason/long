@@ -72,8 +72,8 @@ defmodule Long.Agent.Bots do
     * `/status` — render the current `Activity.snapshot/1`
     * `/btw <note>` — append a mid-flight context note for the running
       agent (picked up via `Long.Jido.Loop`'s `inject_btws/1`)
-    * `/bind <code>` — claim a `HouseholdMember` by its bind code, linking
-      this chat account (`BotUser`) to that family member
+    * `/bind <code>` — claim a `Member` by its bind code, linking
+      this chat account (`BotUser`) to that group member
 
   Returns `{:ok, %{bot_user, session_id, mode}}` where `mode` is one of
   `:cleared | :status | :btw | :bound | :dispatched`, or `{:error, reason}` if
@@ -129,7 +129,7 @@ defmodule Long.Agent.Bots do
 
   defp parse_magic(_), do: :normal
 
-  # Claim a HouseholdMember by its bind code, linking this chat account
+  # Claim a Member by its bind code, linking this chat account
   # to that member. Returns `{bot_user, ack_message}` — the bot_user is
   # the updated row on success, the original on failure.
   defp bind_member(user, "", locale) do
@@ -142,12 +142,12 @@ defmodule Long.Agent.Bots do
         {user, Copy.t("bots.bind_invalid", %{}, locale)}
 
       {:ok, member} ->
-        member = Ash.load!(member, :household)
+        member = Ash.load!(member, :group)
 
         case Agent.bind_bot_user_member(user, %{member_id: member.id}) do
           {:ok, bound} ->
             {bound,
-             Copy.t("bots.bind_ok", %{member: member.display_name, household: member.household.name}, locale)}
+             Copy.t("bots.bind_ok", %{member: member.display_name, group: member.group.name}, locale)}
 
           {:error, _} ->
             {user, Copy.t("bots.bind_failed", %{}, locale)}
@@ -159,7 +159,7 @@ defmodule Long.Agent.Bots do
   end
 
   # The chat user's display locale, resolved via the channel → member →
-  # household → platform → default chain (see `Long.Agent.Locale`).
+  # group → platform → default chain (see `Long.Agent.Locale`).
   defp locale_for(user), do: Long.Agent.Locale.for_bot_user(user)
 
   defp ack(text) do

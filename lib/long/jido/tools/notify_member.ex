@@ -1,11 +1,11 @@
 defmodule Long.Jido.Tools.NotifyMember do
   @moduledoc """
-  Proactively message another member of the caller's household — the
-  "notify my spouse …" capability. The caller is resolved from the current
-  session's bound `BotUser` → `HouseholdMember`; the target is addressed
-  either by relation (spouse / child / parent / self) or by display name,
-  scoped to the same household. The user-facing strings stay Chinese to
-  match the rest of the bot-chat surface (see `Long.Agent.Bots`).
+  Proactively message another member of the caller's group — the
+  "notify the others …" capability. The caller is resolved from the current
+  session's bound `BotUser` → `Member`; the target is addressed by display
+  name (or implied when there's only one other member), scoped to the same
+  group. The user-facing strings stay Chinese to match the rest of the
+  bot-chat surface (see `Long.Agent.Bots`).
 
   The message is pushed to *every* chat account the target has bound
   (WeChat + Telegram), via `Long.Agent.Bots.Outbound`. Delivery is
@@ -19,33 +19,32 @@ defmodule Long.Jido.Tools.NotifyMember do
   use Jido.Action,
     name: "notify_member",
     description: """
-    Send a message to another member of your family group — use this
+    Send a message to another member of your group — use this
     whenever the user asks to tell / pass a message to / 通知 / 和某人说
-    someone in the family.
+    someone in the group.
 
     Addressing the recipient (`target`):
-      - With exactly ONE other member in the household, the target is
+      - With exactly ONE other member in the group, the target is
         ignored — any value (a display name, a pronoun in any language,
         or an empty string) reaches that member. So for "tell him OK" /
         "和他说一声好的", just call this with the message; do NOT ask who.
       - With several other members, pass the member's display name
-        (partial match works) or a relation (spouse/child/parent/self).
-        On a miss the error lists who's available — retry with one of
-        those names.
+        (partial match works). On a miss the error lists who's
+        available — retry with one of those names.
 
     The message is delivered to every chat account (WeChat / Telegram)
-    the target has bound. Only usable from a chat bound to a family
+    the target has bound. Only usable from a chat bound to a group
     member; if it isn't, ask the user to `/bind <code>` first.
     """,
     category: "messaging",
-    tags: ["family", "notify", "household"],
+    tags: ["notify", "group"],
     vsn: "2.0.0",
     schema:
       Zoi.object(%{
         target:
           Zoi.string(
             description:
-              "Who to notify. Ignored when there's only one other member (leave empty for 'the other person'). Otherwise a display name (partial ok) or a relation: spouse/child/parent/self."
+              "Who to notify. Ignored when there's only one other member (leave empty for 'the other person'). Otherwise the member's display name (partial match ok)."
           )
           |> Zoi.optional(),
         message: Zoi.string(description: "The message text to deliver to that member.")
@@ -81,7 +80,6 @@ defmodule Long.Jido.Tools.NotifyMember do
     base = %{
       status: if(delivered > 0, do: "sent", else: "error"),
       to: target.display_name,
-      relation: to_string(target.relation),
       delivered: delivered,
       channels: channels
     }
@@ -107,7 +105,7 @@ defmodule Long.Jido.Tools.NotifyMember do
   defp reason_str(other), do: Long.Util.Error.humanize(other)
 
   # The caller's display locale, resolved via the channel → member →
-  # household → platform → default chain (see `Long.Agent.Locale`).
+  # group → platform → default chain (see `Long.Agent.Locale`).
   defp caller_locale(session_id) do
     case Agent.get_bot_user_for_session(session_id) do
       {:ok, %{} = bot_user} -> Long.Agent.Locale.for_bot_user(bot_user)
@@ -115,7 +113,7 @@ defmodule Long.Jido.Tools.NotifyMember do
     end
   end
 
-  # The household member behind the current session, or an error if the
+  # The group member behind the current session, or an error if the
   # chat isn't bound to one.
   defp caller_member(session_id, locale) do
     case Agent.member_for_session(session_id) do
@@ -124,9 +122,9 @@ defmodule Long.Jido.Tools.NotifyMember do
     end
   end
 
-  # Resolve `target` to one other member of the caller's household.
+  # Resolve `target` to one other member of the caller's group.
   #
-  # The language-agnostic rule: in a household with exactly ONE other
+  # The language-agnostic rule: in a group with exactly ONE other
   # member, *any* target reaches them — a pronoun in any language ("他",
   # "him", "对方", …), a name, or an empty string. No keyword list to
   # maintain; the LLM does the natural-language understanding. Only when
@@ -136,8 +134,8 @@ defmodule Long.Jido.Tools.NotifyMember do
     target = if is_binary(target), do: String.trim(target), else: ""
 
     others =
-      me.household_id
-      |> Agent.list_members_for_household!(load: [:bot_users])
+      me.group_id
+      |> Agent.list_members_for_group!(load: [:bot_users])
       |> Enum.reject(&(&1.id == me.id))
 
     pick(others, target, locale)
@@ -152,16 +150,7 @@ defmodule Long.Jido.Tools.NotifyMember do
     do: {:error, Copy.t("notify.which_member", %{options: member_list(others)}, locale)}
 
   defp pick(others, target, locale) do
-    matches =
-      case relation_for(target) do
-        nil -> name_matches(others, target)
-        rel -> Enum.filter(others, &(&1.relation == rel))
-      end
-
-    # A relation word that matched no one might still be a display name.
-    matches = if matches == [], do: name_matches(others, target), else: matches
-
-    case matches do
+    case name_matches(others, target) do
       [one] -> {:ok, one}
       [] -> {:error, Copy.t("notify.no_match", %{target: target, options: member_list(others)}, locale)}
       many -> {:error, Copy.t("notify.ambiguous", %{options: member_list(many)}, locale)}
@@ -178,7 +167,7 @@ defmodule Long.Jido.Tools.NotifyMember do
   end
 
   defp member_list(members),
-    do: Enum.map_join(members, ", ", &"#{&1.display_name} (#{&1.relation})")
+    do: Enum.map_join(members, ", ", & &1.display_name)
 
   # `bot_users` is already loaded on the member by `resolve_target`.
   defp recipients(%{bot_users: [_ | _] = bus}, _locale), do: {:ok, bus}
@@ -211,17 +200,4 @@ defmodule Long.Jido.Tools.NotifyMember do
 
   defp compose(me, message, locale),
     do: Copy.t("notify.envelope", %{sender: me.display_name, message: message}, locale)
-
-  # Map a free-form Chinese/English relation word to the enum atom.
-  defp relation_for(target) do
-    norm = target |> String.trim() |> String.downcase()
-
-    cond do
-      norm in ["配偶", "爱人", "老婆", "老公", "妻子", "丈夫", "spouse", "wife", "husband"] -> :spouse
-      norm in ["孩子", "小孩", "儿子", "女儿", "child", "kid", "son", "daughter"] -> :child
-      norm in ["父母", "爸爸", "妈妈", "爸", "妈", "parent", "mom", "dad", "father", "mother"] -> :parent
-      norm in ["本人", "自己", "我", "self", "me"] -> :self
-      true -> nil
-    end
-  end
 end

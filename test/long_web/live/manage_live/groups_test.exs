@@ -1,38 +1,38 @@
-defmodule LongWeb.ManageLive.FamilyTest do
+defmodule LongWeb.ManageLive.GroupsTest do
   use LongWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest
 
   alias Long.Agent
 
-  test "Family page renders the English binding instructions", %{conn: conn} do
-    {:ok, _view, html} = live(conn, ~p"/manage/households")
+  test "Groups page renders the English binding instructions", %{conn: conn} do
+    {:ok, _view, html} = live(conn, ~p"/manage/groups")
 
-    assert html =~ "Family"
+    assert html =~ "Groups"
     assert html =~ "How members link their WeChat / Telegram"
     assert html =~ "do <em>not</em> each scan"
-    assert html =~ "New household"
-    refute html =~ "家庭组"
+    assert html =~ "New group"
+    refute html =~ "组"
   end
 
   test "shows each member's /bind command, English relation, and bound status", %{conn: conn} do
-    {:ok, hh} = Agent.create_household(%{name: "Test Home"})
-    {:ok, m} = Agent.create_member(%{household_id: hh.id, display_name: "Alex", relation: :spouse})
+    {:ok, hh} = Agent.create_group(%{name: "Test Home"})
+    {:ok, m} = Agent.create_member(%{group_id: hh.id, display_name: "Alex", relation: :self})
 
-    {:ok, _view, html} = live(conn, ~p"/manage/households")
+    {:ok, _view, html} = live(conn, ~p"/manage/groups")
 
     assert html =~ "Test Home"
     assert html =~ "Alex"
-    assert html =~ "Spouse"
+    assert html =~ "Self"
     assert html =~ "/bind #{m.bind_code}"
     assert html =~ "Not bound"
 
-    Agent.destroy_household!(hh)
+    Agent.destroy_group!(hh)
   end
 
   test "Channels page lists WeChat accounts with a member picker, in English", %{conn: conn} do
-    {:ok, hh} = Agent.create_household(%{name: "Home"})
-    {:ok, m} = Agent.create_member(%{household_id: hh.id, display_name: "Dad", relation: :parent})
+    {:ok, hh} = Agent.create_group(%{name: "Home"})
+    {:ok, m} = Agent.create_member(%{group_id: hh.id, display_name: "Dad", relation: :other})
     name = "dad-#{System.unique_integer([:positive])}"
     {:ok, _} = Agent.upsert_wechat_credential(%{name: name, member_id: m.id})
 
@@ -49,12 +49,12 @@ defmodule LongWeb.ManageLive.FamilyTest do
     {:ok, row} = Agent.get_wechat_credential(name)
     Agent.destroy_wechat_credential!(row)
     Long.Agent.Bots.Wechat.Manager.reconcile()
-    Agent.destroy_household!(hh)
+    Agent.destroy_group!(hh)
   end
 
   test "Channels page lets a Telegram bot be bound to a member too", %{conn: conn} do
-    {:ok, hh} = Agent.create_household(%{name: "Home"})
-    {:ok, m} = Agent.create_member(%{household_id: hh.id, display_name: "Mom", relation: :parent})
+    {:ok, hh} = Agent.create_group(%{name: "Home"})
+    {:ok, m} = Agent.create_member(%{group_id: hh.id, display_name: "Mom", relation: :other})
     name = "mom-bot-#{System.unique_integer([:positive])}"
     {:ok, _} = Agent.upsert_telegram_credential(%{name: name, bot_token: "t", member_id: m.id})
 
@@ -68,7 +68,7 @@ defmodule LongWeb.ManageLive.FamilyTest do
 
     {:ok, row} = Agent.get_telegram_credential(name)
     Agent.destroy_telegram_credential!(row)
-    Agent.destroy_household!(hh)
+    Agent.destroy_group!(hh)
   end
 
   test "Phrases page lists the catalog and an override round-trips", %{conn: conn} do
@@ -126,35 +126,35 @@ defmodule LongWeb.ManageLive.FamilyTest do
     assert {:ok, %{scope: :global}} = Long.Agent.Skill.Store.get("web-shared-skill")
   end
 
-  test "creating a household via the form works", %{conn: conn} do
-    {:ok, view, _html} = live(conn, ~p"/manage/households")
+  test "creating a group via the form works", %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/manage/groups")
 
     html =
       view
-      |> form("form[phx-submit=new_household]", household: %{name: "Fam One"})
+      |> form("form[phx-submit=new_group]", group: %{name: "Fam One"})
       |> render_submit()
 
     assert html =~ "Fam One"
-    assert html =~ "Household created."
+    assert html =~ "Group created."
 
-    Agent.list_households!()
+    Agent.list_groups!()
     |> Enum.filter(&(&1.name == "Fam One"))
-    |> Enum.each(&Agent.destroy_household!/1)
+    |> Enum.each(&Agent.destroy_group!/1)
   end
 
-  test "Family page sets household + member default language", %{conn: conn} do
-    {:ok, hh} = Agent.create_household(%{name: "Lang Home"})
-    {:ok, m} = Agent.create_member(%{household_id: hh.id, display_name: "Kid", relation: :child})
+  test "Groups page sets group + member default language", %{conn: conn} do
+    {:ok, hh} = Agent.create_group(%{name: "Lang Home"})
+    {:ok, m} = Agent.create_member(%{group_id: hh.id, display_name: "Kid", relation: :other})
 
-    {:ok, view, html} = live(conn, ~p"/manage/households")
+    {:ok, view, html} = live(conn, ~p"/manage/groups")
     assert html =~ "Default language"
     assert html =~ "中文"
 
     view
-    |> form("#locsel-set_household_locale-#{hh.id}", %{locale: "zh"})
+    |> form("#locsel-set_group_locale-#{hh.id}", %{locale: "zh"})
     |> render_change()
 
-    assert {:ok, %{locale: "zh"}} = Agent.get_household(hh.id)
+    assert {:ok, %{locale: "zh"}} = Agent.get_group(hh.id)
 
     view
     |> form("#locsel-set_member_locale-#{m.id}", %{locale: "en"})
@@ -162,11 +162,32 @@ defmodule LongWeb.ManageLive.FamilyTest do
 
     assert {:ok, %{locale: "en"}} = Agent.get_member(m.id)
 
-    Agent.destroy_household!(hh)
+    Agent.destroy_group!(hh)
+  end
+
+  test "setting one member's language keeps the other members' selects", %{conn: conn} do
+    {:ok, hh} = Agent.create_group(%{name: "Two-Member"})
+    {:ok, a} = Agent.create_member(%{group_id: hh.id, display_name: "A", relation: :self})
+    {:ok, b} = Agent.create_member(%{group_id: hh.id, display_name: "B", relation: :other})
+
+    {:ok, view, html} = live(conn, ~p"/manage/groups")
+    assert html =~ "locsel-set_member_locale-#{a.id}"
+    assert html =~ "locsel-set_member_locale-#{b.id}"
+
+    html =
+      view
+      |> form("#locsel-set_member_locale-#{a.id}", %{locale: "zh"})
+      |> render_change()
+
+    # After changing A's language, B's language select must still exist.
+    assert html =~ "locsel-set_member_locale-#{a.id}"
+    assert html =~ "locsel-set_member_locale-#{b.id}"
+
+    Agent.destroy_group!(hh)
   end
 
   test "Channels page sets a WeChat account language", %{conn: conn} do
-    {:ok, hh} = Agent.create_household(%{name: "H"})
+    {:ok, hh} = Agent.create_group(%{name: "H"})
     name = "wc-#{System.unique_integer([:positive])}"
     {:ok, _} = Agent.upsert_wechat_credential(%{name: name})
 
@@ -182,6 +203,19 @@ defmodule LongWeb.ManageLive.FamilyTest do
     {:ok, row} = Agent.get_wechat_credential(name)
     Agent.destroy_wechat_credential!(row)
     Long.Agent.Bots.Wechat.Manager.reconcile()
-    Agent.destroy_household!(hh)
+    Agent.destroy_group!(hh)
+  end
+
+  test "Groups page sets the system-wide default language", %{conn: conn} do
+    on_exit(fn -> Long.Copy.put_default_locale(nil) end)
+
+    {:ok, view, html} = live(conn, ~p"/manage/groups")
+    assert html =~ "System default language"
+
+    view
+    |> form("#locsel-set_default_locale-system", %{locale: "zh"})
+    |> render_change()
+
+    assert Long.Copy.default_locale() == "zh"
   end
 end

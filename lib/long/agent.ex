@@ -97,19 +97,19 @@ defmodule Long.Agent do
       define :destroy_scheduled_task, action: :destroy
     end
 
-    resource Long.Agent.Household do
-      define :create_household, action: :create
-      define :list_households, action: :read
-      define :get_household, action: :read, get_by: [:id]
-      define :update_household, action: :update
-      define :destroy_household, action: :destroy
+    resource Long.Agent.Group do
+      define :create_group, action: :create
+      define :list_groups, action: :read
+      define :get_group, action: :read, get_by: [:id]
+      define :update_group, action: :update
+      define :destroy_group, action: :destroy
     end
 
-    resource Long.Agent.HouseholdMember do
+    resource Long.Agent.Member do
       define :create_member, action: :create
       define :list_members, action: :read
       define :get_member, action: :read, get_by: [:id]
-      define :list_members_for_household, action: :by_household, args: [:household_id]
+      define :list_members_for_group, action: :by_group, args: [:group_id]
       define :get_member_by_bind_code, action: :by_bind_code, args: [:bind_code], not_found_error?: false
       define :update_member, action: :update
       define :regenerate_member_bind_code, action: :regenerate_bind_code
@@ -186,11 +186,11 @@ defmodule Long.Agent do
   end
 
   @doc """
-  The `HouseholdMember` bound to a session's chat account, or `nil` for an
+  The `Member` bound to a session's chat account, or `nil` for an
   unbound / web-chat session. Used to scope per-member skills and to
   resolve the caller for `notify_member`.
   """
-  @spec member_for_session(String.t()) :: Long.Agent.HouseholdMember.t() | nil
+  @spec member_for_session(String.t()) :: Long.Agent.Member.t() | nil
   def member_for_session(session_id) when is_binary(session_id) do
     with {:ok, %{member_id: mid}} when is_binary(mid) <- get_bot_user_for_session(session_id),
          {:ok, member} <- get_member(mid) do

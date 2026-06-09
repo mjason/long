@@ -60,8 +60,8 @@ defmodule Long.Agent.Skill.CreateTest do
 
   describe "skill_create tool" do
     defp bind(role) do
-      {:ok, hh} = Agent.create_household(%{name: "H-#{:rand.uniform(99999)}"})
-      {:ok, m} = Agent.create_member(%{household_id: hh.id, display_name: "X", relation: :self, role: role})
+      {:ok, hh} = Agent.create_group(%{name: "H-#{:rand.uniform(99999)}"})
+      {:ok, m} = Agent.create_member(%{group_id: hh.id, display_name: "X", relation: :self, role: role})
       sess = Agent.start_session!(%{title: "t"})
 
       {:ok, _} =

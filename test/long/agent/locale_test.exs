@@ -4,13 +4,13 @@ defmodule Long.Agent.LocaleTest do
   alias Long.Agent
   alias Long.Agent.Locale
 
-  # Build a wechat bot_user wired to a member/household/credential, each
+  # Build a wechat bot_user wired to a member/group/credential, each
   # with an optional locale, so we can probe the fallback chain.
   defp chain(opts) do
-    {:ok, hh} = Agent.create_household(%{name: "H-#{:rand.uniform(99_999)}", locale: opts[:household]})
+    {:ok, hh} = Agent.create_group(%{name: "H-#{:rand.uniform(99_999)}", locale: opts[:group]})
 
     {:ok, m} =
-      Agent.create_member(%{household_id: hh.id, display_name: "X", relation: :self, locale: opts[:member]})
+      Agent.create_member(%{group_id: hh.id, display_name: "X", relation: :self, locale: opts[:member]})
 
     cname = "wc-#{:rand.uniform(99_999)}"
     {:ok, _} = Agent.upsert_wechat_credential(%{name: cname, member_id: m.id, locale: opts[:credential]})
@@ -31,17 +31,17 @@ defmodule Long.Agent.LocaleTest do
     bu
   end
 
-  describe "for_bot_user/1 — channel → member → household → platform → default" do
+  describe "for_bot_user/1 — channel → member → group → platform → default" do
     test "channel (credential) locale wins over everything" do
-      assert Locale.for_bot_user(chain(credential: "zh", member: "en", household: "en", platform: "en")) == "zh"
+      assert Locale.for_bot_user(chain(credential: "zh", member: "en", group: "en", platform: "en")) == "zh"
     end
 
-    test "member locale wins over household + platform" do
-      assert Locale.for_bot_user(chain(member: "en", household: "zh", platform: "zh")) == "en"
+    test "member locale wins over group + platform" do
+      assert Locale.for_bot_user(chain(member: "en", group: "zh", platform: "zh")) == "en"
     end
 
-    test "household default applies (and beats platform-detected)" do
-      assert Locale.for_bot_user(chain(household: "zh", platform: "en")) == "zh"
+    test "group default applies (and beats platform-detected)" do
+      assert Locale.for_bot_user(chain(group: "zh", platform: "en")) == "zh"
     end
 
     test "platform-detected locale used when no owner setting exists" do
@@ -53,18 +53,18 @@ defmodule Long.Agent.LocaleTest do
     end
   end
 
-  describe "for_member/1 — member → household → default" do
-    test "member locale wins over household" do
-      {:ok, hh} = Agent.create_household(%{name: "H", locale: "zh"})
-      {:ok, m} = Agent.create_member(%{household_id: hh.id, display_name: "X", relation: :self, locale: "en"})
-      {:ok, loaded} = Agent.get_member(m.id, load: [:household])
+  describe "for_member/1 — member → group → default" do
+    test "member locale wins over group" do
+      {:ok, hh} = Agent.create_group(%{name: "H", locale: "zh"})
+      {:ok, m} = Agent.create_member(%{group_id: hh.id, display_name: "X", relation: :self, locale: "en"})
+      {:ok, loaded} = Agent.get_member(m.id, load: [:group])
       assert Locale.for_member(loaded) == "en"
     end
 
-    test "household default when member locale unset" do
-      {:ok, hh} = Agent.create_household(%{name: "H", locale: "zh"})
-      {:ok, m} = Agent.create_member(%{household_id: hh.id, display_name: "X", relation: :self})
-      {:ok, loaded} = Agent.get_member(m.id, load: [:household])
+    test "group default when member locale unset" do
+      {:ok, hh} = Agent.create_group(%{name: "H", locale: "zh"})
+      {:ok, m} = Agent.create_member(%{group_id: hh.id, display_name: "X", relation: :self})
+      {:ok, loaded} = Agent.get_member(m.id, load: [:group])
       assert Locale.for_member(loaded) == "zh"
     end
   end

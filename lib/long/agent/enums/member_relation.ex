@@ -1,12 +1,10 @@
 defmodule Long.Agent.Enums.MemberRelation do
   @moduledoc """
-  A household member's relation within the family group, used both for
-  display and for relation-based addressing (e.g. an agent asked to
-  "notify my spouse …" resolves the `:spouse` member of the same household).
-
-  `:self` is the household owner's own member record. `:other` is the
-  catch-all for relations not worth enumerating — the free-form
-  `display_name` carries the specific label in that case.
+  A neutral identity tag for a group member, kept separate from the
+  permission `role`. `:self` marks the owner's own member record (so the
+  agent can exclude "me" when addressing others); `:other` is everyone
+  else. The specific label — a name, a kinship term, a title — lives in
+  the free-form `display_name`.
   """
-  use Ash.Type.Enum, values: [:self, :spouse, :child, :parent, :other]
+  use Ash.Type.Enum, values: [:self, :other]
 end

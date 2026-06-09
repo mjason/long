@@ -18,7 +18,7 @@ defmodule Long.Jido.Tools.Format do
   end
 
   @doc """
-  The household member id bound to `ctx`'s session, or `nil` for an
+  The group member id bound to `ctx`'s session, or `nil` for an
   unbound / web-chat session. Centralizes the session→member lookup that
   per-member tools (code_run, skill_read) need to scope themselves.
   """

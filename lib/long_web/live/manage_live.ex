@@ -25,7 +25,7 @@ defmodule LongWeb.ManageLive do
 
   @sections [
     {:llms, "LLMs", "hero-cpu-chip"},
-    {:households, "Family", "hero-home"},
+    {:groups, "Groups", "hero-user-group"},
     {:memories, "Memories", "hero-bookmark"},
     {:skills, "Skills", "hero-puzzle-piece"},
     {:sessions, "Sessions", "hero-chat-bubble-left-right"},
@@ -65,7 +65,7 @@ defmodule LongWeb.ManageLive do
      |> assign(:wechat_credentials, [])
      |> assign(:member_options, [])
      |> assign(:llms, [])
-     |> assign(:households, [])
+     |> assign(:groups, [])
      |> assign(:globals, [])
      |> assign(:session_memories, [])
      |> assign(:checkpoints, [])
@@ -92,14 +92,14 @@ defmodule LongWeb.ManageLive do
 
   # ── Loaders ──────────────────────────────────────────────────────────
 
-  defp load_section(socket, :households) do
+  defp load_section(socket, :groups) do
     rows =
-      case Agent.list_households(load: [members: [:bot_users]]) do
+      case Agent.list_groups(load: [members: [:bot_users]]) do
         {:ok, hh} -> Enum.sort_by(hh, & &1.inserted_at, DateTime)
         _ -> []
       end
 
-    assign(socket, :households, rows)
+    assign(socket, :groups, rows)
   end
 
   defp load_section(socket, :llms) do
@@ -261,11 +261,11 @@ defmodule LongWeb.ManageLive do
 
   # {id, label} pairs for the per-account member picker on the Channels page.
   defp member_options do
-    case Agent.list_members(load: [:household]) do
+    case Agent.list_members(load: [:group]) do
       {:ok, members} ->
         Enum.map(members, fn m ->
-          household = if is_struct(m.household), do: m.household.name, else: "—"
-          {m.id, "#{household} · #{m.display_name} (#{m.relation})"}
+          group = if is_struct(m.group), do: m.group.name, else: "—"
+          {m.id, "#{group} · #{m.display_name}"}
         end)
 
       _ ->
@@ -284,27 +284,6 @@ defmodule LongWeb.ManageLive do
   defp locale_label("en"), do: "English"
   defp locale_label("zh"), do: "中文"
   defp locale_label(code), do: code
-
-  # A language picker that posts `%{<id_name> => id_value, "locale" => code}`
-  # to `event` on change. Empty selection ("— inherit —") clears the override.
-  attr :event, :string, required: true
-  attr :id_name, :string, required: true
-  attr :id_value, :string, required: true
-  attr :current, :string, default: nil
-
-  defp locale_select(assigns) do
-    assigns = assign(assigns, :options, locale_options())
-
-    ~H"""
-    <form id={"locsel-#{@event}-#{@id_value}"} phx-change={@event}>
-      <input type="hidden" name={@id_name} value={@id_value} />
-      <select name="locale" class="border border-zinc-300 rounded-md px-2 py-1.5 text-sm">
-        <option value="">— inherit —</option>
-        <option :for={{code, label} <- @options} value={code} selected={code == @current}>{label}</option>
-      </select>
-    </form>
-    """
-  end
 
   # Disabled / never-scheduled rows have `next_run_at = nil`; map them
   # to a sentinel far in the future so they sort to the bottom instead
@@ -383,18 +362,18 @@ defmodule LongWeb.ManageLive do
     end
   end
 
-  # ── Events: Family ───────────────────────────────────────────────────
+  # ── Events: Groups ───────────────────────────────────────────────────
 
-  def handle_event("new_household", %{"household" => %{"name" => name}}, socket) do
-    case Agent.create_household(%{name: name}) do
-      {:ok, _} -> {:noreply, socket |> load_section(:households) |> put_flash(:info, "Household created.")}
+  def handle_event("new_group", %{"group" => %{"name" => name}}, socket) do
+    case Agent.create_group(%{name: name}) do
+      {:ok, _} -> {:noreply, socket |> load_section(:groups) |> put_flash(:info, "Group created.")}
       {:error, e} -> {:noreply, put_flash(socket, :error, "Create failed: #{inspect(e)}")}
     end
   end
 
-  def handle_event("destroy_household", %{"id" => id}, socket) do
-    with {:ok, hh} <- Agent.get_household(id), :ok <- Agent.destroy_household(hh) do
-      {:noreply, load_section(socket, :households)}
+  def handle_event("destroy_group", %{"id" => id}, socket) do
+    with {:ok, hh} <- Agent.get_group(id), :ok <- Agent.destroy_group(hh) do
+      {:noreply, load_section(socket, :groups)}
     else
       _ -> {:noreply, put_flash(socket, :error, "Delete failed.")}
     end
@@ -402,21 +381,21 @@ defmodule LongWeb.ManageLive do
 
   def handle_event("new_member", %{"member" => params}, socket) do
     attrs = %{
-      household_id: params["household_id"],
+      group_id: params["group_id"],
       display_name: params["display_name"],
       relation: params["relation"],
       role: params["role"]
     }
 
     case Agent.create_member(attrs) do
-      {:ok, _} -> {:noreply, load_section(socket, :households)}
+      {:ok, _} -> {:noreply, load_section(socket, :groups)}
       {:error, e} -> {:noreply, put_flash(socket, :error, "Add member failed: #{inspect(e)}")}
     end
   end
 
   def handle_event("destroy_member", %{"id" => id}, socket) do
     with {:ok, m} <- Agent.get_member(id), :ok <- Agent.destroy_member(m) do
-      {:noreply, load_section(socket, :households)}
+      {:noreply, load_section(socket, :groups)}
     else
       _ -> {:noreply, put_flash(socket, :error, "Delete failed.")}
     end
@@ -424,7 +403,7 @@ defmodule LongWeb.ManageLive do
 
   def handle_event("regenerate_bind_code", %{"id" => id}, socket) do
     with {:ok, m} <- Agent.get_member(id), {:ok, _} <- Agent.regenerate_member_bind_code(m) do
-      {:noreply, socket |> load_section(:households) |> put_flash(:info, "Bind code regenerated.")}
+      {:noreply, socket |> load_section(:groups) |> put_flash(:info, "Bind code regenerated.")}
     else
       _ -> {:noreply, put_flash(socket, :error, "Operation failed.")}
     end
@@ -781,9 +760,9 @@ defmodule LongWeb.ManageLive do
     end
   end
 
-  # ── Events: language (credential / member / household locale) ─────────
+  # ── Events: language (credential / member / group locale) ─────────
 
-  def handle_event("set_wechat_locale", %{"name" => name, "locale" => locale}, socket) do
+  def handle_event("set_wechat_locale", %{"credential_name" => name, "locale" => locale}, socket) do
     with {:ok, row} <- Agent.get_wechat_credential(name),
          {:ok, _} <- Agent.set_wechat_credential_locale(row, %{locale: nil_if_blank(locale)}) do
       {:noreply, socket |> load_section(:credentials) |> put_flash(:info, "Channel language updated.")}
@@ -792,7 +771,7 @@ defmodule LongWeb.ManageLive do
     end
   end
 
-  def handle_event("set_telegram_locale", %{"name" => name, "locale" => locale}, socket) do
+  def handle_event("set_telegram_locale", %{"credential_name" => name, "locale" => locale}, socket) do
     with {:ok, row} <- Agent.get_telegram_credential(name),
          {:ok, _} <- Agent.set_telegram_credential_locale(row, %{locale: nil_if_blank(locale)}) do
       {:noreply, socket |> load_section(:credentials) |> put_flash(:info, "Channel language updated.")}
@@ -801,22 +780,27 @@ defmodule LongWeb.ManageLive do
     end
   end
 
-  def handle_event("set_household_locale", %{"id" => id, "locale" => locale}, socket) do
-    with {:ok, hh} <- Agent.get_household(id),
-         {:ok, _} <- Agent.update_household(hh, %{locale: nil_if_blank(locale)}) do
-      {:noreply, socket |> load_section(:households) |> put_flash(:info, "Household language updated.")}
+  def handle_event("set_group_locale", %{"group_id" => id, "locale" => locale}, socket) do
+    with {:ok, hh} <- Agent.get_group(id),
+         {:ok, _} <- Agent.update_group(hh, %{locale: nil_if_blank(locale)}) do
+      {:noreply, socket |> load_section(:groups) |> put_flash(:info, "Group language updated.")}
     else
       _ -> {:noreply, put_flash(socket, :error, "Could not update language.")}
     end
   end
 
-  def handle_event("set_member_locale", %{"id" => id, "locale" => locale}, socket) do
+  def handle_event("set_member_locale", %{"member_id" => id, "locale" => locale}, socket) do
     with {:ok, m} <- Agent.get_member(id),
          {:ok, _} <- Agent.update_member(m, %{locale: nil_if_blank(locale)}) do
-      {:noreply, socket |> load_section(:households) |> put_flash(:info, "Member language updated.")}
+      {:noreply, socket |> load_section(:groups) |> put_flash(:info, "Member language updated.")}
     else
       _ -> {:noreply, put_flash(socket, :error, "Could not update language.")}
     end
+  end
+
+  def handle_event("set_default_locale", %{"locale" => locale}, socket) do
+    Long.Copy.put_default_locale(nil_if_blank(locale))
+    {:noreply, socket |> load_section(:groups) |> put_flash(:info, "System default language updated.")}
   end
 
   def handle_event("toggle_telegram_enabled", %{"name" => name}, socket) do
@@ -1092,7 +1076,7 @@ defmodule LongWeb.ManageLive do
   # ── Section views ────────────────────────────────────────────────────
 
   defp section_view(%{section: :llms} = assigns), do: llm_section(assigns)
-  defp section_view(%{section: :households} = assigns), do: households_section(assigns)
+  defp section_view(%{section: :groups} = assigns), do: groups_section(assigns)
   defp section_view(%{section: :memories} = assigns), do: memory_section(assigns)
   defp section_view(%{section: :skills} = assigns), do: skill_section(assigns)
   defp section_view(%{section: :sessions} = assigns), do: sessions_section(assigns)
@@ -1395,7 +1379,7 @@ defmodule LongWeb.ManageLive do
 
       <.card variant="bordered" color="natural" rounded="large" padding="medium">
         <p class="text-xs text-zinc-500 mb-2">
-          Create a <strong>shared skill</strong> — visible to every member of every household
+          Create a <strong>shared skill</strong> — visible to every member of every group
           (the independent shared space, separate from members' personal skills).
         </p>
         <form phx-submit="new_shared_skill" class="space-y-2">
@@ -1669,7 +1653,7 @@ defmodule LongWeb.ManageLive do
       <section class="space-y-2">
         <h2 class="text-sm font-semibold text-zinc-700 uppercase tracking-wide">WeChat accounts</h2>
         <p class="text-xs text-zinc-500 max-w-2xl">
-          Connect one or more WeChat accounts. Assign each to a household member so every
+          Connect one or more WeChat accounts. Assign each to a group member so every
           message arriving on that account runs as that role.
         </p>
 
@@ -1685,7 +1669,7 @@ defmodule LongWeb.ManageLive do
               </tr>
             </thead>
             <tbody>
-              <tr :for={c <- @wechat_credentials} class="border-t border-zinc-100">
+              <tr :for={c <- @wechat_credentials} id={"wechat-row-#{c.id}"} class="border-t border-zinc-100">
                 <td class="px-4 py-2 font-mono text-zinc-800">{c.name}</td>
                 <td class="px-4 py-2">
                   <div class="flex items-center gap-2">
@@ -1703,7 +1687,7 @@ defmodule LongWeb.ManageLive do
                 </td>
                 <td class="px-4 py-2">
                   <form phx-change="assign_wechat_member">
-                    <input type="hidden" name="name" value={c.name} />
+                    <input type="hidden" name="credential_name" value={c.name} />
                     <select
                       name="member_id"
                       class="border border-zinc-300 rounded-md px-2 py-1.5 text-sm"
@@ -1720,7 +1704,13 @@ defmodule LongWeb.ManageLive do
                   </form>
                 </td>
                 <td class="px-4 py-2">
-                  <.locale_select event="set_wechat_locale" id_name="name" id_value={c.name} current={c.locale} />
+                  <form id={"locsel-set_wechat_locale-#{c.name}"} phx-change="set_wechat_locale">
+                    <input type="hidden" name="credential_name" value={c.name} />
+                    <select name="locale" class="border border-zinc-300 rounded-md px-2 py-1.5 text-sm">
+                      <option value="">— inherit —</option>
+                      <option :for={{code, label} <- locale_options()} value={code} selected={code == c.locale}>{label}</option>
+                    </select>
+                  </form>
                 </td>
                 <td class="px-4 py-2">
                   <div class="flex justify-end gap-1.5">
@@ -1849,12 +1839,12 @@ defmodule LongWeb.ManageLive do
               </tr>
             </thead>
             <tbody>
-              <tr :for={c <- @telegram_credentials} class="border-t border-zinc-100">
+              <tr :for={c <- @telegram_credentials} id={"telegram-row-#{c.id}"} class="border-t border-zinc-100">
                 <td class="px-4 py-2 font-medium">{c.name}</td>
                 <td class="px-4 py-2 text-xs font-mono text-zinc-500">{c.username || "—"}</td>
                 <td class="px-4 py-2">
                   <form phx-change="assign_telegram_member">
-                    <input type="hidden" name="name" value={c.name} />
+                    <input type="hidden" name="credential_name" value={c.name} />
                     <select
                       name="member_id"
                       class="border border-zinc-300 rounded-md px-2 py-1.5 text-sm"
@@ -1871,7 +1861,13 @@ defmodule LongWeb.ManageLive do
                   </form>
                 </td>
                 <td class="px-4 py-2">
-                  <.locale_select event="set_telegram_locale" id_name="name" id_value={c.name} current={c.locale} />
+                  <form id={"locsel-set_telegram_locale-#{c.name}"} phx-change="set_telegram_locale">
+                    <input type="hidden" name="credential_name" value={c.name} />
+                    <select name="locale" class="border border-zinc-300 rounded-md px-2 py-1.5 text-sm">
+                      <option value="">— inherit —</option>
+                      <option :for={{code, label} <- locale_options()} value={code} selected={code == c.locale}>{label}</option>
+                    </select>
+                  </form>
                 </td>
                 <td class="px-4 py-2 text-xs font-mono text-zinc-500">{mask_secret(c.bot_token)}</td>
                 <td class="px-4 py-2">
@@ -2023,19 +2019,37 @@ defmodule LongWeb.ManageLive do
     """
   end
 
-  defp households_section(assigns) do
+  defp groups_section(assigns) do
     ~H"""
     <div class="p-6 space-y-6">
       <div class="flex items-center gap-3">
-        <h1 class="text-xl font-semibold flex-1">Family</h1>
+        <h1 class="text-xl font-semibold flex-1">Groups</h1>
       </div>
+
+      <.card variant="bordered" color="natural" rounded="large" padding="none">
+        <div class="flex items-center gap-3 p-4">
+          <div class="flex-1">
+            <div class="text-sm font-medium text-zinc-800">System default language</div>
+            <div class="text-xs text-zinc-500">
+              The fallback used when a channel, member, or group sets no language of its own.
+            </div>
+          </div>
+          <form id="locsel-set_default_locale-system" phx-change="set_default_locale">
+            <input type="hidden" name="scope" value="system" />
+            <select name="locale" class="border border-zinc-300 rounded-md px-2 py-1.5 text-sm">
+              <option value="">— inherit —</option>
+              <option :for={{code, label} <- locale_options()} value={code} selected={code == Long.Copy.default_locale_setting()}>{label}</option>
+            </select>
+          </form>
+        </div>
+      </.card>
 
       <div class="rounded-lg border border-blue-200 bg-blue-50 p-4 text-xs text-zinc-600 max-w-3xl leading-relaxed space-y-2">
         <p class="font-medium text-zinc-800">How members link their WeChat / Telegram</p>
         <p>
           <span class="font-medium">Set up once (owner):</span>
           on the <.link navigate={~p"/manage/credentials"} class="text-blue-700 underline">Channels</.link>
-          page, scan the WeChat QR to host the household's <em>single</em> WeChat account, and/or add a
+          page, scan the WeChat QR to host the group's <em>single</em> WeChat account, and/or add a
           Telegram bot. This is a one-time login — members do <em>not</em> each scan a QR.
         </p>
         <p>Then each member links their own chat to that shared bot:</p>
@@ -2046,16 +2060,16 @@ defmodule LongWeb.ManageLive do
         <p>
           Finally the member sends <code class="bg-white px-1 rounded">/bind &lt;code&gt;</code>
           (the per-member command below). One member can link both WeChat and Telegram; once bound,
-          members can reach each other (e.g. ask the agent to "notify my spouse …").
+          members can reach each other (e.g. ask the agent to "notify Alex …").
         </p>
       </div>
 
       <.card variant="bordered" color="natural" rounded="large" padding="none">
-        <form phx-submit="new_household" class="flex items-end gap-3 p-4">
+        <form phx-submit="new_group" class="flex items-end gap-3 p-4">
           <label class="flex-1 block">
-            <span class="text-xs font-medium text-zinc-600">New household</span>
+            <span class="text-xs font-medium text-zinc-600">New group</span>
             <input
-              name="household[name]"
+              name="group[name]"
               required
               placeholder="e.g. My Home"
               class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm"
@@ -2068,26 +2082,32 @@ defmodule LongWeb.ManageLive do
       </.card>
 
       <.card
-        :for={hh <- @households}
+        :for={hh <- @groups}
         variant="bordered"
         color="natural"
         rounded="large"
         padding="none"
       >
         <div class="flex items-center gap-2 px-4 py-3 border-b border-zinc-200 bg-zinc-50">
-          <.icon name="hero-home" class="size-4 text-zinc-500" />
+          <.icon name="hero-user-group" class="size-4 text-zinc-500" />
           <span class="font-semibold flex-1">{hh.name}</span>
           <span class="text-xs text-zinc-500">Default language</span>
-          <.locale_select event="set_household_locale" id_name="id" id_value={hh.id} current={hh.locale} />
+          <form id={"locsel-set_group_locale-#{hh.id}"} phx-change="set_group_locale">
+            <input type="hidden" name="group_id" value={hh.id} />
+            <select name="locale" class="border border-zinc-300 rounded-md px-2 py-1.5 text-sm">
+              <option value="">— inherit —</option>
+              <option :for={{code, label} <- locale_options()} value={code} selected={code == hh.locale}>{label}</option>
+            </select>
+          </form>
           <.button
-            phx-click="destroy_household"
+            phx-click="destroy_group"
             phx-value-id={hh.id}
             variant="base"
             color="danger"
             size="extra_small"
             icon="hero-trash"
             rounded="medium"
-            data-confirm={"Delete household \"#{hh.name}\"? Its members and their bindings are removed too."}
+            data-confirm={"Delete group \"#{hh.name}\"? Its members and their bindings are removed too."}
           />
         </div>
 
@@ -2104,12 +2124,18 @@ defmodule LongWeb.ManageLive do
             </tr>
           </thead>
           <tbody>
-            <tr :for={m <- hh.members} class="border-t border-zinc-100">
+            <tr :for={m <- hh.members} id={"member-row-#{m.id}"} class="border-t border-zinc-100">
               <td class="px-4 py-2 text-zinc-800">{m.display_name}</td>
               <td class="px-4 py-2 text-zinc-600">{relation_label(m.relation)}</td>
               <td class="px-4 py-2 text-xs text-zinc-500">{m.role}</td>
               <td class="px-4 py-2">
-                <.locale_select event="set_member_locale" id_name="id" id_value={m.id} current={m.locale} />
+                <form id={"locsel-set_member_locale-#{m.id}"} phx-change="set_member_locale">
+                  <input type="hidden" name="member_id" value={m.id} />
+                  <select name="locale" class="border border-zinc-300 rounded-md px-2 py-1.5 text-sm">
+                    <option value="">— inherit —</option>
+                    <option :for={{code, label} <- locale_options()} value={code} selected={code == m.locale}>{label}</option>
+                  </select>
+                </form>
               </td>
               <td class="px-4 py-2">
                 <div class="flex items-center gap-1.5">
@@ -2151,7 +2177,7 @@ defmodule LongWeb.ManageLive do
         </table>
 
         <form phx-submit="new_member" class="flex items-end gap-2 px-4 py-3 border-t border-zinc-200 bg-zinc-50">
-          <input type="hidden" name="member[household_id]" value={hh.id} />
+          <input type="hidden" name="member[group_id]" value={hh.id} />
           <label class="flex-1 block">
             <span class="text-xs font-medium text-zinc-600">Name</span>
             <input
@@ -2179,20 +2205,17 @@ defmodule LongWeb.ManageLive do
         </form>
       </.card>
 
-      <div :if={@households == []} class="text-center text-zinc-400 text-sm py-8">
-        No households yet — create one above.
+      <div :if={@groups == []} class="text-center text-zinc-400 text-sm py-8">
+        No groups yet — create one above.
       </div>
     </div>
     """
   end
 
-  # Display label for a member relation. Accepts the enum atom or its
-  # string form (the <select> options round-trip as strings).
+  # Display label for a member's neutral identity tag (self vs. everyone
+  # else). Accepts the enum atom or its string form (select round-trips).
   defp relation_label(r) when r in [:self, "self"], do: "Self"
-  defp relation_label(r) when r in [:spouse, "spouse"], do: "Spouse"
-  defp relation_label(r) when r in [:child, "child"], do: "Child"
-  defp relation_label(r) when r in [:parent, "parent"], do: "Parent"
-  defp relation_label(_), do: "Other"
+  defp relation_label(_), do: "Member"
 
   # Comma-joined platforms this member has bound, or a placeholder.
   defp bound_accounts(%{bot_users: bus}) when is_list(bus) and bus != [],
@@ -2564,7 +2587,7 @@ defmodule LongWeb.ManageLive do
   # ── Helpers ──────────────────────────────────────────────────────────
 
   defp section_path(:llms), do: ~p"/manage/llms"
-  defp section_path(:households), do: ~p"/manage/households"
+  defp section_path(:groups), do: ~p"/manage/groups"
   defp section_path(:memories), do: ~p"/manage/memories"
   defp section_path(:skills), do: ~p"/manage/skills"
   defp section_path(:sessions), do: ~p"/manage/sessions"

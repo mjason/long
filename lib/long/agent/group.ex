@@ -1,12 +1,12 @@
-defmodule Long.Agent.Household do
+defmodule Long.Agent.Group do
   @moduledoc """
-  A family group — the unit of multi-tenancy for the agent: it
-  owns `HouseholdMember` records, and (in later phases) members' sessions,
+  A group — the unit of multi-tenancy for the agent: it
+  owns `Member` records, and (in later phases) members' sessions,
   skills, and per-member code workspaces are scoped within it.
 
-  A household is deliberately lightweight — just a name and its members.
+  A group is deliberately lightweight — just a name and its members.
   Members are the thing that binds chat accounts and addresses each other
-  (see `Long.Agent.HouseholdMember`).
+  (see `Long.Agent.Member`).
   """
 
   use Ash.Resource,
@@ -14,7 +14,7 @@ defmodule Long.Agent.Household do
     data_layer: AshSqlite.DataLayer
 
   sqlite do
-    table "agent_households"
+    table "agent_groups"
     repo Long.Repo
   end
 
@@ -39,7 +39,7 @@ defmodule Long.Agent.Household do
     end
 
     attribute :locale, :string do
-      description "Default language for this household's bots (e.g. \"zh\"). Falls back to the system default when nil."
+      description "Default language for this group's bots (e.g. \"zh\"). Falls back to the system default when nil."
       public? true
     end
 
@@ -47,7 +47,7 @@ defmodule Long.Agent.Household do
   end
 
   relationships do
-    has_many :members, Long.Agent.HouseholdMember do
+    has_many :members, Long.Agent.Member do
       sort relation: :asc, inserted_at: :asc
     end
   end

@@ -21,7 +21,7 @@ defmodule Long.CopyTest do
   end
 
   test "interpolates %{name} bindings" do
-    out = Copy.t("bots.bind_ok", %{member: "太子", household: "HOME"}, "en")
+    out = Copy.t("bots.bind_ok", %{member: "太子", group: "HOME"}, "en")
     assert out =~ "太子" and out =~ "HOME"
 
     zh = Copy.t("notify.no_match", %{target: "X", options: "A, B"}, "zh")
@@ -41,5 +41,22 @@ defmodule Long.CopyTest do
     Enum.each(rows, &Agent.destroy_phrase!/1)
     :ok = Copy.reload()
     assert Copy.t("bots.btw_ack", %{}, "en") =~ "Got it"
+  end
+
+  test "global default locale override changes Copy.default_locale; blank clears it" do
+    on_exit(fn -> Copy.put_default_locale(nil) end)
+
+    base = Copy.default_locale()
+    assert Copy.default_locale_setting() == nil
+
+    Copy.put_default_locale("zh")
+    assert Copy.default_locale_setting() == "zh"
+    assert Copy.default_locale() == "zh"
+    # an unqualified t/1 now renders in the new global default
+    assert Copy.t("bots.cleared") =~ "已清空"
+
+    Copy.put_default_locale(nil)
+    assert Copy.default_locale_setting() == nil
+    assert Copy.default_locale() == base
   end
 end

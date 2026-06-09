@@ -41,7 +41,7 @@ defmodule Long.Agent.DenoEnv do
     do: Path.join([base || root(), @members_dir, member_id])
 
   @doc """
-  Workspace for an unbound / web-chat session (no household member) — an
+  Workspace for an unbound / web-chat session (no group member) — an
   isolated `unbound/<session_id>` dir so anonymous sessions don't share one
   directory and read each other's files. A `nil` session falls back to the
   shared base.
@@ -55,7 +55,7 @@ defmodule Long.Agent.DenoEnv do
 
   @doc """
   Resolve a caller's base workspace: the member's `members/<id>/` when a
-  household member is bound, otherwise an isolated `unbound/<session_id>/`.
+  group member is bound, otherwise an isolated `unbound/<session_id>/`.
   Centralizes the member-vs-unbound branch both `code_run` tools share.
   """
   def session_workspace(base, member_id, session_id)

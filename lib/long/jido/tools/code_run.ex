@@ -62,7 +62,7 @@ defmodule Long.Jido.Tools.CodeRun do
   end
 
   # The caller's personal workspace dir (members/<id>/), or — for an unbound
-  # / web-chat session with no household member — an isolated unbound/<sid>/.
+  # / web-chat session with no group member — an isolated unbound/<sid>/.
   defp member_base(ctx) do
     DenoEnv.session_workspace(ctx[:workspace_root], Format.member_id_for_session(ctx), ctx[:session_id])
   end

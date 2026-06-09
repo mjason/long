@@ -5,12 +5,12 @@ defmodule Long.Jido.Tools.SkillCreate do
   Two spaces:
     * **personal** (default) — lands in the caller's `members/<id>/` space,
       visible only to them.
-    * **shared** (`shared: true`) — lands in the household's shared/global
+    * **shared** (`shared: true`) — lands in the group's shared/global
       space, visible to everyone. Only a member with role `:owner` may
       create a shared skill (the web admin can also create shared skills
       from `/manage → Skills`).
 
-  Only usable from a chat bound to a family member.
+  Only usable from a chat bound to a group member.
   """
 
   use Jido.Action,
@@ -18,7 +18,7 @@ defmodule Long.Jido.Tools.SkillCreate do
     description: """
     Create a reusable skill (a SKILL.md manual the agent can later read and
     follow). Personal by default; set shared: true to publish it to the
-    whole family — only the household owner may do that. Give a short
+    whole group — only the group owner may do that. Give a short
     `name`, a one-line `description` (used for discovery), and the `body`
     (the SKILL.md instructions, markdown).
     """,
