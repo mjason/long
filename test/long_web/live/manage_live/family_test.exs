@@ -141,4 +141,47 @@ defmodule LongWeb.ManageLive.FamilyTest do
     |> Enum.filter(&(&1.name == "Fam One"))
     |> Enum.each(&Agent.destroy_household!/1)
   end
+
+  test "Family page sets household + member default language", %{conn: conn} do
+    {:ok, hh} = Agent.create_household(%{name: "Lang Home"})
+    {:ok, m} = Agent.create_member(%{household_id: hh.id, display_name: "Kid", relation: :child})
+
+    {:ok, view, html} = live(conn, ~p"/manage/households")
+    assert html =~ "Default language"
+    assert html =~ "中文"
+
+    view
+    |> form("#locsel-set_household_locale-#{hh.id}", %{locale: "zh"})
+    |> render_change()
+
+    assert {:ok, %{locale: "zh"}} = Agent.get_household(hh.id)
+
+    view
+    |> form("#locsel-set_member_locale-#{m.id}", %{locale: "en"})
+    |> render_change()
+
+    assert {:ok, %{locale: "en"}} = Agent.get_member(m.id)
+
+    Agent.destroy_household!(hh)
+  end
+
+  test "Channels page sets a WeChat account language", %{conn: conn} do
+    {:ok, hh} = Agent.create_household(%{name: "H"})
+    name = "wc-#{System.unique_integer([:positive])}"
+    {:ok, _} = Agent.upsert_wechat_credential(%{name: name})
+
+    {:ok, view, html} = live(conn, ~p"/manage/credentials")
+    assert html =~ "Language"
+
+    view
+    |> form("#locsel-set_wechat_locale-#{name}", %{locale: "zh"})
+    |> render_change()
+
+    assert {:ok, %{locale: "zh"}} = Agent.get_wechat_credential(name)
+
+    {:ok, row} = Agent.get_wechat_credential(name)
+    Agent.destroy_wechat_credential!(row)
+    Long.Agent.Bots.Wechat.Manager.reconcile()
+    Agent.destroy_household!(hh)
+  end
 end

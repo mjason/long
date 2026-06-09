@@ -106,10 +106,11 @@ defmodule Long.Jido.Tools.NotifyMember do
   defp reason_str({:error, r}), do: Long.Util.Error.humanize(r)
   defp reason_str(other), do: Long.Util.Error.humanize(other)
 
-  # The chat user's locale (captured into BotUser metadata), or the default.
+  # The caller's display locale, resolved via the channel → member →
+  # household → platform → default chain (see `Long.Agent.Locale`).
   defp caller_locale(session_id) do
     case Agent.get_bot_user_for_session(session_id) do
-      {:ok, %{metadata: m}} when is_map(m) -> m["locale"] || Copy.default_locale()
+      {:ok, %{} = bot_user} -> Long.Agent.Locale.for_bot_user(bot_user)
       _ -> Copy.default_locale()
     end
   end

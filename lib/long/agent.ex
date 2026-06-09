@@ -132,6 +132,7 @@ defmodule Long.Agent do
       define :get_wechat_credential, action: :read, get_by: [:name]
       define :update_wechat_credential_buf, action: :update_buf
       define :set_wechat_credential_member, action: :set_member
+      define :set_wechat_credential_locale, action: :set_locale
       define :destroy_wechat_credential, action: :destroy
     end
 
@@ -142,6 +143,7 @@ defmodule Long.Agent do
       define :update_telegram_credential, action: :update
       define :update_telegram_credential_username, action: :update_username
       define :set_telegram_credential_member, action: :set_member
+      define :set_telegram_credential_locale, action: :set_locale
       define :destroy_telegram_credential, action: :destroy
     end
 

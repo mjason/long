@@ -276,6 +276,36 @@ defmodule LongWeb.ManageLive do
   defp wechat_connected?(%{bot_token: t}) when is_binary(t) and t != "", do: true
   defp wechat_connected?(_), do: false
 
+  defp nil_if_blank(""), do: nil
+  defp nil_if_blank(v), do: v
+
+  # Language options for the locale dropdowns, from the Copy catalog.
+  defp locale_options, do: Enum.map(Long.Copy.locales(), &{&1, locale_label(&1)})
+  defp locale_label("en"), do: "English"
+  defp locale_label("zh"), do: "中文"
+  defp locale_label(code), do: code
+
+  # A language picker that posts `%{<id_name> => id_value, "locale" => code}`
+  # to `event` on change. Empty selection ("— inherit —") clears the override.
+  attr :event, :string, required: true
+  attr :id_name, :string, required: true
+  attr :id_value, :string, required: true
+  attr :current, :string, default: nil
+
+  defp locale_select(assigns) do
+    assigns = assign(assigns, :options, locale_options())
+
+    ~H"""
+    <form id={"locsel-#{@event}-#{@id_value}"} phx-change={@event}>
+      <input type="hidden" name={@id_name} value={@id_value} />
+      <select name="locale" class="border border-zinc-300 rounded-md px-2 py-1.5 text-sm">
+        <option value="">— inherit —</option>
+        <option :for={{code, label} <- @options} value={code} selected={code == @current}>{label}</option>
+      </select>
+    </form>
+    """
+  end
+
   # Disabled / never-scheduled rows have `next_run_at = nil`; map them
   # to a sentinel far in the future so they sort to the bottom instead
   # of crashing DateTime.compare/2 with a no-clause match.
@@ -748,6 +778,44 @@ defmodule LongWeb.ManageLive do
       {:noreply, socket |> load_section(:credentials) |> put_flash(:info, "Bot ↔ member updated.")}
     else
       _ -> {:noreply, put_flash(socket, :error, "Could not update member assignment.")}
+    end
+  end
+
+  # ── Events: language (credential / member / household locale) ─────────
+
+  def handle_event("set_wechat_locale", %{"name" => name, "locale" => locale}, socket) do
+    with {:ok, row} <- Agent.get_wechat_credential(name),
+         {:ok, _} <- Agent.set_wechat_credential_locale(row, %{locale: nil_if_blank(locale)}) do
+      {:noreply, socket |> load_section(:credentials) |> put_flash(:info, "Channel language updated.")}
+    else
+      _ -> {:noreply, put_flash(socket, :error, "Could not update language.")}
+    end
+  end
+
+  def handle_event("set_telegram_locale", %{"name" => name, "locale" => locale}, socket) do
+    with {:ok, row} <- Agent.get_telegram_credential(name),
+         {:ok, _} <- Agent.set_telegram_credential_locale(row, %{locale: nil_if_blank(locale)}) do
+      {:noreply, socket |> load_section(:credentials) |> put_flash(:info, "Channel language updated.")}
+    else
+      _ -> {:noreply, put_flash(socket, :error, "Could not update language.")}
+    end
+  end
+
+  def handle_event("set_household_locale", %{"id" => id, "locale" => locale}, socket) do
+    with {:ok, hh} <- Agent.get_household(id),
+         {:ok, _} <- Agent.update_household(hh, %{locale: nil_if_blank(locale)}) do
+      {:noreply, socket |> load_section(:households) |> put_flash(:info, "Household language updated.")}
+    else
+      _ -> {:noreply, put_flash(socket, :error, "Could not update language.")}
+    end
+  end
+
+  def handle_event("set_member_locale", %{"id" => id, "locale" => locale}, socket) do
+    with {:ok, m} <- Agent.get_member(id),
+         {:ok, _} <- Agent.update_member(m, %{locale: nil_if_blank(locale)}) do
+      {:noreply, socket |> load_section(:households) |> put_flash(:info, "Member language updated.")}
+    else
+      _ -> {:noreply, put_flash(socket, :error, "Could not update language.")}
     end
   end
 
@@ -1612,6 +1680,7 @@ defmodule LongWeb.ManageLive do
                 <th class="text-left px-4 py-2">Account</th>
                 <th class="text-left px-4 py-2">Status</th>
                 <th class="text-left px-4 py-2">Member (role)</th>
+                <th class="text-left px-4 py-2">Language</th>
                 <th class="text-right px-4 py-2">Actions</th>
               </tr>
             </thead>
@@ -1651,6 +1720,9 @@ defmodule LongWeb.ManageLive do
                   </form>
                 </td>
                 <td class="px-4 py-2">
+                  <.locale_select event="set_wechat_locale" id_name="name" id_value={c.name} current={c.locale} />
+                </td>
+                <td class="px-4 py-2">
                   <div class="flex justify-end gap-1.5">
                     <.button
                       phx-click="open_wechat_login"
@@ -1677,7 +1749,7 @@ defmodule LongWeb.ManageLive do
                 </td>
               </tr>
               <tr :if={@wechat_credentials == []}>
-                <td colspan="4" class="px-4 py-6 text-center text-zinc-400 text-sm">
+                <td colspan="5" class="px-4 py-6 text-center text-zinc-400 text-sm">
                   No WeChat accounts yet — add one below.
                 </td>
               </tr>
@@ -1770,6 +1842,7 @@ defmodule LongWeb.ManageLive do
                 <th class="text-left px-4 py-2.5">Name</th>
                 <th class="text-left px-4 py-2.5">Username</th>
                 <th class="text-left px-4 py-2.5">Member (role)</th>
+                <th class="text-left px-4 py-2.5">Language</th>
                 <th class="text-left px-4 py-2.5">Token</th>
                 <th class="text-left px-4 py-2.5">Status</th>
                 <th class="text-right px-4 py-2.5">Actions</th>
@@ -1796,6 +1869,9 @@ defmodule LongWeb.ManageLive do
                       </option>
                     </select>
                   </form>
+                </td>
+                <td class="px-4 py-2">
+                  <.locale_select event="set_telegram_locale" id_name="name" id_value={c.name} current={c.locale} />
                 </td>
                 <td class="px-4 py-2 text-xs font-mono text-zinc-500">{mask_secret(c.bot_token)}</td>
                 <td class="px-4 py-2">
@@ -1841,7 +1917,7 @@ defmodule LongWeb.ManageLive do
                 </td>
               </tr>
               <tr :if={@telegram_credentials == []}>
-                <td colspan="6" class="px-4 py-8 text-center text-zinc-400 text-sm">
+                <td colspan="7" class="px-4 py-8 text-center text-zinc-400 text-sm">
                   No Telegram credentials. Click <strong>New Telegram bot</strong>
                   and paste a BotFather token.
                 </td>
@@ -2001,6 +2077,8 @@ defmodule LongWeb.ManageLive do
         <div class="flex items-center gap-2 px-4 py-3 border-b border-zinc-200 bg-zinc-50">
           <.icon name="hero-home" class="size-4 text-zinc-500" />
           <span class="font-semibold flex-1">{hh.name}</span>
+          <span class="text-xs text-zinc-500">Default language</span>
+          <.locale_select event="set_household_locale" id_name="id" id_value={hh.id} current={hh.locale} />
           <.button
             phx-click="destroy_household"
             phx-value-id={hh.id}
@@ -2019,6 +2097,7 @@ defmodule LongWeb.ManageLive do
               <th class="text-left px-4 py-2">Member</th>
               <th class="text-left px-4 py-2">Relation</th>
               <th class="text-left px-4 py-2">Role</th>
+              <th class="text-left px-4 py-2">Language</th>
               <th class="text-left px-4 py-2">Bind command</th>
               <th class="text-left px-4 py-2">Bound accounts</th>
               <th class="text-right px-4 py-2">Actions</th>
@@ -2029,6 +2108,9 @@ defmodule LongWeb.ManageLive do
               <td class="px-4 py-2 text-zinc-800">{m.display_name}</td>
               <td class="px-4 py-2 text-zinc-600">{relation_label(m.relation)}</td>
               <td class="px-4 py-2 text-xs text-zinc-500">{m.role}</td>
+              <td class="px-4 py-2">
+                <.locale_select event="set_member_locale" id_name="id" id_value={m.id} current={m.locale} />
+              </td>
               <td class="px-4 py-2">
                 <div class="flex items-center gap-1.5">
                   <code class="text-xs font-mono bg-zinc-100 px-1.5 py-0.5 rounded">/bind {m.bind_code}</code>
@@ -2061,7 +2143,7 @@ defmodule LongWeb.ManageLive do
               </td>
             </tr>
             <tr :if={hh.members == []}>
-              <td colspan="6" class="px-4 py-6 text-center text-zinc-400 text-sm">
+              <td colspan="7" class="px-4 py-6 text-center text-zinc-400 text-sm">
                 No members yet — add one below.
               </td>
             </tr>

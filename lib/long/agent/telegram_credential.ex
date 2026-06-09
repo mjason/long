@@ -35,7 +35,7 @@ defmodule Long.Agent.TelegramCredential do
     create :upsert do
       upsert? true
       upsert_identity :name
-      accept [:name, :bot_token, :username, :enabled, :member_id]
+      accept [:name, :bot_token, :username, :enabled, :member_id, :locale]
     end
 
     update :update do
@@ -49,6 +49,11 @@ defmodule Long.Agent.TelegramCredential do
     update :set_member do
       require_atomic? false
       accept [:member_id]
+    end
+
+    update :set_locale do
+      require_atomic? false
+      accept [:locale]
     end
   end
 
@@ -78,6 +83,11 @@ defmodule Long.Agent.TelegramCredential do
       description "When false, the credential is kept but the worker pauses long-polling."
       default true
       allow_nil? false
+      public? true
+    end
+
+    attribute :locale, :string do
+      description "Language for this bot's outbound copy (e.g. \"zh\"), overriding member/household. Nil = inherit."
       public? true
     end
 

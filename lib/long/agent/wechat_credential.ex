@@ -31,7 +31,7 @@ defmodule Long.Agent.WechatCredential do
     create :upsert do
       upsert? true
       upsert_identity :name
-      accept [:name, :bot_token, :ilink_bot_id, :updates_buf, :member_id]
+      accept [:name, :bot_token, :ilink_bot_id, :updates_buf, :member_id, :locale]
     end
 
     update :update_buf do
@@ -41,6 +41,11 @@ defmodule Long.Agent.WechatCredential do
     update :set_member do
       require_atomic? false
       accept [:member_id]
+    end
+
+    update :set_locale do
+      require_atomic? false
+      accept [:locale]
     end
   end
 
@@ -68,6 +73,11 @@ defmodule Long.Agent.WechatCredential do
     attribute :updates_buf, :string do
       description "Long-poll cursor for getupdates. Rewritten after each successful poll."
       default ""
+      public? true
+    end
+
+    attribute :locale, :string do
+      description "Language for this account's outbound copy (e.g. \"zh\"), overriding member/household. Nil = inherit."
       public? true
     end
 

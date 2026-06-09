@@ -22,11 +22,11 @@ defmodule Long.Agent.Household do
     defaults [:read, :destroy]
 
     create :create do
-      accept [:name]
+      accept [:name, :locale]
     end
 
     update :update do
-      accept [:name]
+      accept [:name, :locale]
     end
   end
 
@@ -35,6 +35,11 @@ defmodule Long.Agent.Household do
 
     attribute :name, :string do
       allow_nil? false
+      public? true
+    end
+
+    attribute :locale, :string do
+      description "Default language for this household's bots (e.g. \"zh\"). Falls back to the system default when nil."
       public? true
     end
 

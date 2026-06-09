@@ -158,10 +158,9 @@ defmodule Long.Agent.Bots do
     end
   end
 
-  # The chat user's locale, captured from the platform (e.g. Telegram
-  # `language_code`) into BotUser metadata; falls back to the default.
-  defp locale_for(%{metadata: meta}) when is_map(meta), do: meta["locale"] || Copy.default_locale()
-  defp locale_for(_), do: Copy.default_locale()
+  # The chat user's display locale, resolved via the channel → member →
+  # household → platform → default chain (see `Long.Agent.Locale`).
+  defp locale_for(user), do: Long.Agent.Locale.for_bot_user(user)
 
   defp ack(text) do
     %{text: text, tool_calls: [], attachments: [], ask: nil, error: nil}

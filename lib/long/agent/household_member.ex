@@ -31,12 +31,12 @@ defmodule Long.Agent.HouseholdMember do
     defaults [:read, :destroy]
 
     create :create do
-      accept [:household_id, :display_name, :relation, :role]
+      accept [:household_id, :display_name, :relation, :role, :locale]
       change {Long.Agent.HouseholdMember.Changes.EnsureBindCode, []}
     end
 
     update :update do
-      accept [:display_name, :relation, :role]
+      accept [:display_name, :relation, :role, :locale]
     end
 
     update :regenerate_bind_code do
@@ -78,6 +78,11 @@ defmodule Long.Agent.HouseholdMember do
 
     attribute :bind_code, :string do
       description "Short random token a chat account sends to the bot to claim this member."
+      public? true
+    end
+
+    attribute :locale, :string do
+      description "This member's preferred language (e.g. \"en\"), overriding the household default. Nil = inherit."
       public? true
     end
 
