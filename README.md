@@ -6,7 +6,7 @@
 
 **English** · [简体中文](README.zh-CN.md)
 
-> A single-process LLM agent runtime on Elixir/OTP. Phoenix for the UI, Ash for the data layer, Oban for scheduled tasks, ReqLLM for provider abstraction.
+> A single-process, multi-user LLM agent runtime on Elixir/OTP — for a household or a small team. Phoenix for the UI, Ash for the data layer, Oban for scheduled tasks, ReqLLM for provider abstraction.
 
 Long *started* as a port of the Python [GenericAgent](https://github.com/lsdefine/GenericAgent) to Elixir, borrowing its core shape — *one session → ReAct loop → tools + memory + skills*. The design has since diverged substantially: on the BEAM it gets real concurrency, fault tolerance, and long-lived push messaging natively (one supervised GenServer per session rather than a bolted-on Python process model), and the agent's capability layer has been rebuilt on **mature, standard technology rather than a bespoke tool protocol** — most notably **GraphQL as the agent's primary skill** (see below).
 
@@ -45,25 +45,28 @@ Everything is a page — there's no separate CLI you have to learn to operate th
 | Page | What it is |
 |---|---|
 | `/chat` | the agent. Streaming replies, live tool-call display, a memory side-rail, AI-named sessions. |
-| `/manage` | everything else. LLMs, memory, skills, sessions, search providers, channels, scheduled tasks — each a LiveView. |
+| `/manage` | everything else. LLMs, memory, skills, **groups & members**, sessions, search providers, channels, scheduled tasks, **phrases (i18n)** — each a LiveView. |
 
 ## Features
 
 - **GraphQL capability layer** — one introspectable `graphql` tool gives the agent read/write over its whole data world (see above).
+- **Groups & members (multi-tenant)** — a deployment hosts one or more **groups** (a family, a small team). Each **member** links their own WeChat / Telegram by sending `/bind <code>`, gets an isolated per-member code workspace + personal skills, and can message other members in the group ("notify …"). One owner, many members.
+- **Sandboxed code execution** — `code_run` runs TypeScript/JavaScript on a managed [Deno](https://deno.land/) binary, sandboxed (read/write) to the caller's per-member workspace; `bash` is there for shell. No Python — Deno auto-downloads on first use.
+- **Per-chat language (i18n)** — every bot string resolves through a fallback chain (channel → member → group → platform-detected → system default) and is overridable at `/manage/phrases`; set a system-wide default language in one click.
 - **Web-first LiveView UI** — `/chat` (streaming output + tool-call display + live memory side-rail + AI-generated session titles) and `/manage` for everything else.
 - **Four-tier memory:**
   - L1 `WorkingCheckpoint` (one `key_info` row per session)
   - L2 `GlobalMemory` / `SessionMemory` (fact / preference / goal / decision, with importance + recency decay)
-  - L3 **Anthropic-compatible Skills** (`SKILL.md` + scripts/references/assets; the filesystem is the source of truth, a watcher drives an ETS index)
+  - L3 **Anthropic-compatible Skills** (`SKILL.md` + scripts/references/assets), **scoped per-member or shared group-wide** (promote a personal skill to global, or view a skill's full `SKILL.md`, at `/manage/skills`); the filesystem is the source of truth, a watcher drives an ETS index
   - L4 `SessionArchive` (session archival + LLM summary)
 - **Multi-provider LLM routing** — ReqLLM speaks 20+ providers natively (openai / anthropic / google / groq / deepseek / openrouter / mistral / ollama / xai / bedrock / …); wire protocol is configurable, one alias is the default.
-- **Unified admin at `/manage`** — LLM configs, memory editing, skill browsing, session management, search providers, channels, scheduled tasks, secrets — all LiveView, no ash_admin dependency.
+- **Unified admin at `/manage`** — LLM configs, memory editing, skill browsing, **groups & members, channels, phrases (i18n)**, session management, search providers, scheduled tasks, secrets — all LiveView, no ash_admin dependency.
 - **Scheduled tasks** — Oban-driven; the LLM schedules its own via GraphQL `createScheduledTask`, or you create them by hand at `/manage/scheduled`.
-- **Channels** — WeChat (PCHook) and Telegram, behind a unified `Bots.Outbound` dispatch layer, managed in one place at `/manage/credentials`.
+- **Multi-account channels** — host several WeChat accounts and/or Telegram bots at once, each bound to a different member; inbound auto-tags the sender, outbound routes back through the exact account the chat arrived on. Onboarded at `/manage/credentials`.
 - **Web search aggregation** — Tavily / Brave API + SERP scrapers, RRF multi-source merge, providers configured at `/manage/search`.
 - **Real headless browsing** — the Obscura CLI (a Rust Chromium fork) powers the `web_scan` / `web_execute_js` tools.
 - **Error observability** — ErrorTracker dashboard, a `:logger` crash backstop, transparent exponential-backoff retry on LLM calls.
-- **In-conversation control** — `/clear` wipes a session, `/status` asks what the agent is doing, `/btw <note>` interjects mid-run.
+- **In-conversation control** — `/clear` wipes a session, `/status` asks what the agent is doing, `/btw <note>` interjects mid-run, `/bind <code>` links this chat to a member.
 
 ## Architecture
 
@@ -197,12 +200,14 @@ mix long.skill reindex   # or restart the server; the watcher also picks it up
 
 Next conversation, the LLM sees `hello-world` under `# Available skills` and can `skill_read` then `code_run` it. The format is fully compatible with [Anthropic Agent Skills](https://code.claude.com/docs/en/skills), so you can `git clone https://github.com/anthropics/skills priv/agent/skills/` to grab the official repo wholesale.
 
-## Channels (platform bots)
+## Channels & members
 
-Two channels are supported today, both onboarded entirely from the web at **`/manage/credentials`** (the "Channels" page) — no env vars, no restart.
+A deployment serves one or more **groups**; each group has **members** (people), and each member links their own chat accounts. The owner sets channels up once at **`/manage/credentials`** — no env vars, no restart:
 
-- **WeChat** — click *扫码登录* (scan to log in) to open an inline QR and bind a WeChat account via Tencent's iLink bot API (no desktop hook needed); the credential is stored in the DB and the worker hot-reloads on connect.
-- **Telegram** — paste a [@BotFather](https://t.me/BotFather) token; the worker starts long-polling immediately. Replies render as Telegram HTML, with typing indicators and inbound/outbound media (photos, documents).
+- **WeChat** — click *扫码登录* (scan to log in) for an inline QR and host an account via Tencent's iLink bot API (no desktop hook). **Multiple accounts** are supported — host one per member/role; the worker hot-reloads on connect.
+- **Telegram** — paste a [@BotFather](https://t.me/BotFather) token; the bot starts long-polling immediately. Replies render as Telegram HTML, with typing indicators and inbound/outbound media. **Multiple bots** are supported, one per member.
+
+Members then link themselves: each member has a `/bind <code>` (shown at `/manage/groups`); they send it to the shared bot and that chat account is tied to them. Once bound, members can address each other — *"notify my spouse / 通知老张 …"* — and the agent delivers to every channel that member has linked, in **their** language (see i18n above). Outbound always routes back through the exact account a chat arrived on.
 
 ## CLI tools
 
@@ -244,9 +249,9 @@ mix usage_rules.docs Ash.Resource       # look up dependency docs
 
 ## Status
 
-**Alpha — single-user.** This project currently runs as one person's (mine) daily AI assistant.
+**Beta — small multi-user.** Runs as a daily AI assistant for a household / small workgroup (a few members, one box on the LAN).
 
-- No multi-tenancy / permission isolation.
+- Multi-tenant by **group + member** — per-member code workspaces, personal/shared skills, per-channel binding — but **no hard auth/RBAC yet**: members are trusted, and `bash` runs unsandboxed (only the Deno engine is per-member sandboxed). Fine for a family/team; not for untrusted members or internet exposure.
 - The schema changes occasionally; no backward-compat promise.
 - Some paths (mixin LLM, full WeChat / Telegram chains) have light test coverage.
 - Deployment docs are single-node only.
@@ -257,14 +262,20 @@ Issues and PRs welcome, but there's no committed release cadence.
 
 Near-term:
 
-- [ ] Memory editor on Mishka form components (`<.text_field>` etc.) instead of hand-rolled `<input>`s
-- [ ] AshPhoenix.Form to replace the hand-rolled LLM modal conversion
-- [ ] Multi-user / session isolation (auth + per-user namespace)
+- [x] Multi-user via groups + members (per-member workspace, personal/shared skills, channel binding)
+- [ ] Group-level RBAC — member roles enforced at the data layer (for workgroups / semi-trusted members)
+- [ ] Consolidate the dual ReAct loop + tool families (retire the legacy `Long.Agent.Loop` / `Long.Agent.Tools`)
+- [ ] Pin + SHA-verify the Deno / Obscura binary downloads (supply chain)
 
 Longer-term:
 
-- [ ] CRDT-based multi-client session sync
-- [ ] Extract the ReAct loop into a standalone hex lib so Loop / Memory / Skill can be reused outside Phoenix
+- [ ] PubSub reconnect replay — buffer recent turn events so a reconnecting client doesn't miss mid-stream output
+- [ ] Timezone-aware scheduling (currently UTC-only)
+- [ ] Observability page — tool error rates, LLM retries, Deno / Obscura install status
+
+Backlog (nice-to-have, not roadmap):
+
+- Framework-driven `/manage` forms (Mishka `<.text_field>` / AshPhoenix.Form) instead of hand-rolled `<input>`s
 
 ## Acknowledgements
 

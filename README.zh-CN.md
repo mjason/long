@@ -6,7 +6,7 @@
 
 [English](README.md) · **简体中文**
 
-> 一个跑在 Elixir/OTP 上的单进程 LLM Agent 运行时。Phoenix 做 UI，Ash 做数据层，Oban 跑定时任务，ReqLLM 做 provider 抽象。
+> 一个跑在 Elixir/OTP 上的单进程、多用户 LLM Agent 运行时——面向家庭或小团队。Phoenix 做 UI，Ash 做数据层，Oban 跑定时任务，ReqLLM 做 provider 抽象。
 
 Long *最初* 是把 Python 写的 [GenericAgent](https://github.com/lsdefine/GenericAgent) 搬到 Elixir，借用了「一个会话 → ReAct 循环 → 工具 + 记忆 + 技能」的基本形态。但后来设计思路已经和原版相去甚远：落到 BEAM 上之后原生拿到了真正的并发 / 容错 / 长连接推送（每个会话一个受监督的 GenServer，而不是在 Python 进程模型上硬接监督树），更关键的是 Agent 的能力层被**用成熟的标准技术重做，而不是自造一套工具协议**——最突出的就是**用 GraphQL 做 Agent 的主要技能**（见下文）。
 
@@ -45,25 +45,28 @@ Long 走了另一条路：**Agent 的主要能力是一个 `graphql` 工具**，
 | 页面 | 是什么 |
 |---|---|
 | `/chat` | Agent 本体。流式回复、实时工具调用展示、记忆侧栏、AI 自动命名会话。 |
-| `/manage` | 其它一切。LLM、记忆、技能、会话、搜索 provider、通道、定时任务，每个都是 LiveView。 |
+| `/manage` | 其它一切。LLM、记忆、技能、**组与成员**、会话、搜索 provider、通道、定时任务、**话术(i18n)**，每个都是 LiveView。 |
 
 ## 核心能力
 
 - **GraphQL 能力层** —— 一个可内省的 `graphql` 工具让 Agent 读写自己的整个数据世界（见上文）
+- **组与成员（多租户）** —— 一个部署托管一个或多个**组**（一个家庭、一个小团队）。每个**成员**用 `/bind <绑定码>` 接入自己的微信 / Telegram，拿到独立的 per-member 代码工作区 + 个人技能，还能给组里其他成员发消息（「通知…」）。一个 owner，多个成员。
+- **沙箱化代码执行** —— `code_run` 在托管的 [Deno](https://deno.land/) 二进制上跑 TypeScript/JavaScript，读写沙箱限定在调用者的 per-member 工作区；`bash` 用于 shell。没有 Python——Deno 首次使用时自动下载。
+- **逐聊天语言（i18n）** —— 每条 bot 文案按回退链解析（渠道 → 成员 → 组 → 平台探测 → 系统默认），都能在 `/manage/phrases` 覆盖；系统默认语言一键设置。
 - **Web 优先的 LiveView UI** —— `/chat`（流式渲染 + 工具调用展示 + 实时记忆侧栏 + AI 自动生成会话标题）+ `/manage` 管一切
 - **四层记忆** ——
   - L1 `WorkingCheckpoint`（每会话一行 key_info）
   - L2 `GlobalMemory` / `SessionMemory`（fact / preference / goal / decision，带 importance + recency 衰减）
-  - L3 **Anthropic 兼容 Skills**（`SKILL.md` + scripts/references/assets，文件系统是 source of truth，watcher 驱动的 ETS 索引）
+  - L3 **Anthropic 兼容 Skills**（`SKILL.md` + scripts/references/assets），**按成员私有或组内共享**（在 `/manage/skills` 把个人技能提升为全局，或查看技能完整 `SKILL.md`）；文件系统是 source of truth，watcher 驱动的 ETS 索引
   - L4 `SessionArchive`（会话归档 + LLM 摘要）
 - **多 Provider LLM 路由** —— ReqLLM 原生 20+ provider（openai / anthropic / google / groq / deepseek / openrouter / mistral / ollama / xai / bedrock / …），wire protocol 可配，单条 alias 设为默认
-- **统一管理后台 `/manage`** —— LLM 配置、记忆编辑、技能浏览、会话管理、搜索 provider、通道凭据、定时任务、密钥，全部 LiveView，不依赖 ash_admin
+- **统一管理后台 `/manage`** —— LLM 配置、记忆编辑、技能浏览、**组与成员、通道、话术(i18n)**、会话管理、搜索 provider、定时任务、密钥，全部 LiveView，不依赖 ash_admin
 - **定时任务** —— Oban 驱动，LLM 通过 GraphQL `createScheduledTask` 自己排，或者在 `/manage/scheduled` 手动建
-- **通道** —— WeChat（PCHook）和 Telegram，统一的 `Bots.Outbound` 调度层，通道统一在 `/manage/credentials` 管理
+- **多账号通道** —— 同时托管多个微信号和/或 Telegram bot，每个绑定不同成员；入站自动标记发送者，出站精确路由回这条聊天到达的那个账号。在 `/manage/credentials` 接入。
 - **Web 搜索聚合** —— Tavily / Brave API + SERP scraper，RRF 多源合并，provider 通过 `/manage/search` 配置
 - **真实头(headless) 浏览** —— Obscura CLI（Rust 写的 Chromium fork）驱动 `web_scan` / `web_execute_js` 工具
 - **错误可观测** —— ErrorTracker dashboard，`:logger` crash backstop，LLM 调用透明指数退避重试
-- **对话级控制** —— `/clear` 清会话、`/status` 查问 Agent 在干啥、`/btw <note>` 中途插话
+- **对话级控制** —— `/clear` 清会话、`/status` 查问 Agent 在干啥、`/btw <note>` 中途插话、`/bind <绑定码>` 把这条聊天绑到成员
 
 ## 架构一览
 
@@ -197,12 +200,14 @@ mix long.skill reindex   # 或者重启 server，watcher 也会自动捕获
 
 下次对话里 LLM 看到 `# Available skills` 里的 `hello-world` 就能 `skill_read` 然后 `code_run` 执行。Skill 格式完整兼容 [Anthropic Agent Skills](https://code.claude.com/docs/en/skills)，可以直接 `git clone https://github.com/anthropics/skills priv/agent/skills/` 白嫖官方仓库。
 
-## 通道（平台 Bot）
+## 通道与成员
 
-目前支持两个通道，都在 **`/manage/credentials`**（即「Channels」页）全程网页接入——不用配 env，不用重启。
+一个部署服务一个或多个**组**；每个组有若干**成员**（人），每个成员接入自己的聊天账号。owner 在 **`/manage/credentials`** 一次性配好通道——不用配 env，不用重启：
 
-- **WeChat** —— 点「扫码登录」弹出内嵌二维码，用想绑定的微信号扫码（走腾讯 iLink bot 接口，不需要任何桌面 hook 软件），凭据存进 DB，连上后 worker 自动热重载。
-- **Telegram** —— 粘一个 [@BotFather](https://t.me/BotFather) token，worker 立即开始 long-poll。回复走 Telegram HTML 渲染，带「正在输入」状态和图片/文件双向收发。
+- **WeChat** —— 点「扫码登录」弹出内嵌二维码，用微信号扫码托管（走腾讯 iLink bot 接口，不需要桌面 hook）。支持**多账号**——一个成员/角色托管一个；连上后 worker 自动热重载。
+- **Telegram** —— 粘一个 [@BotFather](https://t.me/BotFather) token，bot 立即 long-poll。回复走 Telegram HTML，带「正在输入」状态和图片/文件双向收发。支持**多 bot**，一个成员一个。
+
+然后成员自己接入：每个成员有一个 `/bind <绑定码>`（在 `/manage/groups` 显示），发给共享 bot，这个聊天账号就绑到他名下。绑定后成员之间可以互相寻址——「通知老张 …」——Agent 会推送到该成员接入的每个通道，并用**他的**语言（见上文 i18n）。出站永远精确路由回这条聊天到达的那个账号。
 
 ## CLI 工具
 
@@ -244,9 +249,9 @@ mix usage_rules.docs Ash.Resource       # 查依赖文档
 
 ## 状态
 
-**Alpha — 单用户使用。** 这个项目目前为一个用户（我自己）的日常 AI 助手运行。
+**Beta — 小型多用户。** 作为一个家庭 / 小工作组的日常 AI 助手运行（几个成员，局域网里一台机器）。
 
-- 没有多租户 / 权限隔离
+- 按**组 + 成员**做多租户——per-member 代码工作区、个人/共享技能、逐通道绑定——但**还没有硬性鉴权/RBAC**：成员是受信任的，`bash` 不沙箱（只有 Deno 引擎按成员沙箱）。适合家庭/团队；不适合不受信任的成员或公网暴露。
 - schema 偶尔会变化，没承诺向后兼容
 - 部分功能（mixin LLM、WeChat / Telegram 全链路）测试覆盖率较低
 - 部署文档目前只跑 single-node
@@ -257,14 +262,20 @@ mix usage_rules.docs Ash.Resource       # 查依赖文档
 
 短期：
 
-- [ ] Memory editor 改用 `<.text_field>` 等 Mishka 表单组件（目前手写 `<input>`）
-- [ ] AshPhoenix.Form 替换 LLM modal 的手卷转换
-- [ ] 多用户 / 会话隔离（auth + per-user namespace）
+- [x] 多用户：组 + 成员（per-member 工作区、个人/共享技能、通道绑定）
+- [ ] 组级 RBAC —— 成员角色在数据层强制（面向工作组 / 半信任成员）
+- [ ] 整合双 ReAct loop + 工具族（退役遗留的 `Long.Agent.Loop` / `Long.Agent.Tools`）
+- [ ] 给 Deno / Obscura 下载钉版本 + SHA256 校验（供应链）
 
 中长期：
 
-- [ ] CRDT-based 多客户端会话同步
-- [ ] 把 ReAct 循环抽成独立 hex lib，让 Loop / Memory / Skill 可以被 Phoenix 之外的项目复用
+- [ ] PubSub 重连补发 —— 缓存最近的 turn 事件，重连的客户端不丢中途输出
+- [ ] 时区感知的定时任务（目前 UTC-only）
+- [ ] 观测面板 —— 工具错误率、LLM 重试、Deno / Obscura 安装状态
+
+Backlog（nice-to-have，不算 roadmap）：
+
+- `/manage` 表单改用框架组件（Mishka `<.text_field>` / AshPhoenix.Form），替换手写 `<input>`
 
 ## 致谢
 
