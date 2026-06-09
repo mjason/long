@@ -98,13 +98,27 @@ defmodule Long.Agent.Skill.CreateTest do
       assert {:ok, %{scope: :personal}} = Store.get("mine-z")
     end
 
-    test "an unbound chat can't create a skill" do
+    test "a web chat with no members at all still can't create (nothing to act as)" do
       sess = Agent.start_session!(%{title: "web"})
 
       assert {:ok, %{status: "error", msg: msg}} =
                SkillCreate.run(%{name: "nope", description: "d", shared: true}, %{session_id: sess.id})
 
       assert msg =~ "/bind"
+    end
+
+    test "a web chat (no bound account) acts as the owner when members exist" do
+      {:ok, hh} = Agent.create_group(%{name: "Home-#{:rand.uniform(99_999)}"})
+      {:ok, owner} = Agent.create_member(%{group_id: hh.id, display_name: "Me", relation: :self, role: :owner})
+      sess = Agent.start_session!(%{title: "web"})
+
+      # no bot_user is bound, so the session falls back to the owner member
+      assert %{id: oid} = Agent.member_for_session(sess.id)
+      assert oid == owner.id
+
+      # which means the web console can create a shared skill without /bind
+      assert {:ok, %{status: "created", scope: "shared"}} =
+               SkillCreate.run(%{name: "web-owner-skill", description: "d", body: "b", shared: true}, %{session_id: sess.id})
     end
   end
 end

@@ -186,9 +186,11 @@ defmodule Long.Agent do
   end
 
   @doc """
-  The `Member` bound to a session's chat account, or `nil` for an
-  unbound / web-chat session. Used to scope per-member skills and to
-  resolve the caller for `notify_member`.
+  The `Member` behind a session. A bot chat resolves to the member its
+  account is bound to; a web `/chat` session has no bound account, so it
+  falls back to `default_member/0` (the owner) — that's what lets the web
+  console use member-scoped features (skills, `notify_member`, a
+  per-member code workspace). Only `nil` when no members exist at all.
   """
   @spec member_for_session(String.t()) :: Long.Agent.Member.t() | nil
   def member_for_session(session_id) when is_binary(session_id) do
@@ -196,16 +198,34 @@ defmodule Long.Agent do
          {:ok, member} <- get_member(mid) do
       member
     else
+      _ -> default_member()
+    end
+  end
+
+  @doc "Just the member's id for `session_id` (incl. the web-chat fallback), or `nil`."
+  @spec member_id_for_session(String.t()) :: String.t() | nil
+  def member_id_for_session(session_id) when is_binary(session_id) do
+    case member_for_session(session_id) do
+      %{id: id} -> id
       _ -> nil
     end
   end
 
-  @doc "Just the bound member's id for `session_id`, or `nil`."
-  @spec member_id_for_session(String.t()) :: String.t() | nil
-  def member_id_for_session(session_id) when is_binary(session_id) do
-    case get_bot_user_for_session(session_id) do
-      {:ok, %{member_id: mid}} -> mid
-      _ -> nil
+  @doc """
+  The member a web `/chat` session acts as when no chat account is bound —
+  the owner. Prefers the `:self` member (the owner's own record), then any
+  `:owner`-role member, then the first member; `nil` if there are none.
+  """
+  @spec default_member() :: Long.Agent.Member.t() | nil
+  def default_member do
+    case list_members() do
+      {:ok, [_ | _] = members} ->
+        Enum.find(members, &(&1.relation == :self)) ||
+          Enum.find(members, &(&1.role == :owner)) ||
+          List.first(members)
+
+      _ ->
+        nil
     end
   end
 end
