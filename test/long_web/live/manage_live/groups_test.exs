@@ -126,6 +126,36 @@ defmodule LongWeb.ManageLive.GroupsTest do
     assert {:ok, %{scope: :global}} = Long.Agent.Skill.Store.get("web-shared-skill")
   end
 
+  test "Skills page opens a skill to show its full SKILL.md", %{conn: conn} do
+    cfg = Application.get_env(:long, Long.Agent, [])
+    tmp = Path.join(System.tmp_dir!(), "viewskill_#{System.unique_integer([:positive])}")
+    File.mkdir_p!(tmp)
+    Application.put_env(:long, Long.Agent, Keyword.put(cfg, :skill_root, tmp))
+    Long.Agent.Skill.Store.reindex()
+
+    on_exit(fn ->
+      Application.put_env(:long, Long.Agent, cfg)
+      File.rm_rf!(tmp)
+      Long.Agent.Skill.Store.reindex()
+    end)
+
+    {:ok, _} = Long.Agent.Skill.Store.create_skill("viewable-skill", "what it does", "Step one.\nStep two.")
+
+    {:ok, view, html} = live(conn, ~p"/manage/skills")
+    # the list shows the name/description but not the body until you open it
+    assert html =~ "viewable-skill"
+    refute html =~ "Step one."
+
+    html =
+      view
+      |> element("button[phx-value-name=viewable-skill][phx-click=view_skill]")
+      |> render_click()
+
+    assert html =~ "Skill · viewable-skill"
+    assert html =~ "Step one."
+    assert html =~ "Step two."
+  end
+
   test "creating a group via the form works", %{conn: conn} do
     {:ok, view, _html} = live(conn, ~p"/manage/groups")
 

@@ -512,6 +512,13 @@ defmodule LongWeb.ManageLive do
     {:noreply, load_section(socket, :skills) |> put_flash(:info, "Rescanned skill_root.")}
   end
 
+  def handle_event("view_skill", %{"name" => name}, socket) do
+    case SkillStore.get(name) do
+      {:ok, skill} -> {:noreply, assign(socket, :editing, Map.put(skill, :__action__, :view_skill))}
+      _ -> {:noreply, put_flash(socket, :error, "Skill not found — try Reindex.")}
+    end
+  end
+
   def handle_event("new_shared_skill", %{"skill" => p}, socket) do
     # No member_id → the shared (global) space.
     case SkillStore.create_skill(p["name"], p["description"], p["body"] || "") do
@@ -1048,6 +1055,7 @@ defmodule LongWeb.ManageLive do
         />
         <.secret_modal :if={editing_kind(@editing) == :secret} editing={@editing} />
         <.telegram_modal :if={editing_kind(@editing) == :telegram} editing={@editing} />
+        <.skill_modal :if={editing_kind(@editing) == :skill} editing={@editing} />
         <.wechat_login_modal
           :if={@wechat_modal_open?}
           socket={@socket}
@@ -1070,6 +1078,8 @@ defmodule LongWeb.ManageLive do
 
   defp editing_kind(%{__action__: a}) when a in [:create_telegram, :edit_telegram],
     do: :telegram
+
+  defp editing_kind(%{__action__: :view_skill}), do: :skill
 
   defp editing_kind(_), do: nil
 
@@ -1441,7 +1451,18 @@ defmodule LongWeb.ManageLive do
               <td class="px-4 py-2 text-xs font-mono text-zinc-500">{s.relative_path}</td>
               <td class="px-4 py-2 text-right text-zinc-600">{s.use_count}</td>
               <td class="px-4 py-2">
-                <div class="flex justify-end">
+                <div class="flex justify-end gap-1.5">
+                  <.button
+                    phx-click="view_skill"
+                    phx-value-name={s.name}
+                    variant="outline"
+                    color="natural"
+                    size="extra_small"
+                    icon="hero-eye"
+                    rounded="medium"
+                  >
+                    View
+                  </.button>
                   <.button
                     :if={s[:scope] == :personal}
                     phx-click="promote_skill"
@@ -2971,6 +2992,49 @@ defmodule LongWeb.ManageLive do
           <.button type="submit" color="primary" rounded="medium" size="small">Save</.button>
         </div>
       </form>
+    </.modal>
+    """
+  end
+
+  attr :editing, :map, required: true
+
+  defp skill_modal(assigns) do
+    ~H"""
+    <.modal
+      id="skill-view-modal"
+      show
+      title={"Skill · #{@editing.name}"}
+      on_cancel={JS.push("cancel_edit")}
+      size="large"
+    >
+      <div class="space-y-4">
+        <div class="flex flex-wrap items-center gap-1.5 text-xs">
+          <.badge
+            color={if @editing.scope == :global, do: "success", else: "info"}
+            size="extra_small"
+            rounded="full"
+          >
+            {@editing.scope}
+          </.badge>
+          <.badge :for={t <- @editing.tags || []} color="silver" size="extra_small" rounded="full">
+            {t}
+          </.badge>
+        </div>
+
+        <p :if={(@editing.description || "") != ""} class="text-sm text-zinc-600 leading-snug">
+          {@editing.description}
+        </p>
+
+        <div class="text-[11px] text-zinc-500 font-mono space-y-0.5">
+          <div>path: {@editing.relative_path}</div>
+          <div>dir: {@editing.absolute_path}</div>
+        </div>
+
+        <div>
+          <div class="text-xs font-medium text-zinc-600 mb-1">SKILL.md</div>
+          <pre class="max-h-[60vh] overflow-auto rounded-md border border-zinc-200 bg-zinc-50 p-3 text-xs whitespace-pre-wrap break-words">{if (@editing.body || "") == "", do: "(no SKILL.md body)", else: @editing.body}</pre>
+        </div>
+      </div>
     </.modal>
     """
   end
