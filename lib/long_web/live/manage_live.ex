@@ -685,7 +685,7 @@ defmodule LongWeb.ManageLive do
     end
   end
 
-  def handle_event("assign_wechat_member", %{"name" => name, "member_id" => mid}, socket) do
+  def handle_event("assign_wechat_member", %{"credential_name" => name, "member_id" => mid}, socket) do
     member_id = if mid == "", do: nil, else: mid
 
     with {:ok, row} <- Agent.get_wechat_credential(name),
@@ -754,7 +754,7 @@ defmodule LongWeb.ManageLive do
     end
   end
 
-  def handle_event("assign_telegram_member", %{"name" => name, "member_id" => mid}, socket) do
+  def handle_event("assign_telegram_member", %{"credential_name" => name, "member_id" => mid}, socket) do
     member_id = if mid == "", do: nil, else: mid
 
     with {:ok, row} <- Agent.get_telegram_credential(name),
@@ -1707,7 +1707,7 @@ defmodule LongWeb.ManageLive do
                   </div>
                 </td>
                 <td class="px-4 py-2">
-                  <form phx-change="assign_wechat_member">
+                  <form id={"memsel-assign_wechat_member-#{c.name}"} phx-change="assign_wechat_member">
                     <input type="hidden" name="credential_name" value={c.name} />
                     <select
                       name="member_id"
@@ -1864,7 +1864,7 @@ defmodule LongWeb.ManageLive do
                 <td class="px-4 py-2 font-medium">{c.name}</td>
                 <td class="px-4 py-2 text-xs font-mono text-zinc-500">{c.username || "—"}</td>
                 <td class="px-4 py-2">
-                  <form phx-change="assign_telegram_member">
+                  <form id={"memsel-assign_telegram_member-#{c.name}"} phx-change="assign_telegram_member">
                     <input type="hidden" name="credential_name" value={c.name} />
                     <select
                       name="member_id"

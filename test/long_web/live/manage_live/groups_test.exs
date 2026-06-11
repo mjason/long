@@ -52,6 +52,54 @@ defmodule LongWeb.ManageLive.GroupsTest do
     Agent.destroy_group!(hh)
   end
 
+  test "assigning a member to a WeChat account via the picker persists", %{conn: conn} do
+    {:ok, hh} = Agent.create_group(%{name: "Pick Home"})
+    {:ok, m} = Agent.create_member(%{group_id: hh.id, display_name: "Pat", relation: :self})
+    name = "pick-wc-#{System.unique_integer([:positive])}"
+    {:ok, _} = Agent.upsert_wechat_credential(%{name: name})
+
+    {:ok, view, _html} = live(conn, ~p"/manage/credentials")
+
+    view
+    |> form("#memsel-assign_wechat_member-#{name}", %{member_id: m.id})
+    |> render_change()
+
+    assert {:ok, %{member_id: assigned}} = Agent.get_wechat_credential(name)
+    assert assigned == m.id
+
+    # …and "— unassigned —" clears it back to nil
+    view
+    |> form("#memsel-assign_wechat_member-#{name}", %{member_id: ""})
+    |> render_change()
+
+    assert {:ok, %{member_id: nil}} = Agent.get_wechat_credential(name)
+
+    {:ok, row} = Agent.get_wechat_credential(name)
+    Agent.destroy_wechat_credential!(row)
+    Long.Agent.Bots.Wechat.Manager.reconcile()
+    Agent.destroy_group!(hh)
+  end
+
+  test "assigning a member to a Telegram bot via the picker persists", %{conn: conn} do
+    {:ok, hh} = Agent.create_group(%{name: "Pick Home"})
+    {:ok, m} = Agent.create_member(%{group_id: hh.id, display_name: "Sam", relation: :self})
+    name = "pick-tg-#{System.unique_integer([:positive])}"
+    {:ok, _} = Agent.upsert_telegram_credential(%{name: name, bot_token: "t"})
+
+    {:ok, view, _html} = live(conn, ~p"/manage/credentials")
+
+    view
+    |> form("#memsel-assign_telegram_member-#{name}", %{member_id: m.id})
+    |> render_change()
+
+    assert {:ok, %{member_id: assigned}} = Agent.get_telegram_credential(name)
+    assert assigned == m.id
+
+    {:ok, row} = Agent.get_telegram_credential(name)
+    Agent.destroy_telegram_credential!(row)
+    Agent.destroy_group!(hh)
+  end
+
   test "Channels page lets a Telegram bot be bound to a member too", %{conn: conn} do
     {:ok, hh} = Agent.create_group(%{name: "Home"})
     {:ok, m} = Agent.create_member(%{group_id: hh.id, display_name: "Mom", relation: :other})
