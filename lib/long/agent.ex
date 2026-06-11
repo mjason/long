@@ -228,4 +228,45 @@ defmodule Long.Agent do
         nil
     end
   end
+
+  @doc """
+  Propagate a hosted account's member assignment onto the chat identities
+  (`BotUser` rows) that arrived on it, so a freshly-assigned account is
+  reachable for outbound `notify_member` immediately — without waiting for
+  the next inbound message to lazily backfill it (see `Long.Agent.Bots`).
+
+  Mirrors the inbound rule: an assigned account is authoritative over the
+  member of every chat that arrives on it, so all of its bot_users adopt the
+  assignment. A nil assignment is a no-op — un-assigning a hosted account
+  keeps any explicit `/bind`.
+  """
+  @spec reassign_bot_users(atom(), String.t(), String.t() | nil) :: :ok
+  def reassign_bot_users(_platform, _credential_name, nil), do: :ok
+
+  def reassign_bot_users(platform, credential_name, member_id)
+      when is_atom(platform) and is_binary(credential_name) and is_binary(member_id) do
+    {:ok, users} = list_bot_users()
+
+    users
+    |> Enum.filter(&(&1.platform == platform and &1.credential_name == credential_name))
+    |> Enum.reject(&(&1.member_id == member_id))
+    |> Enum.each(&bind_bot_user_member(&1, %{member_id: member_id}))
+
+    :ok
+  end
+
+  # `after_action` hooks for the credential `set_member` actions — thin
+  # adapters onto reassign_bot_users/3 so both credential resources share one
+  # implementation (mirrors the named-callback style in Long.Agent.Session).
+  @doc false
+  def reassign_wechat_bot_users(_changeset, credential, _context) do
+    reassign_bot_users(:wechat, credential.name, credential.member_id)
+    {:ok, credential}
+  end
+
+  @doc false
+  def reassign_telegram_bot_users(_changeset, credential, _context) do
+    reassign_bot_users(:telegram, credential.name, credential.member_id)
+    {:ok, credential}
+  end
 end

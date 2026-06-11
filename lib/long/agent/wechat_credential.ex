@@ -41,6 +41,11 @@ defmodule Long.Agent.WechatCredential do
     update :set_member do
       require_atomic? false
       accept [:member_id]
+
+      # Eagerly backfill this account's bot_users so a freshly-assigned member
+      # is reachable for outbound notify_member at once — the eager counterpart
+      # of the lazy inbound backfill in Long.Agent.Bots.
+      change after_action(&Long.Agent.reassign_wechat_bot_users/3)
     end
 
     update :set_locale do

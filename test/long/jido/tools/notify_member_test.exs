@@ -193,4 +193,139 @@ defmodule Long.Jido.Tools.NotifyMemberTest do
       assert {:ok, %{status: "error", delivered: 0}} = run_deliver(sid, fn _, _ -> exit(:boom) end)
     end
   end
+
+  # Regression: assigning a hosted account to a member via the admin path
+  # must make that member reachable for notify *immediately* — not only after
+  # the next inbound message lazily backfills the chat identity. The bug was
+  # that `set_member` only set `credential.member_id` (inbound attribution),
+  # leaving the account's `bot_user`s unbound, so outbound notify said the
+  # member had "no linked chat account".
+  describe "assigning a hosted account backfills its chat identities" do
+    test "set_wechat_credential_member makes a previously-unreachable member reachable" do
+      {:ok, hh} = Agent.create_group(%{name: "Assign-#{uniq()}"})
+
+      {:ok, caller} =
+        Agent.create_member(%{group_id: hh.id, display_name: "Me", relation: :self, role: :owner})
+
+      {:ok, target} =
+        Agent.create_member(%{group_id: hh.id, display_name: "Queen", relation: :other})
+
+      sess = Agent.start_session!(%{title: "t"})
+
+      {:ok, _} =
+        Agent.create_bot_user(%{
+          platform: :wechat,
+          external_id: "caller-#{uniq()}",
+          session_id: sess.id,
+          member_id: caller.id
+        })
+
+      # A chat arrived on a hosted account but isn't bound to any member yet.
+      name = "queen-acct-#{uniq()}"
+      {:ok, _} = Agent.upsert_wechat_credential(%{name: name})
+
+      {:ok, bu} =
+        Agent.create_bot_user(%{
+          platform: :wechat,
+          external_id: "queen-#{uniq()}",
+          chat_id: "1",
+          credential_name: name,
+          member_id: nil
+        })
+
+      # Before assignment the target has no channel — notify can't reach her.
+      assert {:ok, %{status: "error", msg: msg}} =
+               NotifyMember.run(%{target: "Queen", message: "rest"}, %{session_id: sess.id})
+
+      assert msg =~ "no linked chat account"
+
+      # Admin assigns the account to the member.
+      {:ok, cred} = Agent.get_wechat_credential(name)
+      {:ok, _} = Agent.set_wechat_credential_member(cred, %{member_id: target.id})
+
+      # The account's chat identity now belongs to the member…
+      {:ok, users} = Agent.list_bot_users()
+      assert Enum.find(users, &(&1.id == bu.id)).member_id == target.id
+
+      # …so notify reaches her, via that exact account.
+      me = self()
+      deliver = fn pushed, _body -> send(me, {:pushed, pushed}) && :ok end
+
+      assert {:ok, %{status: "sent", to: "Queen", delivered: 1}} =
+               NotifyMember.run(%{target: "Queen", message: "rest"}, %{session_id: sess.id, deliver: deliver})
+
+      assert_receive {:pushed, pushed}
+      assert pushed.credential_name == name
+    end
+
+    test "un-assigning (nil) keeps the existing binding — never clobbers a /bind" do
+      {:ok, hh} = Agent.create_group(%{name: "Unassign-#{uniq()}"})
+      {:ok, m} = Agent.create_member(%{group_id: hh.id, display_name: "X", relation: :other})
+
+      name = "acct-#{uniq()}"
+      {:ok, _} = Agent.upsert_wechat_credential(%{name: name, member_id: m.id})
+
+      {:ok, bu} =
+        Agent.create_bot_user(%{
+          platform: :wechat,
+          external_id: "u-#{uniq()}",
+          credential_name: name,
+          member_id: m.id
+        })
+
+      {:ok, cred} = Agent.get_wechat_credential(name)
+      {:ok, _} = Agent.set_wechat_credential_member(cred, %{member_id: nil})
+
+      {:ok, users} = Agent.list_bot_users()
+      assert Enum.find(users, &(&1.id == bu.id)).member_id == m.id
+    end
+
+    test "backfill is scoped to the matching account + platform" do
+      {:ok, hh} = Agent.create_group(%{name: "Scope-#{uniq()}"})
+      {:ok, m} = Agent.create_member(%{group_id: hh.id, display_name: "Y", relation: :other})
+
+      name = "acct-#{uniq()}"
+      {:ok, _} = Agent.upsert_wechat_credential(%{name: name})
+
+      {:ok, mine} =
+        Agent.create_bot_user(%{platform: :wechat, external_id: "a-#{uniq()}", credential_name: name})
+
+      # A chat on a *different* account must stay untouched.
+      {:ok, foreign} =
+        Agent.create_bot_user(%{
+          platform: :wechat,
+          external_id: "b-#{uniq()}",
+          credential_name: "other-#{uniq()}"
+        })
+
+      {:ok, cred} = Agent.get_wechat_credential(name)
+      {:ok, _} = Agent.set_wechat_credential_member(cred, %{member_id: m.id})
+
+      {:ok, users} = Agent.list_bot_users()
+      assert Enum.find(users, &(&1.id == mine.id)).member_id == m.id
+      assert Enum.find(users, &(&1.id == foreign.id)).member_id == nil
+    end
+
+    test "set_telegram_credential_member backfills its bot_users too" do
+      {:ok, hh} = Agent.create_group(%{name: "Tg-#{uniq()}"})
+      {:ok, m} = Agent.create_member(%{group_id: hh.id, display_name: "Z", relation: :other})
+
+      name = "tgacct-#{uniq()}"
+      {:ok, _} = Agent.upsert_telegram_credential(%{name: name, bot_token: "t"})
+
+      {:ok, bu} =
+        Agent.create_bot_user(%{
+          platform: :telegram,
+          external_id: "tg-#{uniq()}",
+          chat_id: "1",
+          credential_name: name
+        })
+
+      {:ok, cred} = Agent.get_telegram_credential(name)
+      {:ok, _} = Agent.set_telegram_credential_member(cred, %{member_id: m.id})
+
+      {:ok, users} = Agent.list_bot_users()
+      assert Enum.find(users, &(&1.id == bu.id)).member_id == m.id
+    end
+  end
 end
