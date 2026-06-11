@@ -82,16 +82,22 @@ RUN apt-get update \
 # Pre-install Deno (the code_run sandbox) and Obscura (the web_scan browser)
 # onto PATH so the running app never downloads them at runtime
 # (LONG_AUTO_INSTALL_BINARIES=false below). Their Engines call
-# Installer.locate/2 first and find these.
+# Installer.locate/2 first and find these. TARGETARCH is injected by
+# buildx (amd64 / arm64), so one Dockerfile builds both architectures.
+ARG TARGETARCH
 RUN set -eux; \
-  curl -fsSL -o /tmp/deno.zip https://github.com/denoland/deno/releases/latest/download/deno-x86_64-unknown-linux-gnu.zip; \
-  unzip -o /tmp/deno.zip -d /usr/local/bin; chmod +x /usr/local/bin/deno; rm /tmp/deno.zip; \
-  /usr/local/bin/deno --version
-RUN set -eux; \
-  curl -fsSL -o /tmp/obscura.tgz https://github.com/h4ckf0r0day/obscura/releases/latest/download/obscura-x86_64-linux.tar.gz; \
+  case "$TARGETARCH" in \
+    amd64) DENO_ARCH=x86_64-unknown-linux-gnu; OBS_ARCH=x86_64-linux ;; \
+    arm64) DENO_ARCH=aarch64-unknown-linux-gnu; OBS_ARCH=aarch64-linux ;; \
+    *) echo "unsupported TARGETARCH=$TARGETARCH" >&2; exit 1 ;; \
+  esac; \
+  curl -fsSL -o /tmp/deno.zip "https://github.com/denoland/deno/releases/latest/download/deno-${DENO_ARCH}.zip"; \
+  unzip -o /tmp/deno.zip -d /usr/local/bin && chmod +x /usr/local/bin/deno; \
+  curl -fsSL -o /tmp/obscura.tgz "https://github.com/h4ckf0r0day/obscura/releases/latest/download/obscura-${OBS_ARCH}.tar.gz"; \
   tar -xzf /tmp/obscura.tgz -C /tmp; \
   find /tmp -type f -name obscura -exec install -m0755 {} /usr/local/bin/obscura \; ; \
-  rm -rf /tmp/obscura*; test -x /usr/local/bin/obscura
+  rm -rf /tmp/deno.zip /tmp/obscura*; \
+  test -x /usr/local/bin/deno && test -x /usr/local/bin/obscura
 
 # Set the locale
 RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen \
