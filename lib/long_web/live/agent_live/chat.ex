@@ -153,7 +153,11 @@ defmodule LongWeb.AgentLive.Chat do
   # ── Loop events via PubSub ───────────────────────────────────────────────
 
   @impl true
-  def handle_info(:loop_started, socket), do: {:noreply, assign(socket, :loop_running?, true)}
+  # Clear any ask_user card on resume: the turn restarted because the prompt
+  # was answered — here, from a bot channel (web answers clear it directly),
+  # or simply superseded by a new message.
+  def handle_info(:loop_started, socket),
+    do: {:noreply, socket |> assign(:loop_running?, true) |> assign(:ask_user, nil)}
 
   def handle_info(:loop_ended, socket) do
     {:noreply,

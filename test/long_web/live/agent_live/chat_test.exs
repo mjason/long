@@ -95,4 +95,19 @@ defmodule LongWeb.AgentLive.ChatTest do
       assert Enum.any?(files, &(&1 =~ "notes"))
     end
   end
+
+  describe "ask_user prompt" do
+    test "clears when the turn resumes (e.g. answered from another channel)", %{conn: conn} do
+      {:ok, sess} = Agent.start_session(%{title: "ask"})
+      {:ok, view, _html} = live(conn, ~p"/chat/#{sess.id}")
+
+      # Agent asks → the card shows the question.
+      send(view.pid, {:ask_user, %{"question" => "Which one — A or B?", "candidates" => []}})
+      assert render(view) =~ "Which one — A or B?"
+
+      # Answered elsewhere (e.g. WeChat) → server starts the next turn → clears.
+      send(view.pid, :loop_started)
+      refute render(view) =~ "Which one — A or B?"
+    end
+  end
 end
