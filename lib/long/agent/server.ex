@@ -405,6 +405,7 @@ defmodule Long.Agent.Server do
     system_text =
       [
         Long.Agent.ToolInventory.render(tools),
+        Long.Agent.Schedule.now_prompt(),
         Loop.default_system() |> String.replace("{{session_id}}", state.session_id),
         addendum
       ]

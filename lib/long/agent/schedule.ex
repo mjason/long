@@ -63,6 +63,45 @@ defmodule Long.Agent.Schedule do
     end
   end
 
+  @doc """
+  A status line for the system prompt: the current time in UTC and in the
+  user's configured timezone. The model has no clock of its own, so this is
+  how it knows "now" — and how to convert a user's stated local time
+  ("tomorrow 8:30am") into the UTC it must store on a scheduled task. Falls
+  back to UTC-only text if the tz database can't resolve the zone.
+  """
+  def now_prompt(now \\ DateTime.utc_now()) do
+    tz = resolve_timezone()
+    utc = DateTime.truncate(now, :second)
+    base = "Current time: #{DateTime.to_iso8601(utc)} (UTC)."
+
+    case DateTime.shift_zone(utc, tz) do
+      {:ok, local} ->
+        local_str = Calendar.strftime(local, "%Y-%m-%d %H:%M %A")
+
+        base <>
+          " The user's timezone is #{tz}; their local time is #{local_str}." <>
+          " Times stored on a scheduled task (scheduleTime / nextRunAt) MUST be UTC" <>
+          " — convert the user's local time to UTC first."
+
+      _ ->
+        base
+    end
+  end
+
+  # The user's timezone: the stored `user_timezone` global memory if they've
+  # told the agent where they are (the system prompt instructs the model to
+  # persist it), else the configured default.
+  defp resolve_timezone do
+    with {:ok, rows} <- Long.Agent.list_global_memory(),
+         %{value: tz} when is_binary(tz) and tz != "" <-
+           Enum.find(rows, &(&1.key == "user_timezone")) do
+      tz
+    else
+      _ -> Application.get_env(:long, :user_timezone, "Asia/Shanghai")
+    end
+  end
+
   defp initial_target(%ScheduledTask{repeat: r, schedule_time: ts}, now)
        when r in [:daily, :weekday, :weekly, :monthly] do
     {h, m} = parse_hhmm(ts)

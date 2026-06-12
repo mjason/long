@@ -7,6 +7,14 @@
 # General application configuration
 import Config
 
+# Enable the bundled IANA tzdata so DateTime.shift_zone/2 works — the agent
+# converts the user's local times ("remind me at 8:30am") into the UTC stored
+# on scheduled tasks (see Long.Agent.Schedule / Long.Agent.Server).
+config :elixir, :time_zone_database, Tzdata.TimeZoneDatabase
+
+# Timezone the agent assumes for the user when converting local times to UTC.
+config :long, :user_timezone, "Asia/Shanghai"
+
 config :ash_oban, pro?: false
 
 config :long, Oban,
