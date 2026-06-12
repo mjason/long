@@ -297,14 +297,16 @@ defmodule LongWeb.ManageLive.GroupsTest do
     assert Long.Copy.default_locale() == "zh"
   end
 
-  test "Groups page sets the system timezone, stored as the user_timezone memory", %{conn: conn} do
+  test "Groups page sets the system timezone, ignoring half-typed input", %{conn: conn} do
     {:ok, view, html} = live(conn, ~p"/manage/groups")
     assert html =~ "System timezone"
 
-    view
-    |> form("#tzsel-set_timezone", %{timezone: "Europe/London"})
-    |> render_change()
+    # phx-change fires while typing — a half-typed (invalid) zone is ignored.
+    view |> form("#tzsel-set_timezone", %{timezone: "Europe/Lon"}) |> render_change()
+    refute Long.Agent.user_timezone() == "Europe/Lon"
 
+    # A complete, valid zone persists.
+    view |> form("#tzsel-set_timezone", %{timezone: "Europe/London"}) |> render_change()
     assert Long.Agent.user_timezone() == "Europe/London"
   end
 end

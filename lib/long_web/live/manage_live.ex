@@ -282,14 +282,14 @@ defmodule LongWeb.ManageLive do
   # Language options for the locale dropdowns, from the Copy catalog.
   defp locale_options, do: Enum.map(Long.Copy.locales(), &{&1, locale_label(&1)})
 
-  # The picker: the current value + a few common zones up top for quick
-  # selection, then every IANA zone so any timezone is reachable.
-  defp timezone_options(current) do
+  # Every IANA zone for the datalist, common ones first so they surface near
+  # the top as the user types.
+  defp timezone_options do
     common =
       ~w(Asia/Shanghai Asia/Hong_Kong Asia/Tokyo Asia/Singapore Asia/Kolkata
          Europe/London Europe/Paris America/New_York America/Los_Angeles UTC)
 
-    ([current | common] ++ Tzdata.zone_list()) |> Enum.uniq()
+    (common ++ Tzdata.zone_list()) |> Enum.uniq()
   end
 
   defp locale_label("en"), do: "English"
@@ -822,16 +822,22 @@ defmodule LongWeb.ManageLive do
   end
 
   def handle_event("set_timezone", %{"timezone" => tz}, socket) do
-    {:ok, _} =
-      Agent.put_global_memory(%{
-        scope: :general,
-        key: "user_timezone",
-        value: tz,
-        kind: :preference,
-        importance: 4
-      })
+    # phx-change fires while typing; only persist a complete, valid zone (a
+    # picked datalist option or a fully-typed one), ignoring half-typed input.
+    if tz in Tzdata.zone_list() do
+      {:ok, _} =
+        Agent.put_global_memory(%{
+          scope: :general,
+          key: "user_timezone",
+          value: tz,
+          kind: :preference,
+          importance: 4
+        })
 
-    {:noreply, socket |> load_section(:groups) |> put_flash(:info, "System timezone updated.")}
+      {:noreply, socket |> load_section(:groups) |> put_flash(:info, "System timezone updated.")}
+    else
+      {:noreply, socket}
+    end
   end
 
   def handle_event("toggle_telegram_enabled", %{"name" => name}, socket) do
@@ -2101,9 +2107,18 @@ defmodule LongWeb.ManageLive do
           </div>
           <% current_tz = Agent.user_timezone() %>
           <form id="tzsel-set_timezone" phx-change="set_timezone">
-            <select name="timezone" class="border border-zinc-300 rounded-md px-2 py-1.5 text-sm">
-              <option :for={tz <- timezone_options(current_tz)} value={tz} selected={tz == current_tz}>{tz}</option>
-            </select>
+            <input
+              type="text"
+              name="timezone"
+              list="tz-datalist"
+              autocomplete="off"
+              phx-debounce="300"
+              placeholder={"now: #{current_tz} — type to change"}
+              class="border border-zinc-300 rounded-md px-2 py-1.5 text-sm w-72"
+            />
+            <datalist id="tz-datalist">
+              <option :for={tz <- timezone_options()} value={tz}></option>
+            </datalist>
           </form>
         </div>
       </.card>
