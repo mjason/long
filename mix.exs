@@ -4,7 +4,7 @@ defmodule Long.MixProject do
   def project do
     [
       app: :long,
-      version: "0.3.13",
+      version: "0.3.14",
       elixir: "~> 1.15",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
