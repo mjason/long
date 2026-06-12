@@ -58,6 +58,7 @@ defmodule Long.Agent do
     resource Long.Agent.Setting do
       define :put_setting, action: :upsert
       define :get_setting, action: :read, get_by: [:key]
+      define :delete_setting, action: :destroy
     end
 
     resource Long.Agent.SessionMemory do

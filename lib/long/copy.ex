@@ -23,11 +23,12 @@ defmodule Long.Copy do
   @locales ["en", "zh"]
   @pt_key {__MODULE__, :overrides}
 
-  # The global default locale is stored as a Phrase override under this
-  # sentinel key (not a catalog phrase), so it reuses the same
-  # persistent_term cache and `/manage` plumbing — no extra table.
-  @global_locale_key "system.default_locale"
-  @global_locale_loc "*"
+  # The operator default locale is a `Long.Agent.Setting` (key below), cached
+  # in persistent_term separately from the catalog overrides because it's read
+  # on every `t/3`. Mirrors how `user_timezone` is stored — a setting, not a
+  # memory/catalog row the LLM can touch.
+  @default_locale_key "default_locale"
+  @dl_pt_key {__MODULE__, :default_locale}
 
   # ── The catalog — the single source of truth for system copy ─────────
   @catalog %{
@@ -141,26 +142,27 @@ defmodule Long.Copy do
   else `config :long, :default_locale`, else `"en"`.
   """
   def default_locale do
-    override(@global_locale_key, @global_locale_loc) ||
-      Application.get_env(:long, :default_locale, @default_locale)
+    default_locale_setting() || Application.get_env(:long, :default_locale, @default_locale)
   end
 
   @doc "The operator-set global default locale, or nil when unset (config fallback applies)."
-  def default_locale_setting, do: override(@global_locale_key, @global_locale_loc)
+  def default_locale_setting, do: cached_default_locale()
 
-  @doc "Set the global default locale (blank/nil clears it). Persisted as a Phrase override."
+  @doc "Set the global default locale (blank/nil clears it). Persisted as a setting."
   def put_default_locale(locale) when is_binary(locale) and locale != "" do
-    {:ok, _} = Agent.upsert_phrase(%{key: @global_locale_key, locale: @global_locale_loc, text: locale})
-    reload()
+    {:ok, _} = Agent.put_setting(%{key: @default_locale_key, value: locale})
+    reload_default_locale()
+    :ok
   end
 
   def put_default_locale(_) do
-    with {:ok, rows} <- Agent.list_phrases(),
-         %{} = row <- Enum.find(rows, &(&1.key == @global_locale_key and &1.locale == @global_locale_loc)) do
-      _ = Agent.destroy_phrase(row)
+    case Agent.get_setting(@default_locale_key) do
+      {:ok, row} -> Agent.delete_setting(row)
+      _ -> :ok
     end
 
-    reload()
+    reload_default_locale()
+    :ok
   end
 
   @doc "Locales the catalog ships defaults for."
@@ -218,6 +220,26 @@ defmodule Long.Copy do
 
     :persistent_term.put(@pt_key, map)
     map
+  end
+
+  # The operator default locale, cached separately from catalog overrides
+  # since it's read on every t/3.
+  defp cached_default_locale do
+    case :persistent_term.get(@dl_pt_key, :unset) do
+      :unset -> reload_default_locale()
+      val -> val
+    end
+  end
+
+  defp reload_default_locale do
+    val =
+      case Agent.get_setting(@default_locale_key) do
+        {:ok, %{value: v}} when is_binary(v) and v != "" -> v
+        _ -> nil
+      end
+
+    :persistent_term.put(@dl_pt_key, val)
+    val
   end
 
   # ── helpers ──────────────────────────────────────────────────────────
