@@ -77,15 +77,23 @@ defmodule Long.Agent.SchedulerTest do
     end
   end
 
-  describe "Schedule.now_prompt/1" do
-    test "states UTC and the user's local time so the model can convert" do
-      line = Schedule.now_prompt(~U[2026-06-11 23:00:00Z])
+  describe "Schedule timezone context (static note + per-turn now_line)" do
+    test "timezone_note states the zone + store-UTC rule, with no clock" do
+      note = Schedule.timezone_note()
 
-      assert line =~ "2026-06-11T23:00:00Z"
-      assert line =~ "Asia/Shanghai"
-      # 23:00Z + 8h = next-day 07:00 CST — proves the tz database is wired in
+      assert note =~ "Asia/Shanghai"
+      assert note =~ "MUST be UTC"
+      # No current time here — it must not bust the cached system prompt.
+      refute note =~ "Current time"
+    end
+
+    test "now_line carries UTC + the user's local time for the current turn" do
+      line = Schedule.now_line(~U[2026-06-11 23:00:00Z])
+
+      assert line =~ "2026-06-11T23:00:00Z UTC"
+      # 23:00Z + 8h = next-day 07:00 CST — proves the tz database is wired in.
       assert line =~ "2026-06-12 07:00"
-      assert line =~ "MUST be UTC"
+      assert line =~ "Asia/Shanghai"
     end
   end
 

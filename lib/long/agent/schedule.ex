@@ -64,28 +64,33 @@ defmodule Long.Agent.Schedule do
   end
 
   @doc """
-  A status line for the system prompt: the current time in UTC and in the
-  user's configured timezone. The model has no clock of its own, so this is
-  how it knows "now" — and how to convert a user's stated local time
-  ("tomorrow 8:30am") into the UTC it must store on a scheduled task. Falls
-  back to UTC-only text if the tz database can't resolve the zone.
+  Static timezone context for the (cached) system prompt — the user's zone and
+  the store-UTC rule. The zone changes rarely, so this is cache-safe. The
+  current time deliberately does NOT live here (it changes every turn and would
+  bust the prompt cache); it rides the user turn via `now_line/1`.
   """
-  def now_prompt(now \\ DateTime.utc_now()) do
+  def timezone_note do
+    "The user's timezone is #{Long.Agent.user_timezone()}. Times stored on a " <>
+      "scheduled task (scheduleTime / nextRunAt) MUST be UTC — convert the " <>
+      "user's stated local time to UTC first."
+  end
+
+  @doc """
+  The current time (UTC + the user's local zone) for the *current* user turn.
+  Kept off the system prompt so it never busts the prompt cache — it's prepended
+  to the latest user message instead, and isn't persisted into history.
+  """
+  def now_line(now \\ DateTime.utc_now()) do
     tz = Long.Agent.user_timezone()
     utc = DateTime.truncate(now, :second)
-    base = "Current time: #{DateTime.to_iso8601(utc)} (UTC)."
 
     case DateTime.shift_zone(utc, tz) do
       {:ok, local} ->
-        local_str = Calendar.strftime(local, "%Y-%m-%d %H:%M %A")
-
-        base <>
-          " The user's timezone is #{tz}; their local time is #{local_str}." <>
-          " Times stored on a scheduled task (scheduleTime / nextRunAt) MUST be UTC" <>
-          " — convert the user's local time to UTC first."
+        "[Current time: #{DateTime.to_iso8601(utc)} UTC = " <>
+          "#{Calendar.strftime(local, "%Y-%m-%d %H:%M %A")} #{tz}]"
 
       _ ->
-        base
+        "[Current time: #{DateTime.to_iso8601(utc)} UTC]"
     end
   end
 

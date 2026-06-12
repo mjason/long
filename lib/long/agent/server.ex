@@ -380,7 +380,9 @@ defmodule Long.Agent.Server do
     turn_no = state.turn + 1
     broadcast(state.session_id, {:turn_start, turn_no})
 
-    user_msg = build_user_message(text, attachments)
+    # The current time rides the user turn (not the system prompt) so it never
+    # busts the prompt cache; the persisted display_text stays time-free.
+    user_msg = build_user_message(Long.Agent.Schedule.now_line() <> "\n\n" <> text, attachments)
     display_text = display_text_for(text, attachments)
     persist_message(state.session_id, :user, display_text, [], [], turn_no, attachment_blocks(attachments))
 
@@ -405,7 +407,7 @@ defmodule Long.Agent.Server do
     system_text =
       [
         Long.Agent.ToolInventory.render(tools),
-        Long.Agent.Schedule.now_prompt(),
+        Long.Agent.Schedule.timezone_note(),
         Loop.default_system() |> String.replace("{{session_id}}", state.session_id),
         addendum
       ]
