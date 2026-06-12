@@ -296,4 +296,15 @@ defmodule LongWeb.ManageLive.GroupsTest do
 
     assert Long.Copy.default_locale() == "zh"
   end
+
+  test "Groups page sets the system timezone, stored as the user_timezone memory", %{conn: conn} do
+    {:ok, view, html} = live(conn, ~p"/manage/groups")
+    assert html =~ "System timezone"
+
+    view
+    |> form("#tzsel-set_timezone", %{timezone: "Europe/London"})
+    |> render_change()
+
+    assert Long.Agent.user_timezone() == "Europe/London"
+  end
 end

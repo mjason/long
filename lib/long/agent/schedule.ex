@@ -71,7 +71,7 @@ defmodule Long.Agent.Schedule do
   back to UTC-only text if the tz database can't resolve the zone.
   """
   def now_prompt(now \\ DateTime.utc_now()) do
-    tz = resolve_timezone()
+    tz = Long.Agent.user_timezone()
     utc = DateTime.truncate(now, :second)
     base = "Current time: #{DateTime.to_iso8601(utc)} (UTC)."
 
@@ -86,19 +86,6 @@ defmodule Long.Agent.Schedule do
 
       _ ->
         base
-    end
-  end
-
-  # The user's timezone: the stored `user_timezone` global memory if they've
-  # told the agent where they are (the system prompt instructs the model to
-  # persist it), else the configured default.
-  defp resolve_timezone do
-    with {:ok, rows} <- Long.Agent.list_global_memory(),
-         %{value: tz} when is_binary(tz) and tz != "" <-
-           Enum.find(rows, &(&1.key == "user_timezone")) do
-      tz
-    else
-      _ -> Application.get_env(:long, :user_timezone, "Asia/Shanghai")
     end
   end
 

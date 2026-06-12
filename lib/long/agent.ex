@@ -308,6 +308,22 @@ defmodule Long.Agent do
     dest
   end
 
+  @doc """
+  The user's timezone for local↔UTC conversion — the stored `user_timezone`
+  global memory if set (by the user in chat or the admin in /manage), else the
+  configured default. Used by `Long.Agent.Schedule.now_prompt/1`.
+  """
+  @spec user_timezone() :: String.t()
+  def user_timezone do
+    with {:ok, rows} <- list_global_memory(),
+         %{value: tz} when is_binary(tz) and tz != "" <-
+           Enum.find(rows, &(&1.key == "user_timezone")) do
+      tz
+    else
+      _ -> Application.get_env(:long, :user_timezone, "Asia/Shanghai")
+    end
+  end
+
   defp unique_web_inbox_path(dir, name) do
     safe = name |> Path.basename() |> String.replace(~r/[^\w.\-]+/u, "_")
     candidate = Path.join(dir, safe)

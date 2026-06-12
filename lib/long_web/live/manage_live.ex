@@ -281,6 +281,17 @@ defmodule LongWeb.ManageLive do
 
   # Language options for the locale dropdowns, from the Copy catalog.
   defp locale_options, do: Enum.map(Long.Copy.locales(), &{&1, locale_label(&1)})
+
+  # Common IANA zones for the picker, with whatever is currently in effect
+  # prepended so it's always selectable even if it isn't in the short list.
+  defp timezone_options(current) do
+    common =
+      ~w(Asia/Shanghai Asia/Hong_Kong Asia/Tokyo Asia/Singapore Asia/Kolkata
+         Europe/London Europe/Paris America/New_York America/Los_Angeles UTC)
+
+    if current in common, do: common, else: [current | common]
+  end
+
   defp locale_label("en"), do: "English"
   defp locale_label("zh"), do: "中文"
   defp locale_label(code), do: code
@@ -808,6 +819,19 @@ defmodule LongWeb.ManageLive do
   def handle_event("set_default_locale", %{"locale" => locale}, socket) do
     Long.Copy.put_default_locale(nil_if_blank(locale))
     {:noreply, socket |> load_section(:groups) |> put_flash(:info, "System default language updated.")}
+  end
+
+  def handle_event("set_timezone", %{"timezone" => tz}, socket) do
+    {:ok, _} =
+      Agent.put_global_memory(%{
+        scope: :general,
+        key: "user_timezone",
+        value: tz,
+        kind: :preference,
+        importance: 4
+      })
+
+    {:noreply, socket |> load_section(:groups) |> put_flash(:info, "System timezone updated.")}
   end
 
   def handle_event("toggle_telegram_enabled", %{"name" => name}, socket) do
@@ -2060,6 +2084,25 @@ defmodule LongWeb.ManageLive do
             <select name="locale" class="border border-zinc-300 rounded-md px-2 py-1.5 text-sm">
               <option value="">— inherit —</option>
               <option :for={{code, label} <- locale_options()} value={code} selected={code == Long.Copy.default_locale_setting()}>{label}</option>
+            </select>
+          </form>
+        </div>
+      </.card>
+
+      <.card variant="bordered" color="natural" rounded="large" padding="none">
+        <div class="flex items-center gap-3 p-4">
+          <div class="flex-1">
+            <div class="text-sm font-medium text-zinc-800">System timezone</div>
+            <div class="text-xs text-zinc-500">
+              How the agent reads your local time when scheduling reminders
+              (e.g. "remind me at 8:30am"). The agent also picks this up when
+              you tell it where you are.
+            </div>
+          </div>
+          <% current_tz = Agent.user_timezone() %>
+          <form id="tzsel-set_timezone" phx-change="set_timezone">
+            <select name="timezone" class="border border-zinc-300 rounded-md px-2 py-1.5 text-sm">
+              <option :for={tz <- timezone_options(current_tz)} value={tz} selected={tz == current_tz}>{tz}</option>
             </select>
           </form>
         </div>
