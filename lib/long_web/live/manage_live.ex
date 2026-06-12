@@ -282,14 +282,14 @@ defmodule LongWeb.ManageLive do
   # Language options for the locale dropdowns, from the Copy catalog.
   defp locale_options, do: Enum.map(Long.Copy.locales(), &{&1, locale_label(&1)})
 
-  # Common IANA zones for the picker, with whatever is currently in effect
-  # prepended so it's always selectable even if it isn't in the short list.
+  # The picker: the current value + a few common zones up top for quick
+  # selection, then every IANA zone so any timezone is reachable.
   defp timezone_options(current) do
     common =
       ~w(Asia/Shanghai Asia/Hong_Kong Asia/Tokyo Asia/Singapore Asia/Kolkata
          Europe/London Europe/Paris America/New_York America/Los_Angeles UTC)
 
-    if current in common, do: common, else: [current | common]
+    ([current | common] ++ Tzdata.zone_list()) |> Enum.uniq()
   end
 
   defp locale_label("en"), do: "English"
