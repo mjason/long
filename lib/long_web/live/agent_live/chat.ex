@@ -716,6 +716,48 @@ defmodule LongWeb.AgentLive.Chat do
     """
   end
 
+  attr :attachments, :list, required: true
+  attr :session_id, :string, required: true
+  attr :dark?, :boolean, default: false
+
+  defp attachment_list(assigns) do
+    ~H"""
+    <div class="flex flex-wrap gap-2 mt-2">
+      <%= for a <- @attachments do %>
+        <a
+          :if={a["kind"] == "image"}
+          href={media_url(@session_id, a["file"])}
+          target="_blank"
+          class="block"
+        >
+          <img
+            src={media_url(@session_id, a["file"])}
+            title={a["caption"]}
+            class={["max-h-52 max-w-[240px] rounded-lg border", (@dark? && "border-white/40") || "border-zinc-200"]}
+          />
+        </a>
+        <video
+          :if={a["kind"] == "video"}
+          src={media_url(@session_id, a["file"])}
+          controls
+          class={["max-h-52 max-w-[240px] rounded-lg border", (@dark? && "border-white/40") || "border-zinc-200"]}
+        />
+        <a
+          :if={a["kind"] not in ["image", "video"]}
+          href={media_url(@session_id, a["file"])}
+          target="_blank"
+          class={[
+            "px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5",
+            (@dark? && "bg-white/20") || "bg-zinc-100 text-zinc-700"
+          ]}
+        >
+          <.icon name="hero-document" class="size-4" />{a["caption"] || a["file"]}
+        </a>
+      <% end %>
+    </div>
+    """
+  end
+
   attr :msg, :any, required: true
 
   defp message_bubble(%{msg: %{role: :user}} = assigns) do
@@ -735,32 +777,20 @@ defmodule LongWeb.AgentLive.Chat do
     >
       <.chat_section class="px-4 py-2.5 text-[15px] leading-relaxed">
         <div :if={@body != ""} class="whitespace-pre-wrap break-words">{@body}</div>
-        <div :if={@attachments != []} class={["flex flex-wrap gap-2", @body != "" && "mt-2"]}>
-          <a
-            :for={a <- @attachments}
-            href={media_url(@msg.session_id, a["file"])}
-            target="_blank"
-            class="block"
-          >
-            <img
-              :if={a["kind"] == "image"}
-              src={media_url(@msg.session_id, a["file"])}
-              class="max-h-52 max-w-[240px] rounded-lg border border-white/40"
-            />
-            <span
-              :if={a["kind"] != "image"}
-              class="px-3 py-1.5 rounded-lg bg-white/20 text-xs flex items-center gap-1.5"
-            >
-              <.icon name="hero-document" class="size-4" />{a["file"]}
-            </span>
-          </a>
-        </div>
+        <.attachment_list
+          :if={@attachments != []}
+          attachments={@attachments}
+          session_id={@msg.session_id}
+          dark?={true}
+        />
       </.chat_section>
     </.chat>
     """
   end
 
   defp message_bubble(%{msg: %{role: :assistant}} = assigns) do
+    assigns = assign(assigns, :attachments, attachments_of(assigns.msg))
+
     ~H"""
     <.chat
       position="normal"
@@ -771,6 +801,12 @@ defmodule LongWeb.AgentLive.Chat do
       class="[&>.chat-section-bubble]:!max-w-[85%] [&>.chat-section-bubble]:bg-white [&>.chat-section-bubble]:border-zinc-300 [&>.chat-section-bubble]:shadow-sm"
     >
       <.chat_section class="px-4 py-3 text-[15px] leading-relaxed">
+        <.attachment_list
+          :if={@attachments != []}
+          attachments={@attachments}
+          session_id={@msg.session_id}
+          dark?={false}
+        />
         <div :if={(@msg.content || "") != ""} class="whitespace-pre-wrap break-words">
           {format_text(@msg.content)}
         </div>
@@ -1055,27 +1091,11 @@ defmodule LongWeb.AgentLive.Chat do
   # web_inbox (under the workspace root so the agent's file tools can read
   # them) and return their absolute paths.
   defp consume_attachments(socket) do
-    dir = Agent.web_inbox_dir(socket.assigns.session_id)
-    File.mkdir_p!(dir)
+    sid = socket.assigns.session_id
 
     consume_uploaded_entries(socket, :attachments, fn %{path: tmp}, entry ->
-      dest = unique_dest(dir, entry.client_name)
-      File.cp!(tmp, dest)
-      {:ok, dest}
+      {:ok, Agent.stage_in_web_inbox(sid, tmp, entry.client_name)}
     end)
-  end
-
-  defp unique_dest(dir, client_name) do
-    safe = client_name |> Path.basename() |> String.replace(~r/[^\w.\-]+/u, "_")
-    candidate = Path.join(dir, safe)
-
-    if File.exists?(candidate) do
-      ext = Path.extname(safe)
-      base = Path.basename(safe, ext)
-      Path.join(dir, "#{base}-#{System.unique_integer([:positive])}#{ext}")
-    else
-      candidate
-    end
   end
 
   defp image_entry?(%{client_type: "image/" <> _}), do: true

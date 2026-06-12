@@ -6,10 +6,10 @@ defmodule Long.Jido.Tools.SendMedia do
   the bot adapter listening on that topic dispatches the actual upload
   + send when the agent loop ends.
 
-  When called from a chat LiveView session (no bot listening), the
-  broadcast is a no-op — the LLM thinks it sent media but nothing
-  reaches the user. Today that's a v1 limitation; future versions can
-  surface inline media in the chat UI.
+  A web `/chat` session has no bot listening to the broadcast; instead the
+  web UI surfaces the media from the assistant message's persisted
+  `blocks["attachments"]` (staged into the session web_inbox at persist time
+  by `Long.Agent.Server`), so it renders inline there too.
   """
 
   use Jido.Action,

@@ -74,6 +74,46 @@ defmodule Long.Agent.ServerTest do
       assert file == Path.basename(img)
       assert user.content =~ "[attachments:"
     end
+
+    test "copies send_media output into web_inbox and records it on the assistant message",
+         %{session: session} do
+      img = Path.join(System.tmp_dir!(), "chart-#{System.unique_integer([:positive])}.png")
+      File.write!(img, "PNGBYTES")
+      on_exit(fn -> File.rm(img) end)
+      on_exit(fn -> File.rm_rf(Agent.web_inbox_dir(session.id)) end)
+
+      Long.Jido.SessionRunner.subscribe(session.id)
+
+      LLMConsumerMock.push_response(session.id, %{
+        type: :tool_calls,
+        tool_calls: [
+          %{
+            id: "m1",
+            name: "send_media",
+            arguments: %{"path" => img, "kind" => "image", "caption" => "the chart"}
+          }
+        ]
+      })
+
+      LLMConsumerMock.push_response(session.id, %{type: :final_answer, text: "here you go"})
+
+      :ok = Server.send_user_message(session.id, "draw a chart", llm_consumer: LLMConsumerMock)
+      assert_receive :loop_ended, 3_000
+
+      {:ok, all} = Agent.list_messages()
+
+      assistant =
+        Enum.find(
+          all,
+          &(&1.session_id == session.id and &1.role == :assistant and is_map(&1.blocks) and
+              &1.blocks["attachments"])
+        )
+
+      assert [%{"file" => file, "kind" => "image", "caption" => "the chart"}] =
+               assistant.blocks["attachments"]
+
+      assert File.regular?(Path.join(Agent.web_inbox_dir(session.id), file))
+    end
   end
 
   describe "lifecycle" do

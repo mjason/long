@@ -292,4 +292,32 @@ defmodule Long.Agent do
     do: path |> Path.extname() |> String.downcase() |> then(&(&1 in ~w(.jpg .jpeg .png .gif .webp .bmp)))
 
   def image?(_), do: false
+
+  @doc """
+  Copy a source file into the session's web_inbox under a sanitized,
+  collision-free name and return the destination path. Both the chat upload
+  path and the agent's send_media output stage media through here, so the
+  media route serves them identically.
+  """
+  @spec stage_in_web_inbox(String.t(), String.t(), String.t() | nil) :: String.t()
+  def stage_in_web_inbox(session_id, src_path, name \\ nil) do
+    dir = web_inbox_dir(session_id)
+    File.mkdir_p!(dir)
+    dest = unique_web_inbox_path(dir, name || Path.basename(src_path))
+    File.cp!(src_path, dest)
+    dest
+  end
+
+  defp unique_web_inbox_path(dir, name) do
+    safe = name |> Path.basename() |> String.replace(~r/[^\w.\-]+/u, "_")
+    candidate = Path.join(dir, safe)
+
+    if File.exists?(candidate) do
+      ext = Path.extname(safe)
+      base = Path.basename(safe, ext)
+      Path.join(dir, "#{base}-#{System.unique_integer([:positive])}#{ext}")
+    else
+      candidate
+    end
+  end
 end

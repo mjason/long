@@ -487,7 +487,18 @@ defmodule Long.Agent.Server do
 
     assistant_msg = ReqLLM.Context.assistant(text || "", tool_calls: req_calls)
 
-    persist_message(state.session_id, :assistant, text || "", tcs, [], state.turn)
+    # outbound_media_blocks stages any send_media output into web_inbox for
+    # the web UI — the referenced file was produced on an earlier turn, so it
+    # already exists on disk by now.
+    persist_message(
+      state.session_id,
+      :assistant,
+      text || "",
+      tcs,
+      [],
+      state.turn,
+      outbound_media_blocks(state.session_id, tcs)
+    )
 
     # Synthesize tool_results immediately for the overflow tail; only
     # the to_run portion goes through actual execution.
@@ -934,6 +945,41 @@ defmodule Long.Agent.Server do
         end)
     }
   end
+
+  # When the assistant calls send_media, copy the referenced workspace file
+  # into the session's web_inbox and record a UI ref on the message, so the
+  # web /chat renders it inline (bot channels deliver the same payload via the
+  # :bot_send_media broadcast; the web surfaces it from message.blocks). The
+  # file already exists — send_media targets a path the agent produced earlier.
+  defp outbound_media_blocks(session_id, tool_calls) do
+    case Enum.flat_map(tool_calls, &outbound_media(session_id, &1)) do
+      [] -> %{}
+      medias -> %{"attachments" => medias}
+    end
+  end
+
+  defp outbound_media(session_id, %{name: "send_media", arguments: args}) when is_map(args) do
+    path = args["path"]
+
+    if is_binary(path) and File.regular?(path) do
+      dest = Agent.stage_in_web_inbox(session_id, path)
+
+      [
+        %{
+          "file" => Path.basename(dest),
+          "kind" => to_string(args["kind"] || "file"),
+          "caption" => args["caption"]
+        }
+      ]
+    else
+      # Not on disk yet (e.g. generated in this same tool batch) — the bot
+      # broadcast path catches it post-turn; the web render skips it.
+      Logger.debug("send_media path not ready at persist time, skipping web render: #{inspect(path)}")
+      []
+    end
+  end
+
+  defp outbound_media(_session_id, _tool_call), do: []
 
   defp image?(p), do: Agent.image?(p)
 
