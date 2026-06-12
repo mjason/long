@@ -55,6 +55,11 @@ defmodule Long.Agent do
       define :bump_global_memory_usage, action: :bump_usage
     end
 
+    resource Long.Agent.Setting do
+      define :put_setting, action: :upsert
+      define :get_setting, action: :read, get_by: [:key]
+    end
+
     resource Long.Agent.SessionMemory do
       define :put_session_memory, action: :upsert
       define :list_session_memory, action: :read
@@ -310,19 +315,33 @@ defmodule Long.Agent do
 
   @doc """
   The user's timezone for local↔UTC conversion — the stored `user_timezone`
-  global memory if set (by the user in chat or the admin in /manage), else the
-  configured default. Used by `Long.Agent.Schedule.now_prompt/1`.
+  setting if set (by the user via `set_timezone` or the admin in /manage), else
+  the configured default. Used by `Long.Agent.Schedule.timezone_note/0`.
   """
   @spec user_timezone() :: String.t()
   def user_timezone do
-    with {:ok, rows} <- list_global_memory(),
-         %{value: tz} when is_binary(tz) and tz != "" <-
-           Enum.find(rows, &(&1.key == "user_timezone")) do
-      tz
-    else
+    case get_setting("user_timezone") do
+      {:ok, %{value: tz}} when is_binary(tz) and tz != "" -> tz
       _ -> Application.get_env(:long, :user_timezone, "Asia/Shanghai")
     end
   end
+
+  @doc """
+  Persist the user timezone if `tz` is a valid IANA zone — the single write path
+  shared by the `set_timezone` tool and the admin UI. Returns `:ok`, or `:error`
+  for an unknown zone / non-binary (so callers can ignore half-typed input).
+  """
+  @spec put_user_timezone(term()) :: :ok | :error
+  def put_user_timezone(tz) when is_binary(tz) do
+    if tz in Tzdata.zone_list() do
+      {:ok, _} = put_setting(%{key: "user_timezone", value: tz})
+      :ok
+    else
+      :error
+    end
+  end
+
+  def put_user_timezone(_), do: :error
 
   defp unique_web_inbox_path(dir, name) do
     safe = name |> Path.basename() |> String.replace(~r/[^\w.\-]+/u, "_")

@@ -40,11 +40,11 @@ defmodule Long.Jido.Tools.GraphQL do
         }) { result { id name nextRunAt } errors { message } }
       }
 
-      # Remember a global preference
+      # Remember a global preference (NOT timezone — use the set_timezone tool)
       mutation {
         putGlobalMemory(input: {
-          scope: GENERAL, key: "user_timezone",
-          value: "Asia/Shanghai", kind: PREFERENCE, importance: 4
+          scope: GENERAL, key: "coffee_order",
+          value: "oat flat white, no sugar", kind: PREFERENCE, importance: 3
         }) { result { id } errors { message } }
       }
 

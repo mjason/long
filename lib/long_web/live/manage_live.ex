@@ -822,21 +822,10 @@ defmodule LongWeb.ManageLive do
   end
 
   def handle_event("set_timezone", %{"timezone" => tz}, socket) do
-    # phx-change fires while typing; only persist a complete, valid zone (a
-    # picked datalist option or a fully-typed one), ignoring half-typed input.
-    if tz in Tzdata.zone_list() do
-      {:ok, _} =
-        Agent.put_global_memory(%{
-          scope: :general,
-          key: "user_timezone",
-          value: tz,
-          kind: :preference,
-          importance: 4
-        })
-
-      {:noreply, socket |> load_section(:groups) |> put_flash(:info, "System timezone updated.")}
-    else
-      {:noreply, socket}
+    # phx-change fires while typing; put_user_timezone ignores half-typed input.
+    case Agent.put_user_timezone(tz) do
+      :ok -> {:noreply, socket |> load_section(:groups) |> put_flash(:info, "System timezone updated.")}
+      :error -> {:noreply, socket}
     end
   end
 

@@ -82,12 +82,15 @@ defmodule Long.Jido.Loop do
       mutation {
         putGlobalMemory(input: {
           scope: GENERAL
-          key: "user_timezone"
-          value: "Asia/Shanghai"
+          key: "coffee_order"
+          value: "oat flat white, no sugar"
           kind: PREFERENCE
-          importance: 4
+          importance: 3
         }) { result { id } errors { message } }
       }
+
+  (The user's timezone is NOT a memory — it's injected every turn and you
+  change it with the `set_timezone` tool, never `putGlobalMemory`.)
 
   Remember something session-local:
 

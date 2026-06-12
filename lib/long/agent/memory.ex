@@ -56,24 +56,19 @@ defmodule Long.Agent.Memory do
 
   defp l2_section do
     case Agent.list_global_memory() do
-      {:ok, rows} ->
-        # `user_timezone` is a system setting the prompt's clock line already
-        # uses (see Long.Agent.Schedule.now_prompt) — don't also dump it here
-        # as if it were an agent-learned memory.
-        case Enum.reject(rows, &(&1.key == "user_timezone")) do
-          [] ->
-            nil
+      {:ok, []} ->
+        nil
 
-          kept ->
-            kept
-            |> Enum.group_by(& &1.scope)
-            |> Enum.sort_by(fn {scope, _} -> scope_order(scope) end)
-            |> Enum.map_join("\n\n", fn {scope, entries} ->
-              header = "## [Global memory — L2 · #{scope}]"
-              body = Enum.map_join(entries, "\n", &"- **#{&1.key}**: #{&1.value}")
-              header <> "\n" <> body
-            end)
-        end
+      {:ok, rows} ->
+        grouped = Enum.group_by(rows, & &1.scope)
+
+        grouped
+        |> Enum.sort_by(fn {scope, _} -> scope_order(scope) end)
+        |> Enum.map_join("\n\n", fn {scope, entries} ->
+          header = "## [Global memory — L2 · #{scope}]"
+          body = Enum.map_join(entries, "\n", &"- **#{&1.key}**: #{&1.value}")
+          header <> "\n" <> body
+        end)
 
       _ ->
         nil
