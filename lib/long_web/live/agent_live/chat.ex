@@ -35,18 +35,18 @@ defmodule LongWeb.AgentLive.Chat do
      |> assign(:sessions, list_sessions())
      |> assign(:sidebar_open?, true)
      |> assign(:memory_open?, true)
-     |> assign(:editing_title?, false)}
+     |> assign(:editing_title?, false)
+     |> allow_upload(:attachments, accept: :any, max_entries: 6, max_file_size: 25_000_000)}
   end
 
   @impl true
   def handle_event("dismiss_notice", _, socket), do: {:noreply, assign(socket, :loop_notice, nil)}
 
   def handle_event("submit", %{"input" => text}, socket) do
-    case String.trim(text) do
-      "" ->
-        {:noreply, socket}
+    trimmed = String.trim(text)
 
-      "/clear" ->
+    cond do
+      trimmed == "/clear" ->
         Long.Agent.SessionClear.clear(socket.assigns.session_id)
 
         {:noreply,
@@ -58,8 +58,12 @@ defmodule LongWeb.AgentLive.Chat do
          |> assign(:loop_notice, %{kind: :info, text: Long.Copy.t("bots.cleared")})
          |> push_event("agent:clear-composer", %{})}
 
-      trimmed ->
-        SessionRunner.send_user_message(socket.assigns.session_id, trimmed)
+      trimmed == "" and socket.assigns.uploads.attachments.entries == [] ->
+        {:noreply, socket}
+
+      true ->
+        attachments = consume_attachments(socket)
+        SessionRunner.send_user_message(socket.assigns.session_id, trimmed, attachments: attachments)
 
         {:noreply,
          socket
@@ -69,6 +73,11 @@ defmodule LongWeb.AgentLive.Chat do
          |> push_event("agent:clear-composer", %{})}
     end
   end
+
+  def handle_event("validate_upload", _params, socket), do: {:noreply, socket}
+
+  def handle_event("cancel_upload", %{"ref" => ref}, socket),
+    do: {:noreply, cancel_upload(socket, :attachments, ref)}
 
   def handle_event("new_session", _, socket) do
     {:ok, sess} =
@@ -479,7 +488,7 @@ defmodule LongWeb.AgentLive.Chat do
           <.loop_notice :if={@loop_notice} notice={@loop_notice} />
         </div>
 
-        <.composer loop_running?={@loop_running?} />
+        <.composer loop_running?={@loop_running?} uploads={@uploads} />
 
         <script :type={Phoenix.LiveView.ColocatedHook} name=".ScrollBottom">
           export default {
@@ -710,6 +719,11 @@ defmodule LongWeb.AgentLive.Chat do
   attr :msg, :any, required: true
 
   defp message_bubble(%{msg: %{role: :user}} = assigns) do
+    assigns =
+      assigns
+      |> assign(:body, attachment_text(assigns.msg))
+      |> assign(:attachments, attachments_of(assigns.msg))
+
     ~H"""
     <.chat
       position="flipped"
@@ -720,7 +734,27 @@ defmodule LongWeb.AgentLive.Chat do
       class="[&>.chat-section-bubble]:!max-w-[75%]"
     >
       <.chat_section class="px-4 py-2.5 text-[15px] leading-relaxed">
-        <div class="whitespace-pre-wrap break-words">{@msg.content}</div>
+        <div :if={@body != ""} class="whitespace-pre-wrap break-words">{@body}</div>
+        <div :if={@attachments != []} class={["flex flex-wrap gap-2", @body != "" && "mt-2"]}>
+          <a
+            :for={a <- @attachments}
+            href={media_url(@msg.session_id, a["file"])}
+            target="_blank"
+            class="block"
+          >
+            <img
+              :if={a["kind"] == "image"}
+              src={media_url(@msg.session_id, a["file"])}
+              class="max-h-52 max-w-[240px] rounded-lg border border-white/40"
+            />
+            <span
+              :if={a["kind"] != "image"}
+              class="px-3 py-1.5 rounded-lg bg-white/20 text-xs flex items-center gap-1.5"
+            >
+              <.icon name="hero-document" class="size-4" />{a["file"]}
+            </span>
+          </a>
+        </div>
       </.chat_section>
     </.chat>
     """
@@ -899,38 +933,84 @@ defmodule LongWeb.AgentLive.Chat do
   end
 
   attr :loop_running?, :boolean, required: true
+  attr :uploads, :any, required: true
 
   defp composer(assigns) do
     ~H"""
     <form
       id="composer"
       phx-submit="submit"
+      phx-change="validate_upload"
       phx-hook=".Composer"
+      phx-drop-target={@uploads.attachments.ref}
       class="border-t border-zinc-200 bg-white px-4 sm:px-6 py-3"
     >
-      <div class="flex items-end gap-3 max-w-4xl mx-auto">
-        <textarea
-          name="input"
-          rows="1"
-          placeholder={
-            if @loop_running?,
-              do: "Working…",
-              else: "Send a message  (Enter to send · Shift+Enter for newline)"
-          }
-          class="flex-1 resize-none border border-zinc-300 rounded-2xl px-4 py-3 leading-relaxed bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none max-h-60"
-          autofocus
-        ></textarea>
-        <.button
-          type="submit"
-          disabled={@loop_running?}
-          color={if @loop_running?, do: "natural", else: "primary"}
-          rounded="full"
-          size="medium"
-          icon={if @loop_running?, do: "hero-arrow-path", else: "hero-paper-airplane"}
-          icon_class={@loop_running? && "animate-spin"}
-          class="!h-[50px] !w-[50px] !p-0 shrink-0 flex items-center justify-center"
-          title="Send"
-        />
+      <div class="max-w-4xl mx-auto">
+        <div :if={@uploads.attachments.entries != []} class="flex flex-wrap gap-3 mb-3">
+          <div :for={entry <- @uploads.attachments.entries} class="relative group">
+            <.live_img_preview
+              :if={image_entry?(entry)}
+              entry={entry}
+              class="h-16 w-16 object-cover rounded-lg border border-zinc-200"
+            />
+            <div
+              :if={!image_entry?(entry)}
+              class="h-16 px-3 flex items-center gap-1.5 rounded-lg border border-zinc-200 bg-zinc-50 text-xs text-zinc-600 max-w-[180px]"
+            >
+              <.icon name="hero-document" class="size-4 shrink-0 text-zinc-400" />
+              <span class="truncate">{entry.client_name}</span>
+            </div>
+            <button
+              type="button"
+              phx-click="cancel_upload"
+              phx-value-ref={entry.ref}
+              class="absolute -top-1.5 -right-1.5 size-5 rounded-full bg-zinc-700 text-white text-sm leading-none flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
+              title="Remove"
+            >
+              ×
+            </button>
+            <p
+              :for={err <- upload_errors(@uploads.attachments, entry)}
+              class="absolute -bottom-4 left-0 text-[10px] text-red-500 whitespace-nowrap"
+            >
+              {upload_error_to_string(err)}
+            </p>
+          </div>
+        </div>
+
+        <div class="flex items-end gap-2">
+          <label
+            class="shrink-0 size-[50px] flex items-center justify-center rounded-2xl border border-zinc-300 text-zinc-500 hover:bg-zinc-50 cursor-pointer"
+            title="Attach images or files"
+          >
+            <.icon name="hero-paper-clip" class="size-5" />
+            <.live_file_input upload={@uploads.attachments} class="hidden" />
+          </label>
+
+          <textarea
+            name="input"
+            rows="1"
+            placeholder={
+              if @loop_running?,
+                do: "Working…",
+                else: "Send a message  (Enter to send · Shift+Enter for newline)"
+            }
+            class="flex-1 resize-none border border-zinc-300 rounded-2xl px-4 py-3 leading-relaxed bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none max-h-60"
+            autofocus
+          ></textarea>
+
+          <.button
+            type="submit"
+            disabled={@loop_running?}
+            color={if @loop_running?, do: "natural", else: "primary"}
+            rounded="full"
+            size="medium"
+            icon={if @loop_running?, do: "hero-arrow-path", else: "hero-paper-airplane"}
+            icon_class={@loop_running? && "animate-spin"}
+            class="!h-[50px] !w-[50px] !p-0 shrink-0 flex items-center justify-center"
+            title="Send"
+          />
+        </div>
       </div>
     </form>
     """
@@ -968,4 +1048,57 @@ defmodule LongWeb.AgentLive.Chat do
     </aside>
     """
   end
+
+  # ── Attachments (web /chat multimodal uploads) ───────────────────────
+
+  # Move this turn's uploaded files out of the temp area into the session's
+  # web_inbox (under the workspace root so the agent's file tools can read
+  # them) and return their absolute paths.
+  defp consume_attachments(socket) do
+    dir = Agent.web_inbox_dir(socket.assigns.session_id)
+    File.mkdir_p!(dir)
+
+    consume_uploaded_entries(socket, :attachments, fn %{path: tmp}, entry ->
+      dest = unique_dest(dir, entry.client_name)
+      File.cp!(tmp, dest)
+      {:ok, dest}
+    end)
+  end
+
+  defp unique_dest(dir, client_name) do
+    safe = client_name |> Path.basename() |> String.replace(~r/[^\w.\-]+/u, "_")
+    candidate = Path.join(dir, safe)
+
+    if File.exists?(candidate) do
+      ext = Path.extname(safe)
+      base = Path.basename(safe, ext)
+      Path.join(dir, "#{base}-#{System.unique_integer([:positive])}#{ext}")
+    else
+      candidate
+    end
+  end
+
+  defp image_entry?(%{client_type: "image/" <> _}), do: true
+  defp image_entry?(%{client_name: name}) when is_binary(name), do: Agent.image?(name)
+  defp image_entry?(_), do: false
+
+  defp media_url(session_id, file), do: ~p"/chat/media/#{session_id}/#{file}"
+
+  defp attachments_of(%{blocks: %{"attachments" => atts}}) when is_list(atts), do: atts
+  defp attachments_of(_), do: []
+
+  defp attachment_text(%{content: content}), do: strip_attachment_note(content)
+  defp attachment_text(_), do: ""
+
+  # Undo the "[attachments: …]" suffix Server.display_text_for/2 appends to
+  # the stored content — the bubble shows the files as thumbnails/chips.
+  defp strip_attachment_note(nil), do: ""
+
+  defp strip_attachment_note(text),
+    do: String.replace(text, ~r/\n\[attachments:[^\]]*\]\s*\z/, "")
+
+  defp upload_error_to_string(:too_large), do: "too large (max 25MB)"
+  defp upload_error_to_string(:too_many_files), do: "too many files"
+  defp upload_error_to_string(:not_accepted), do: "type not accepted"
+  defp upload_error_to_string(other), do: to_string(other)
 end

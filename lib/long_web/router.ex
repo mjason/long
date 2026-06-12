@@ -29,6 +29,7 @@ defmodule LongWeb.Router do
 
     live "/chat", AgentLive.Chat
     live "/chat/:session_id", AgentLive.Chat
+    get "/chat/media/:session_id/:name", AgentLive.MediaController, :show
     live "/wechat", WechatLive.Login
 
     live "/manage", ManageLive, :llms

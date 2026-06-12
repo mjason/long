@@ -72,4 +72,27 @@ defmodule LongWeb.AgentLive.ChatTest do
       assert html =~ "(echo) ping"
     end
   end
+
+  describe "attachments" do
+    test "uploading a file then submitting stores it under the session web_inbox", %{conn: conn} do
+      {:ok, sess} = Agent.start_session(%{title: "upload"})
+      on_exit(fn -> File.rm_rf(Agent.web_inbox_dir(sess.id)) end)
+
+      {:ok, view, _html} = live(conn, ~p"/chat/#{sess.id}")
+      :ok = SessionRunner.subscribe(sess.id)
+
+      up =
+        file_input(view, "#composer", :attachments, [
+          %{name: "notes.txt", content: "hello file", type: "text/plain"}
+        ])
+
+      render_upload(up, "notes.txt")
+      view |> form("#composer", input: "read this") |> render_submit()
+
+      assert_receive :loop_ended, 2_000
+
+      files = File.ls!(Agent.web_inbox_dir(sess.id))
+      assert Enum.any?(files, &(&1 =~ "notes"))
+    end
+  end
 end

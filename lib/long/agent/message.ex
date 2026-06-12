@@ -73,7 +73,7 @@ defmodule Long.Agent.Message do
     end
 
     attribute :blocks, :map do
-      description "Raw LLM content blocks (Anthropic-style list of dicts) for faithful replay."
+      description "Provider-agnostic side-channel, key-discriminated by writer: \"items\" holds Anthropic-style content blocks for replay; \"attachments\" holds web-upload UI refs ({file, kind}). Replay readers must match the key they expect."
       public? true
     end
 

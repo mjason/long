@@ -365,8 +365,9 @@ defmodule Long.Agent.Server do
     state = %{state | max_turns: max_turns}
 
     if is_nil(alias_name) do
-      # No LLM configured — delegate to the echo fallback runner which
-      # owns its own PubSub broadcasts and message persistence.
+      # No LLM configured — delegate to the echo fallback runner which owns
+      # its own PubSub broadcasts and persistence. It is text-only, so any
+      # :attachments are dropped in echo (demo) mode.
       Long.Agent.SessionRunner.send_user_message(state.session_id, text, opts)
       state
     else
@@ -381,7 +382,7 @@ defmodule Long.Agent.Server do
 
     user_msg = build_user_message(text, attachments)
     display_text = display_text_for(text, attachments)
-    persist_message(state.session_id, :user, display_text, [], [], turn_no)
+    persist_message(state.session_id, :user, display_text, [], [], turn_no, attachment_blocks(attachments))
 
     %{system_addendum: summary_addendum, messages: history} =
       History.load_or_compress(state.session_id, alias_name)
@@ -896,26 +897,45 @@ defmodule Long.Agent.Server do
         end
       end)
 
+    body = text_with_file_note(text || "", attachments)
+
     case image_parts do
-      [] -> ReqLLM.Context.user(text)
-      parts -> ReqLLM.Context.user([ReqLLM.Message.ContentPart.text(text || "") | parts])
+      [] -> ReqLLM.Context.user(body)
+      parts -> ReqLLM.Context.user([ReqLLM.Message.ContentPart.text(body) | parts])
+    end
+  end
+
+  # Non-image uploads aren't multimodal — tell the model their workspace
+  # paths so it can open them with file_read.
+  defp text_with_file_note(text, attachments) do
+    case Enum.reject(attachments, &image?/1) do
+      [] -> text
+      files -> "#{text}\n\n[Uploaded files — open with file_read:\n#{Enum.map_join(files, "\n", &("- " <> &1))}]"
     end
   end
 
   defp display_text_for(text, []), do: text
 
   defp display_text_for(text, attachments) do
-    image_names = attachments |> Enum.filter(&image?/1) |> Enum.map(&Path.basename/1)
-
-    case image_names do
-      [] -> text
-      names -> "#{text}\n[attachments: #{Enum.join(names, ", ")}]"
-    end
+    names = Enum.map_join(attachments, ", ", &Path.basename/1)
+    "#{text}\n[attachments: #{names}]"
   end
 
-  @image_exts ~w(.jpg .jpeg .png .gif .webp .bmp)
-  defp image?(p) when is_binary(p), do: Path.extname(p) |> String.downcase() |> then(&(&1 in @image_exts))
-  defp image?(_), do: false
+  # Persist a lightweight reference to each upload on the user message so
+  # the web UI can render it and history survives a reload. The bytes stay
+  # on the workspace filesystem; only {file, kind} is stored.
+  defp attachment_blocks([]), do: %{}
+
+  defp attachment_blocks(attachments) do
+    %{
+      "attachments" =>
+        Enum.map(attachments, fn p ->
+          %{"file" => Path.basename(p), "kind" => if(image?(p), do: "image", else: "file")}
+        end)
+    }
+  end
+
+  defp image?(p), do: Agent.image?(p)
 
   @mime_by_ext %{
     ".jpg" => "image/jpeg",
@@ -946,8 +966,7 @@ defmodule Long.Agent.Server do
     Application.get_env(:long, :default_tools, Long.Jido.SessionRunner.default_tools())
   end
 
-  defp workspace_root,
-    do: Application.get_env(:long, Long.Agent, [])[:workspace_root] || Path.expand("priv/agent/workspace", File.cwd!())
+  defp workspace_root, do: Agent.workspace_root()
 
   defp build_llm_callbacks(tools, tool_ctx) do
     callbacks =
@@ -1003,7 +1022,7 @@ defmodule Long.Agent.Server do
     Phoenix.PubSub.broadcast(Long.PubSub, @topic_prefix <> session_id, msg)
   end
 
-  defp persist_message(session_id, role, content, tool_calls, tool_results, turn) do
+  defp persist_message(session_id, role, content, tool_calls, tool_results, turn, blocks \\ %{}) do
     tcs =
       Enum.map(tool_calls, fn tc ->
         %{"id" => tc.id, "name" => tc.name, "input" => tc.arguments}
@@ -1023,7 +1042,8 @@ defmodule Long.Agent.Server do
       content: content,
       tool_calls: tcs,
       tool_results: trs,
-      turn: turn
+      turn: turn,
+      blocks: blocks
     }
 
     case Agent.append_message(attrs) do

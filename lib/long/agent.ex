@@ -269,4 +269,27 @@ defmodule Long.Agent do
     reassign_bot_users(:telegram, credential.name, credential.member_id)
     {:ok, credential}
   end
+
+  @doc "Filesystem root the agent's file tools and inbound media live under."
+  @spec workspace_root() :: String.t()
+  def workspace_root,
+    do:
+      Application.get_env(:long, Long.Agent, [])[:workspace_root] ||
+        Path.expand("priv/agent/workspace", File.cwd!())
+
+  @doc """
+  Directory holding a web `/chat` session's uploaded attachments. Kept under
+  the workspace root so the agent's file_read/code_run path guard can reach
+  them, and isolated per session so the media route can serve them safely.
+  """
+  @spec web_inbox_dir(String.t()) :: String.t()
+  def web_inbox_dir(session_id) when is_binary(session_id),
+    do: Path.join([workspace_root(), "web_inbox", session_id])
+
+  @doc "True for paths we treat as inline-renderable / vision-capable images."
+  @spec image?(term()) :: boolean()
+  def image?(path) when is_binary(path),
+    do: path |> Path.extname() |> String.downcase() |> then(&(&1 in ~w(.jpg .jpeg .png .gif .webp .bmp)))
+
+  def image?(_), do: false
 end

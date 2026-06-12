@@ -50,6 +50,32 @@ defmodule Long.Agent.ServerTest do
     end
   end
 
+  describe "attachments" do
+    test "persists upload references onto the user message blocks", %{session: session} do
+      Long.Jido.SessionRunner.subscribe(session.id)
+      LLMConsumerMock.push_response(session.id, %{type: :final_answer, text: "ok"})
+
+      img = Path.join(System.tmp_dir!(), "shot-#{System.unique_integer([:positive])}.png")
+      File.write!(img, "fakepngbytes")
+      on_exit(fn -> File.rm(img) end)
+
+      :ok =
+        Server.send_user_message(session.id, "look at this",
+          attachments: [img],
+          llm_consumer: LLMConsumerMock
+        )
+
+      assert_receive :loop_ended, 2_000
+
+      {:ok, all} = Agent.list_messages()
+      user = Enum.find(all, &(&1.session_id == session.id and &1.role == :user))
+
+      assert [%{"file" => file, "kind" => "image"}] = user.blocks["attachments"]
+      assert file == Path.basename(img)
+      assert user.content =~ "[attachments:"
+    end
+  end
+
   describe "lifecycle" do
     test "spawns a Server under DynamicSupervisor on first send", %{session: session} do
       :ok = Server.send_user_message(session.id, "hi")
