@@ -36,6 +36,12 @@ defmodule Long.Agent.Bots.Wechat.Markdown do
   # the official filter's `containsCJK` set).
   @cjk_class "\\x{2E80}-\\x{9FFF}\\x{AC00}-\\x{D7AF}\\x{F900}-\\x{FAFF}"
 
+  # Code fences (``` … ```, incl. an unclosed trailing one) and inline code
+  # (`…`) pass through verbatim — mirrors the official filter's `fence` state,
+  # so markdown-like characters inside code are never mangled.
+  @fence_re ~r/```.*?(?:```|\z)/s
+  @inline_re ~r/`[^`\n]+`/
+
   @doc """
   Apply the full WeChat-tuned cleanup: strip our own framing tokens,
   then run the markdown sanitizer.
@@ -53,6 +59,24 @@ defmodule Long.Agent.Bots.Wechat.Markdown do
 
   @doc "Strip the markdown subset WeChat doesn't render or renders badly."
   def strip_markdown(text) when is_binary(text) do
+    # Code fences and inline code pass through verbatim (the official filter's
+    # `fence` state); only the plain segments between them are stripped, so
+    # `~~`, `*中文*`, `#####`, `>` inside code survive untouched.
+    protect(text, @fence_re, fn outside ->
+      protect(outside, @inline_re, &strip_plain/1)
+    end)
+  end
+
+  # Run `fun` only on the segments that DON'T match `re`; keep matches verbatim.
+  defp protect(text, re, fun) do
+    re
+    |> Regex.split(text, include_captures: true, trim: false)
+    |> Enum.map_join("", fn part ->
+      if Regex.match?(re, part), do: part, else: fun.(part)
+    end)
+  end
+
+  defp strip_plain(text) do
     text
     |> remove_images()
     |> strip_strikethrough()
