@@ -24,13 +24,17 @@ defmodule Long.Jido.Tools.NotifyMember do
     someone in the group.
 
     Addressing the recipient (`target`):
-      - With exactly ONE other member in the group, the target is
-        ignored — any value (a display name, a pronoun in any language,
-        or an empty string) reaches that member. So for "tell him OK" /
-        "和他说一声好的", just call this with the message; do NOT ask who.
-      - With several other members, pass the member's display name
-        (partial match works). On a miss the error lists who's
-        available — retry with one of those names.
+      - Leave `target` EMPTY when you don't have a specific name. With
+        exactly ONE other member it goes straight to them — so for
+        "tell them OK" / "和ta说一声好的", just send with an empty target;
+        do NOT ask who. With several members an empty target asks which.
+      - When you DO name a `target`, it must match a member's display
+        name (partial match works) — even when there's only one other
+        member. On a miss the error lists who's actually in the group;
+        retry with one of those names, or an empty target for "the other
+        person". (Naming the caller themselves, or a word that matches
+        nobody, is a miss — it will NOT be force-delivered to the one
+        other member.)
 
     The message is delivered to every chat account (WeChat / Telegram)
     the target has bound. Only usable from a chat bound to a group
@@ -144,11 +148,18 @@ defmodule Long.Jido.Tools.NotifyMember do
   defp pick([], _target, locale),
     do: {:error, Copy.t("notify.no_others", %{}, locale)}
 
-  defp pick([only], _target, _locale), do: {:ok, only}
+  # No name given — auto-route only when there's exactly one other member
+  # ("tell them …" with nobody named). With several, we must ask who.
+  defp pick([only], "", _locale), do: {:ok, only}
 
   defp pick(others, "", locale),
     do: {:error, Copy.t("notify.which_member", %{options: member_list(others)}, locale)}
 
+  # A name WAS given — require a real match even when there's only one other
+  # member. A miss returns the roster instead of silently delivering to the
+  # lone member: that's the bug where naming the caller themselves (or any
+  # word that matches nobody) still reached the one other member. The LLM
+  # then retries with a listed name or an empty target.
   defp pick(others, target, locale) do
     case name_matches(others, target) do
       [one] -> {:ok, one}

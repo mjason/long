@@ -192,19 +192,40 @@ defmodule Long.Agent do
   end
 
   @doc """
-  The `Member` behind a session. A bot chat resolves to the member its
-  account is bound to; a web `/chat` session has no bound account, so it
-  falls back to `default_member/0` (the owner) — that's what lets the web
-  console use member-scoped features (skills, `notify_member`, a
-  per-member code workspace). Only `nil` when no members exist at all.
+  The `Member` behind a session, or `nil` when there's no member to act as.
+
+  Resolution hinges on one distinction — "no bot account" vs "a bot account
+  that simply hasn't bound yet":
+
+    * a bot chat bound (`/bind`) to a member → that member;
+    * a bot chat that exists but is **unbound** → `nil`. An unbound account
+      is a stranger talking to a hosted bot; it must NOT inherit the owner's
+      powers (skills, `notify_member`, the owner's code workspace);
+    * a web `/chat` session (no bot account at all) → `default_member/0`,
+      the owner, because the web console *is* the owner's own surface;
+    * `nil` if no members exist.
+
+  The old code folded "unbound bot account" into the owner fallback, so an
+  unbound Telegram/WeChat user was silently treated as the owner — a
+  privilege-escalation hole this guards against.
   """
   @spec member_for_session(String.t()) :: Long.Agent.Member.t() | nil
   def member_for_session(session_id) when is_binary(session_id) do
-    with {:ok, %{member_id: mid}} when is_binary(mid) <- get_bot_user_for_session(session_id),
-         {:ok, member} <- get_member(mid) do
-      member
-    else
-      _ -> default_member()
+    case get_bot_user_for_session(session_id) do
+      {:ok, %{member_id: mid}} when is_binary(mid) ->
+        case get_member(mid) do
+          {:ok, member} -> member
+          _ -> nil
+        end
+
+      # A bot account present but not yet bound to a member — a stranger on a
+      # hosted bot. Genuinely unbound: do not impersonate the owner.
+      {:ok, _unbound} ->
+        nil
+
+      # No bot account at all → a web `/chat` console, which acts as the owner.
+      _ ->
+        default_member()
     end
   end
 

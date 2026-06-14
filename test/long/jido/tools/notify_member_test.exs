@@ -43,25 +43,31 @@ defmodule Long.Jido.Tools.NotifyMemberTest do
   defp uniq, do: System.unique_integer([:positive])
   defp run(target, sid), do: NotifyMember.run(%{target: target, message: "好的"}, %{session_id: sid})
 
-  describe "2-person group — any target reaches the one other member (any language)" do
+  describe "2-person group — empty target auto-routes; a named target must still match" do
     setup do
       {:ok, sid: setup_group([{"太子", :self, true}])}
     end
 
-    test "a pronoun in any language reaches them", %{sid: sid} do
-      assert {:ok, %{to: "太子", channels: 1}} = run("他", sid)
-      assert {:ok, %{to: "太子"}} = run("him", sid)
-      assert {:ok, %{to: "太子"}} = run("对方", sid)
-    end
-
-    test "an empty / nil target reaches them", %{sid: sid} do
-      assert {:ok, %{to: "太子"}} = run("", sid)
+    test "an empty / nil target reaches the one other member", %{sid: sid} do
+      assert {:ok, %{to: "太子", channels: 1}} = run("", sid)
       assert {:ok, %{to: "太子"}} = run(nil, sid)
     end
 
-    test "a name or even a non-matching word still reaches the only other member", %{sid: sid} do
+    test "the other member's name (even partial) reaches them", %{sid: sid} do
       assert {:ok, %{to: "太子"}} = run("太子", sid)
-      assert {:ok, %{to: "太子"}} = run("neighbour bob", sid)
+      assert {:ok, %{to: "太子"}} = run("太", sid)
+    end
+
+    # Regression: naming someone who isn't the one other member — the caller
+    # themselves, a pronoun, or any non-matching word — must NOT be force-
+    # delivered to that member (the bug where notifying the caller reached
+    # the only other member instead). The error lists who's available so the
+    # LLM retries with a real name or an empty target.
+    test "a non-matching name errors with the roster, never mis-delivers", %{sid: sid} do
+      assert {:ok, %{status: "error", msg: msg}} = run("大人", sid)
+      assert msg =~ "太子"
+      assert {:ok, %{status: "error"}} = run("neighbour bob", sid)
+      assert {:ok, %{status: "error"}} = run("他", sid)
     end
   end
 
@@ -112,6 +118,61 @@ defmodule Long.Jido.Tools.NotifyMemberTest do
       sess = Agent.start_session!(%{title: "web"})
       assert {:ok, %{status: "error", msg: msg}} = run("他", sess.id)
       assert msg =~ "/bind"
+    end
+
+    # Regression (privilege escalation): a bot account that exists but never
+    # /bind-ed is a stranger — it must be rejected, NOT silently promoted to
+    # the owner. Before the fix this fell back to default_member and notified
+    # the group as the owner.
+    test "an unbound bot account can't notify even when an owner exists" do
+      {:ok, hh} = Agent.create_group(%{name: "Esc-#{uniq()}"})
+
+      {:ok, _owner} =
+        Agent.create_member(%{group_id: hh.id, display_name: "Owner", relation: :self, role: :owner})
+
+      {:ok, _queen} =
+        Agent.create_member(%{group_id: hh.id, display_name: "Queen", relation: :other})
+
+      sess = Agent.start_session!(%{title: "telegram:stranger"})
+
+      {:ok, _} =
+        Agent.create_bot_user(%{
+          platform: :telegram,
+          external_id: "stranger-#{uniq()}",
+          chat_id: "999",
+          session_id: sess.id,
+          member_id: nil
+        })
+
+      assert {:ok, %{status: "error", msg: msg}} = run("Queen", sess.id)
+      assert msg =~ "/bind"
+    end
+
+    # The flip side: a web /chat session has NO bot account, so it legitimately
+    # acts as the owner — that must keep working.
+    test "a web /chat session (no bot account) still acts as the owner" do
+      {:ok, hh} = Agent.create_group(%{name: "Web-#{uniq()}"})
+
+      {:ok, _owner} =
+        Agent.create_member(%{group_id: hh.id, display_name: "Owner", relation: :self, role: :owner})
+
+      {:ok, queen} =
+        Agent.create_member(%{group_id: hh.id, display_name: "Queen", relation: :other})
+
+      {:ok, _} =
+        Agent.create_bot_user(%{
+          platform: :telegram,
+          external_id: "q-#{uniq()}",
+          chat_id: "1",
+          member_id: queen.id
+        })
+
+      sess = Agent.start_session!(%{title: "web"})
+      me = self()
+      deliver = fn _bu, _body -> send(me, :pushed) && :ok end
+
+      assert {:ok, %{status: "sent", to: "Queen"}} =
+               NotifyMember.run(%{target: "Queen", message: "hi"}, %{session_id: sess.id, deliver: deliver})
     end
   end
 
