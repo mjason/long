@@ -188,18 +188,25 @@ defmodule Long.Agent.CodeRunner do
   released the port. Send SIGKILL first when the port is still alive.
   """
   def kill_port(port) do
-    case Port.info(port, :os_pid) do
-      {:os_pid, pid} -> _ = System.cmd("kill", ["-9", to_string(pid)])
-      _ -> :ok
-    end
-
+    # Best-effort: must never raise (it runs on the timeout / output-flood
+    # cleanup path). `kill` may be absent (slim images lack procps), so resolve
+    # it first and skip the SIGKILL if missing — Port.close still sends SIGTERM.
+    # Previously a bare `System.cmd("kill", ...)` raised :enoent there, crashing
+    # the whole code_run with an opaque ExecutionFailureError.
     try do
+      with {:os_pid, pid} <- Port.info(port, :os_pid),
+           kill when is_binary(kill) <- System.find_executable("kill") do
+        System.cmd(kill, ["-9", to_string(pid)])
+      end
+
       Port.close(port)
     rescue
       _ -> :ok
     catch
       _, _ -> :ok
     end
+
+    :ok
   end
 
   @doc """

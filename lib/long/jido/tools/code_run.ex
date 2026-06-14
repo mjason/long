@@ -15,7 +15,11 @@ defmodule Long.Jido.Tools.CodeRun do
         "(TypeScript/JavaScript): it runs in a per-member workspace with filesystem " <>
         "access limited to that directory plus network — a safe multi-user sandbox. " <>
         "Use type=\"bash\" for shell / system commands (dates, file ops). For " <>
-        "computation, write TS/JS and let it run on Deno (the default).",
+        "computation, write TS/JS and let it run on Deno (the default). " <>
+        "The Deno sandbox has NO subprocess — no shelling out to python / libreoffice / " <>
+        "bash / Deno.Command / child_process. To read a document, import a parser from " <>
+        "esm.sh (mammoth for .docx, unpdf for .pdf), or — since .docx/.pptx/.xlsx are " <>
+        "ZIP — unzip with JSZip and read the XML (for .pptx, the slides' <a:t> text).",
     category: "code",
     tags: ["deno", "javascript", "typescript", "bash"],
     vsn: "3.0.0",

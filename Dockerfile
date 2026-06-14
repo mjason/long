@@ -72,7 +72,7 @@ FROM ${RUNNER_IMAGE} AS final
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
-       libstdc++6 openssl libncurses6 locales ca-certificates curl unzip inotify-tools \
+       libstdc++6 openssl libncurses6 locales ca-certificates curl unzip inotify-tools procps \
        libnss3 libnspr4 libgbm1 libdrm2 libxkbcommon0 libexpat1 \
        libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libxext6 libx11-6 \
        libpango-1.0-0 libcairo2 libasound2t64 libatk1.0-0t64 \

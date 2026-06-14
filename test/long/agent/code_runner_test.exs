@@ -212,4 +212,18 @@ defmodule Long.Agent.CodeRunnerTest do
       end
     end
   end
+
+  describe "kill_port/1" do
+    # Regression: it runs on the timeout / output-flood cleanup path and must
+    # never raise. `kill` can be absent (slim images), where a bare
+    # System.cmd("kill", ...) raised :enoent and crashed the whole code_run.
+    test "is best-effort: returns :ok and never raises, even on an exited/closed port" do
+      exe = System.find_executable("true") || "/bin/true"
+      port = Port.open({:spawn_executable, exe}, [:exit_status, :binary, :hide])
+
+      assert CodeRunner.kill_port(port) == :ok
+      # a second call on the now-closed port must also not raise
+      assert CodeRunner.kill_port(port) == :ok
+    end
+  end
 end
