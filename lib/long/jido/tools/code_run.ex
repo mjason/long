@@ -16,10 +16,12 @@ defmodule Long.Jido.Tools.CodeRun do
         "access limited to that directory plus network — a safe multi-user sandbox. " <>
         "Use type=\"bash\" for shell / system commands (dates, file ops). For " <>
         "computation, write TS/JS and let it run on Deno (the default). " <>
-        "The Deno sandbox has NO subprocess — no shelling out to python / libreoffice / " <>
-        "bash / Deno.Command / child_process. To read a document, import a parser from " <>
-        "esm.sh (mammoth for .docx, unpdf for .pdf), or — since .docx/.pptx/.xlsx are " <>
-        "ZIP — unzip with JSZip and read the XML (for .pptx, the slides' <a:t> text).",
+        "The sandbox has network and can import ANY package from esm.sh / npm, so you " <>
+        "can read or convert ANY file type — pick a fitting parser (mammoth for .docx, " <>
+        "unpdf for .pdf, JSZip for ZIP-based Office files) or decode the bytes yourself; " <>
+        "for an unfamiliar format, find a suitable npm library and just try it before " <>
+        "giving up. The only limit: NO subprocess (no python / libreoffice / bash / " <>
+        "Deno.Command / child_process).",
     category: "code",
     tags: ["deno", "javascript", "typescript", "bash"],
     vsn: "3.0.0",

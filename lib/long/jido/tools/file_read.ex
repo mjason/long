@@ -47,13 +47,13 @@ defmodule Long.Jido.Tools.FileRead do
   defp binary_blob?(contents), do: String.contains?(contents, <<0>>)
 
   defp binary_hint do
-    "This file looks binary (.docx / .pptx / .xlsx / .pdf / .doc), not text — " <>
-      "file_read can't extract it. Use code_run (Deno, NO subprocess) instead: " <>
-      "import a parser from esm.sh — `mammoth` for .docx, `unpdf` for .pdf — or, " <>
-      "since .docx/.pptx/.xlsx are ZIP, unzip with `JSZip` and read the XML (for " <>
-      ".pptx, the slides' `<a:t>` text). Don't shell out to python/libreoffice; " <>
-      "there is no subprocess. A legacy .doc/.ppt has no good JS parser — ask for " <>
-      ".docx/.pptx, PDF, or text."
+    "This file is binary; file_read only handles text. In code_run (Deno) you can " <>
+      "import ANY package from esm.sh / npm to parse ANY format — e.g. mammoth " <>
+      "(.docx), unpdf (.pdf), JSZip (ZIP-based .docx/.pptx/.xlsx — read the XML, e.g. " <>
+      ".pptx slides' <a:t>) — and for any other type, find a fitting npm parser or " <>
+      "decode the bytes yourself, and just try it. No subprocess (no python / " <>
+      "libreoffice / bash). Only ask the user to convert if a format genuinely has no " <>
+      "usable JS library (e.g. a legacy .doc / .ppt)."
   end
 
   defp render(contents, params) do
