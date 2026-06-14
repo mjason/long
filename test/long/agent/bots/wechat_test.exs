@@ -1,7 +1,7 @@
 defmodule Long.Agent.Bots.WechatTest do
   use Long.DataCase, async: false
 
-  alias Long.Agent.Bots.Wechat.{Client, Credential, Crypto, Markdown}
+  alias Long.Agent.Bots.Wechat.{Client, Credential, Crypto, Markdown, Worker}
 
   describe "Crypto" do
     test "encrypt/decrypt round-trips with PKCS7 padding" do
@@ -92,6 +92,26 @@ defmodule Long.Agent.Bots.WechatTest do
     test "false for bot echoes" do
       refute Client.user_msg?(%{"message_type" => Client.msg_bot()})
       refute Client.user_msg?(%{})
+    end
+  end
+
+  describe "Worker.combined_text/1 — coalescing a split caption+media burst" do
+    test "keeps the caption when a text message and an image-only message are combined" do
+      # WeChat splits "caption + image" into two messages a beat apart; the
+      # combine must keep the caption (the image message contributes no text).
+      text = %{"item_list" => [%{"type" => Client.item_text(), "text_item" => %{"text" => "帮我分析这个文件"}}]}
+      image = %{"item_list" => [%{"type" => Client.item_image(), "image_item" => %{}}]}
+
+      assert Worker.combined_text([text, image]) == "帮我分析这个文件"
+      assert Worker.combined_text([image, text]) == "帮我分析这个文件"
+    end
+
+    test "joins multiple captions newline-wise; drops blanks" do
+      t = fn s -> %{"item_list" => [%{"type" => Client.item_text(), "text_item" => %{"text" => s}}]} end
+      image = %{"item_list" => [%{"type" => Client.item_image(), "image_item" => %{}}]}
+
+      assert Worker.combined_text([t.("a"), t.("b")]) == "a\nb"
+      assert Worker.combined_text([image, image]) == ""
     end
   end
 

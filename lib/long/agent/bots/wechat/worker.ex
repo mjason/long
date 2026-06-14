@@ -29,6 +29,14 @@ defmodule Long.Agent.Bots.Wechat.Worker do
   @poll_timeout_seconds 30
   @retry_delay_ms 5_000
   @max_seen_msgs 5_000
+
+  # WeChat delivers a "caption + file/image" as separate messages a beat apart
+  # (observed 0.3–2.3s). Buffer a user's inbound messages for this window, then
+  # dispatch them as ONE multimodal turn — so the model sees text + attachments
+  # together and we don't split them across two turns (which dropped the
+  # attachment and fired a spurious "still processing" ack). Cost: a lone
+  # message waits up to this long before the agent starts. Tune via config.
+  @coalesce_ms 2_000
   # iLink "正在输入" bubble lifetime is not documented; empirically a
   # ping every 4s keeps it visible without hammering the API. 2s was
   # over-pinging; >5s lets the bubble flicker off briefly between pings.
@@ -79,12 +87,12 @@ defmodule Long.Agent.Bots.Wechat.Worker do
     case active_credential(name) do
       nil ->
         Logger.info("Wechat.Worker[#{name}]: no usable token yet; idle until one is saved.")
-        {:ok, %{name: name, token: nil, seen: MapSet.new()}}
+        {:ok, %{name: name, token: nil, seen: MapSet.new(), buffers: %{}}}
 
       cred ->
         Logger.info("Wechat.Worker[#{name}]: credential loaded (bot_id=#{cred.ilink_bot_id})")
         send(self(), :poll)
-        {:ok, %{name: name, token: cred, seen: MapSet.new()}}
+        {:ok, %{name: name, token: cred, seen: MapSet.new(), buffers: %{}}}
     end
   end
 
@@ -147,6 +155,31 @@ defmodule Long.Agent.Bots.Wechat.Worker do
     end
   end
 
+  # Flush a user's buffered burst as ONE combined turn (see @coalesce_ms).
+  def handle_info({:flush, uid}, %{token: token} = state) when not is_nil(token) do
+    {buffered, buffers} = Map.pop(state.buffers, uid, [])
+
+    case Enum.reverse(buffered) do
+      [] ->
+        {:noreply, %{state | buffers: buffers}}
+
+      msgs ->
+        member_id = token[:member_id]
+        credential_name = state.name
+
+        Task.Supervisor.start_child(Long.Agent.TaskSup, fn ->
+          handle_buffered(token, member_id, credential_name, uid, msgs)
+        end)
+
+        {:noreply, %{state | buffers: buffers}}
+    end
+  end
+
+  # Credential was unloaded between buffering and flush — drop the burst.
+  def handle_info({:flush, uid}, state) do
+    {:noreply, %{state | buffers: Map.delete(state.buffers, uid)}}
+  end
+
   def handle_info({:EXIT, _pid, _reason}, state), do: {:noreply, state}
   def handle_info(_other, state), do: {:noreply, state}
 
@@ -166,20 +199,25 @@ defmodule Long.Agent.Bots.Wechat.Worker do
           acc
 
         true ->
-          token = acc.token
-          # member_id lives on the loaded credential map; derive it rather
-          # than caching a second copy in state.
-          member_id = token[:member_id]
-          credential_name = acc.name
-
-          Task.Supervisor.start_child(Long.Agent.TaskSup, fn ->
-            handle_message(token, member_id, credential_name, msg)
-          end)
-
-          %{acc | seen: prune(MapSet.put(acc.seen, mid))}
+          acc = %{acc | seen: prune(MapSet.put(acc.seen, mid))}
+          buffer_message(acc, msg)
       end
     end)
   end
+
+  # Append a message to its sender's buffer; on the first message of a burst,
+  # arm the flush timer. Later messages within the window join the same buffer
+  # (fixed window from the first message, not reset-on-each), so a burst's
+  # latency is bounded to @coalesce_ms. The member_id/token are read at flush
+  # time from the (then-current) credential, not cached per message.
+  defp buffer_message(state, msg) do
+    uid = Map.get(msg, "from_user_id", "")
+    existing = Map.get(state.buffers, uid, [])
+    if existing == [], do: Process.send_after(self(), {:flush, uid}, coalesce_ms())
+    %{state | buffers: Map.put(state.buffers, uid, [msg | existing])}
+  end
+
+  defp coalesce_ms, do: Application.get_env(:long, Long.Agent, [])[:wechat_coalesce_ms] || @coalesce_ms
 
   defp prune(seen) when is_struct(seen, MapSet) do
     case MapSet.size(seen) do
@@ -193,14 +231,18 @@ defmodule Long.Agent.Bots.Wechat.Worker do
 
   # ── One inbound message → agent → outbound text/media ────────────────
 
-  defp handle_message(token, member_id, credential_name, msg) do
-    text = Client.extract_text(msg) |> String.trim()
-    uid = Map.get(msg, "from_user_id", "")
-    ctx_token = Map.get(msg, "context_token", "")
+  defp handle_buffered(token, member_id, credential_name, uid, msgs) do
+    # WeChat splits a "caption + file/image" across separate messages; combine
+    # the buffered burst's text and media into ONE multimodal turn so the model
+    # sees them together (and no half lands mid-reply triggering an enqueue ack).
+    text = combined_text(msgs)
+    ctx_token = msgs |> List.last() |> Map.get("context_token", "")
+
     # Stage inbound files into the member's own workspace inbox so the agent's
     # sandboxed code_run can open them (to parse .docx/PDF); unbound strangers
     # fall back to the shared inbox.
-    media_paths = Media.download_all(msg, DenoEnv.member_inbox(member_id) || media_dir())
+    dir = DenoEnv.member_inbox(member_id) || media_dir()
+    media_paths = Enum.flat_map(msgs, &Media.download_all(&1, dir))
 
     {image_paths, file_paths} = Enum.split_with(media_paths, &image?/1)
     body = build_body(text, file_paths)
@@ -264,6 +306,16 @@ defmodule Long.Agent.Bots.Wechat.Worker do
 
   defp build_body(text, paths) do
     text <> "\n" <> Enum.map_join(paths, "\n", &Long.Copy.t("chat.file_marker", %{path: &1}))
+  end
+
+  # Join the captions from a buffered burst (usually one text). Pure; public
+  # only so the coalescing behavior is unit-testable.
+  @doc false
+  def combined_text(msgs) do
+    msgs
+    |> Enum.map(&(Client.extract_text(&1) |> String.trim()))
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.join("\n")
   end
 
   defp attach_summary([]), do: ""
