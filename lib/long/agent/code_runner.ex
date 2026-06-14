@@ -122,11 +122,15 @@ defmodule Long.Agent.CodeRunner do
     end
   end
 
-  # Deno permission flags, scoped to the member's workspace `cwd`. We grant
-  # filesystem read/write only *inside* that directory (multi-member
-  # isolation), plus network; everything else — subprocess (`--allow-run`),
-  # FFI, env — stays denied. `--no-prompt` makes a missing permission a hard
-  # deny instead of a hang waiting on a TTY that isn't there.
+  # Deno permission flags, scoped to the member's workspace `cwd`. Filesystem
+  # read/write only *inside* that dir (multi-member isolation), network, and
+  # env. `--allow-env` is blanket — Node-polyfilled libs (mammoth/.docx,
+  # unpdf/PDF) each read different debug-probe vars at import, and a
+  # per-library whitelist proved brittle. It's safe because `port_env/1` blanks
+  # the only secret in the container env (SECRET_KEY_BASE; LLM API keys live in
+  # the DB, not env) for the deno child. Subprocess (`--allow-run`) and FFI
+  # stay denied. `--no-prompt` makes a missing permission a hard deny, not a
+  # TTY hang.
   defp deno_args(cwd, tmp) do
     [
       "run",
@@ -135,6 +139,7 @@ defmodule Long.Agent.CodeRunner do
       "--allow-read=#{cwd}",
       "--allow-write=#{cwd}",
       "--allow-net",
+      "--allow-env",
       tmp
     ]
   end
@@ -154,7 +159,20 @@ defmodule Long.Agent.CodeRunner do
     [
       {~c"PATH", String.to_charlist(Enum.join([workspace, parent], ":"))},
       {~c"DENO_DIR", String.to_charlist(deno_cache_dir())}
+      | redacted_env()
     ]
+  end
+
+  # code_run grants blanket --allow-env (see deno_args), so we blank out the
+  # secrets in the container env for the deno child *only* — `{name, false}`
+  # unsets the var — keeping them unreadable to sandboxed code while the app
+  # itself keeps using them. Today that's just SECRET_KEY_BASE (LLM keys live in
+  # the DB). Extend via `config :long, Long.Agent, code_run_redact_env: [...]`.
+  @redacted_env ~w(SECRET_KEY_BASE)
+
+  defp redacted_env do
+    (Application.get_env(:long, Long.Agent, [])[:code_run_redact_env] || @redacted_env)
+    |> Enum.map(&{String.to_charlist(&1), false})
   end
 
   defp deno_cache_dir do

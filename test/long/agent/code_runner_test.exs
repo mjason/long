@@ -187,5 +187,29 @@ defmodule Long.Agent.CodeRunnerTest do
       assert {_, path} = List.keyfind(env, ~c"PATH", 0)
       assert to_string(path) =~ "/some/workspace"
     end
+
+    # Blanket --allow-env (see below) would expose container secrets to
+    # sandboxed code; port_env unsets them ({name, false}) for the deno child.
+    test "blanks out SECRET_KEY_BASE so blanket --allow-env can't leak it" do
+      env = CodeRunner.port_env("/some/workspace")
+      assert {~c"SECRET_KEY_BASE", false} in env
+    end
+  end
+
+  describe "deno sandbox env" do
+    # A per-library env whitelist proved brittle (each polyfilled dep —
+    # readable-stream, bluebird, … — wants a different debug-probe var), so we
+    # grant blanket --allow-env and redact secrets in port_env instead.
+    test "build_command grants --allow-env (secrets redacted via port_env)" do
+      case CodeRunner.build_command("console.log(1)", "deno", System.tmp_dir!()) do
+        {:ok, _exe, args, cleanup} ->
+          cleanup.()
+          assert "--allow-env" in args
+
+        {:error, _} ->
+          # deno not installed in this environment — nothing to assert.
+          :ok
+      end
+    end
   end
 end
