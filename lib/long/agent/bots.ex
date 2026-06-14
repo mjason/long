@@ -221,7 +221,11 @@ defmodule Long.Agent.Bots do
   end
 
   defp acquire_or_enqueue(user, session_id, text, watcher_opts, on_complete) do
-    payload = {user, text, on_complete}
+    # Carry THIS message's attachments in the payload. When the session is
+    # busy the message is enqueued and drained later (see `drain_queue/2`);
+    # without them an image/file sent while the agent is mid-reply would be
+    # delivered to the model with no media — it'd "see" an empty message.
+    payload = {user, text, Keyword.get(watcher_opts, :attachments, []), on_complete}
 
     case Activity.try_acquire_or_enqueue(session_id, payload) do
       :acquired ->
@@ -266,7 +270,7 @@ defmodule Long.Agent.Bots do
       nil ->
         :ok
 
-      {next_user, next_text, next_on_complete} ->
+      {next_user, next_text, next_attachments, next_on_complete} ->
         # Refresh `:request` (and clear stale tool/turn from the previous
         # message) so `/status` reflects what we're working on right now.
         Activity.update(session_id, %{
@@ -275,7 +279,10 @@ defmodule Long.Agent.Bots do
           tool: nil
         })
 
-        process_one(next_user, session_id, next_text, watcher_opts, next_on_complete)
+        # Use THIS message's attachments, not the slot owner's watcher_opts —
+        # otherwise an enqueued image/file reaches the model stripped of media.
+        next_opts = Keyword.put(watcher_opts, :attachments, next_attachments)
+        process_one(next_user, session_id, next_text, next_opts, next_on_complete)
         drain_queue(session_id, watcher_opts)
     end
   end

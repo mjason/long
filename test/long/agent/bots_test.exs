@@ -175,6 +175,41 @@ defmodule Long.Agent.BotsTest do
     end
   end
 
+  describe "Bots.run_async/4 enqueue carries attachments" do
+    # Regression: a message that arrives while the agent is mid-reply gets
+    # enqueued; the enqueue payload used to be {user, text, on_complete} with
+    # NO attachments, so an image sent right after a text reached the model
+    # stripped of its media (it "saw" an empty message + only the injected time).
+    test "an image enqueued while the session is busy keeps its attachments" do
+      this = self()
+      {:ok, %{session_id: sid}} = Bots.ensure_session(:telegram, "enq-att", chat_id: "1")
+
+      # Hold the slot from another process so the next message is enqueued.
+      owner =
+        spawn(fn ->
+          :acquired = Long.Agent.Activity.try_acquire_or_enqueue(sid, :held)
+          send(this, :ready)
+          receive do: (:release -> Long.Agent.Activity.release(sid))
+        end)
+
+      assert_receive :ready, 500
+
+      {:ok, %{mode: :dispatched}} =
+        Bots.run_async(:telegram, "enq-att", "看看这张图",
+          attachments: ["/tmp/pic.jpg"],
+          on_complete: fn _u, _r -> send(this, :enqueued_ack) end
+        )
+
+      # on_complete fires the enqueued ack only after the payload is queued.
+      assert_receive :enqueued_ack, 1_000
+
+      assert {_user, "看看这张图", ["/tmp/pic.jpg"], _on_complete} =
+               Long.Agent.Activity.dequeue(sid)
+
+      send(owner, :release)
+    end
+  end
+
   describe "Agent.get_bot_user_for_session/1" do
     test "returns the BotUser tied to a session_id" do
       {:ok, %{bot_user: u, session_id: sid}} =
