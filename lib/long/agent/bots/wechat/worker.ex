@@ -24,7 +24,6 @@ defmodule Long.Agent.Bots.Wechat.Worker do
   alias Long.Agent.Bots
   alias Long.Agent.Bots.Wechat
   alias Long.Agent.Bots.Wechat.{Client, Credential, Media}
-  alias Long.Agent.DenoEnv
 
   @poll_timeout_seconds 30
   @retry_delay_ms 5_000
@@ -238,10 +237,18 @@ defmodule Long.Agent.Bots.Wechat.Worker do
     text = combined_text(msgs)
     ctx_token = msgs |> List.last() |> Map.get("context_token", "")
 
-    # Stage inbound files into the member's own workspace inbox so the agent's
-    # sandboxed code_run can open them (to parse .docx/PDF); unbound strangers
-    # fall back to the shared inbox.
-    dir = DenoEnv.member_inbox(member_id) || media_dir()
+    # Stage inbound files into THIS session's own workspace inbox — the exact
+    # dir code_run is sandboxed to — so bound AND unbound chats alike can open
+    # them. Ensure the session up front to get the same id run_async reuses;
+    # fall back to the shared inbox if it can't be ensured.
+    base_opts = [session_title: "wechat:#{uid}", member_id: member_id, credential_name: credential_name]
+
+    dir =
+      case Bots.ensure_session(:wechat, uid, base_opts) do
+        {:ok, %{session_id: sid}} -> Long.Agent.session_inbox(sid)
+        _ -> media_dir()
+      end
+
     media_paths = Enum.flat_map(msgs, &Media.download_all(&1, dir))
 
     {image_paths, file_paths} = Enum.split_with(media_paths, &image?/1)
@@ -260,15 +267,17 @@ defmodule Long.Agent.Bots.Wechat.Worker do
       # because the synchronous `run_and_collect` timed out before the
       # final assistant message landed.
       result =
-        Bots.run_async(:wechat, uid, body,
-          session_title: "wechat:#{uid}",
-          member_id: member_id,
-          credential_name: credential_name,
-          attachments: image_paths,
-          on_complete: fn _bot_user, result ->
-            stop_typing(typing)
-            send_reply(token, uid, ctx_token, result, media_paths)
-          end
+        Bots.run_async(
+          :wechat,
+          uid,
+          body,
+          Keyword.merge(base_opts,
+            attachments: image_paths,
+            on_complete: fn _bot_user, result ->
+              stop_typing(typing)
+              send_reply(token, uid, ctx_token, result, media_paths)
+            end
+          )
         )
 
       # Let the typing keepalive subscribe to the session's PubSub so

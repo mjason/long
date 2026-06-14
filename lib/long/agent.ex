@@ -239,6 +239,21 @@ defmodule Long.Agent do
   end
 
   @doc """
+  Inbound-file directory for a session: `<that session's code_run workspace>/inbox`.
+  A bound member → `members/<id>/inbox`; an unbound session (no member) → its own
+  isolated `unbound/<session_id>/inbox`. Staging inbound files here — the SAME dir
+  code_run is sandboxed to — is what lets the agent open them, for bound and
+  unbound chats alike: a no-member chat still gets its own private workspace home,
+  not the owner's and not an unreachable global inbox.
+  """
+  @spec session_inbox(String.t()) :: String.t()
+  def session_inbox(session_id) when is_binary(session_id) do
+    workspace_root()
+    |> Long.Agent.DenoEnv.session_workspace(member_id_for_session(session_id), session_id)
+    |> Path.join("inbox")
+  end
+
+  @doc """
   The member a web `/chat` session acts as when no chat account is bound —
   the owner. Prefers the `:self` member (the owner's own record), then any
   `:owner`-role member, then the first member; `nil` if there are none.

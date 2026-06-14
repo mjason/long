@@ -30,7 +30,6 @@ defmodule Long.Agent.Bots.Telegram do
 
   alias Long.Agent.Bots
   alias Long.Agent.Bots.Telegram.{Credential, Format, Media}
-  alias Long.Agent.DenoEnv
 
   @default_long_poll_timeout 25
   @default_poll_interval_ms 1_000
@@ -328,18 +327,23 @@ defmodule Long.Agent.Bots.Telegram do
   defp handle_message(state, msg) do
     typing = start_typing(state, msg.chat_id)
 
-    inbound_paths = download_inbound(state, msg.media)
-    {image_paths, file_paths} = Enum.split_with(inbound_paths, &image?/1)
-    body = compose_body(msg.text, file_paths)
-
-    run_opts =
+    base_opts =
       Keyword.merge(state.run_opts,
         chat_id: msg.chat_id,
         display_name: msg.display_name,
         member_id: state.member_id,
         credential_name: state.credential_name,
+        metadata: %{"telegram" => true, "locale" => msg.locale}
+      )
+
+    {image_paths, file_paths} =
+      msg.media |> download_inbound(state, msg.user_id, base_opts) |> Enum.split_with(&image?/1)
+
+    body = compose_body(msg.text, file_paths)
+
+    run_opts =
+      Keyword.merge(base_opts,
         attachments: image_paths,
-        metadata: %{"telegram" => true, "locale" => msg.locale},
         on_complete: fn _bot_user, result ->
           stop_typing(typing)
 
@@ -406,13 +410,19 @@ defmodule Long.Agent.Bots.Telegram do
   end
 
   # Skip the mkdir + Task overhead entirely for text-only messages.
-  defp download_inbound(_state, []), do: []
+  defp download_inbound([], _state, _user_id, _base_opts), do: []
 
-  defp download_inbound(state, descriptors) do
-    # Stage into the member's own workspace inbox so the sandboxed code_run can
-    # open the files (to parse .docx/PDF); unbound strangers fall back to the
-    # shared inbox.
-    dir = DenoEnv.member_inbox(state.member_id) || state.media_dir
+  defp download_inbound(descriptors, state, user_id, base_opts) do
+    # Stage into THIS session's own workspace inbox — the exact dir code_run is
+    # sandboxed to — so bound AND unbound chats alike can open the files.
+    # Ensuring the session up front yields the same id run_async reuses; falls
+    # back to the shared media_dir if it can't be ensured.
+    dir =
+      case Bots.ensure_session(:telegram, user_id, base_opts) do
+        {:ok, %{session_id: sid}} -> Long.Agent.session_inbox(sid)
+        _ -> state.media_dir
+      end
+
     File.mkdir_p!(dir)
     Media.download_all(descriptors, dir, state.token, state.http)
   end

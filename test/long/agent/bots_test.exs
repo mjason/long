@@ -591,4 +591,41 @@ defmodule Long.Agent.BotsTest do
       assert_receive {:feishu_reply, _}, 5_000
     end
   end
+
+  describe "Agent.session_inbox/1 — staging dir matches code_run's workspace" do
+    test "a bound member's session resolves to members/<id>/inbox" do
+      {:ok, hh} = Agent.create_group(%{name: "SI-#{System.unique_integer([:positive])}"})
+      {:ok, m} = Agent.create_member(%{group_id: hh.id, display_name: "M", relation: :other})
+      sess = Agent.start_session!(%{title: "t"})
+
+      {:ok, _} =
+        Agent.create_bot_user(%{
+          platform: :telegram,
+          external_id: "si-#{System.unique_integer([:positive])}",
+          session_id: sess.id,
+          member_id: m.id
+        })
+
+      assert String.ends_with?(Agent.session_inbox(sess.id), "/members/#{m.id}/inbox")
+    end
+
+    test "an unbound bot session gets its own unbound/<sid>/inbox (no member needed)" do
+      # An owner exists, so this isn't the no-members case — the bot account is
+      # genuinely unbound (member_id nil) and must get its OWN isolated inbox
+      # that code_run for the same session can read, not an unreachable global one.
+      {:ok, hh} = Agent.create_group(%{name: "SI-#{System.unique_integer([:positive])}"})
+      {:ok, _owner} = Agent.create_member(%{group_id: hh.id, display_name: "O", relation: :self, role: :owner})
+      sess = Agent.start_session!(%{title: "tg"})
+
+      {:ok, _} =
+        Agent.create_bot_user(%{
+          platform: :telegram,
+          external_id: "si-#{System.unique_integer([:positive])}",
+          session_id: sess.id,
+          member_id: nil
+        })
+
+      assert String.ends_with?(Agent.session_inbox(sess.id), "/unbound/#{sess.id}/inbox")
+    end
+  end
 end
