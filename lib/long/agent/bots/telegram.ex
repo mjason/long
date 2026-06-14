@@ -121,6 +121,9 @@ defmodule Long.Agent.Bots.Telegram do
         user_id: to_string(from["id"]),
         text: text,
         media: media,
+        # A multi-photo album arrives as separate updates sharing this id (the
+        # caption rides on only one). nil for an ordinary single message.
+        media_group_id: msg["media_group_id"],
         locale: from["language_code"],
         display_name:
           [from["first_name"], from["last_name"]] |> Enum.reject(&is_nil/1) |> Enum.join(" ")
@@ -241,7 +244,12 @@ defmodule Long.Agent.Bots.Telegram do
   defp poll_once(state) do
     case fetch_updates(state) do
       {:ok, updates} when is_list(updates) ->
-        Enum.each(updates, &spawn_handler(state, &1))
+        updates
+        |> Enum.map(&extract_message/1)
+        |> Enum.reject(&is_nil/1)
+        |> merge_albums()
+        |> Enum.each(&spawn_handler(state, &1))
+
         next_offset_from(updates) || state.offset
 
       {:ok, _other} ->
@@ -284,14 +292,37 @@ defmodule Long.Agent.Bots.Telegram do
 
   # ── Dispatch ─────────────────────────────────────────────────────────────
 
-  defp spawn_handler(state, update) do
-    case extract_message(update) do
-      nil ->
-        :ok
+  defp spawn_handler(state, msg) do
+    Task.start(fn -> handle_message(state, msg) end)
+  end
 
-      msg ->
-        Task.start(fn -> handle_message(state, msg) end)
-    end
+  @doc false
+  # Telegram delivers a multi-photo album as separate updates sharing a
+  # `media_group_id`, with the caption on only one of them. Merge each group
+  # into ONE message (all media + the single caption) so the album becomes one
+  # turn instead of N — otherwise the 2nd+ get enqueued (a "still processing"
+  # ack) and arrive captionless. Messages with no media_group_id pass through
+  # unchanged: a single send already carries caption + media in one update.
+  # Order-preserving: the merged album takes its first member's position.
+  def merge_albums(msgs) do
+    {merged, _seen} =
+      Enum.flat_map_reduce(msgs, MapSet.new(), fn msg, seen ->
+        gid = msg.media_group_id
+
+        cond do
+          is_nil(gid) -> {[msg], seen}
+          MapSet.member?(seen, gid) -> {[], seen}
+          true -> {[merge_group(Enum.filter(msgs, &(&1.media_group_id == gid)))], MapSet.put(seen, gid)}
+        end
+      end)
+
+    merged
+  end
+
+  defp merge_group([first | _] = members) do
+    caption = members |> Enum.map(& &1.text) |> Enum.find("", &(&1 != ""))
+    media = Enum.flat_map(members, & &1.media)
+    %{first | text: caption, media: media}
   end
 
   defp handle_message(state, msg) do

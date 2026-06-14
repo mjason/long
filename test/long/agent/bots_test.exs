@@ -335,6 +335,33 @@ defmodule Long.Agent.BotsTest do
     end
   end
 
+  describe "Telegram.merge_albums/1 — album (media_group) coalescing" do
+    test "merges same media_group_id into one message: all media + the single caption" do
+      a = %{text: "看看这几张", media: [{:image, "f1", nil}], media_group_id: "G"}
+      b = %{text: "", media: [{:image, "f2", nil}], media_group_id: "G"}
+
+      assert [merged] = Telegram.merge_albums([a, b])
+      assert merged.text == "看看这几张"
+      assert merged.media == [{:image, "f1", nil}, {:image, "f2", nil}]
+    end
+
+    test "leaves single (non-album) messages untouched and in order" do
+      x = %{text: "one", media: [], media_group_id: nil}
+      y = %{text: "two", media: [], media_group_id: nil}
+      assert [^x, ^y] = Telegram.merge_albums([x, y])
+    end
+
+    test "a merged album keeps its first member's position among singles" do
+      a1 = %{text: "cap", media: [{:image, "f1", nil}], media_group_id: "G"}
+      s = %{text: "later", media: [], media_group_id: nil}
+      a2 = %{text: "", media: [{:image, "f2", nil}], media_group_id: "G"}
+
+      assert [merged, ^s] = Telegram.merge_albums([a1, s, a2])
+      assert merged.media == [{:image, "f1", nil}, {:image, "f2", nil}]
+      assert merged.text == "cap"
+    end
+  end
+
   describe "Telegram GenServer" do
     test "start_link succeeds but stays idle when no credential is configured" do
       System.delete_env("TELEGRAM_BOT_TOKEN")
