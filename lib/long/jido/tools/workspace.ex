@@ -7,9 +7,10 @@ defmodule Long.Jido.Tools.Workspace do
   """
 
   @doc """
-  Resolve `path` relative to the workspace root from `ctx`. Returns
-  `{:ok, absolute_path}` when the result is inside the workspace, or
-  `{:error, reason}` otherwise.
+  Resolve `path` against the workspace root from `ctx`. A relative path is
+  joined under the root; an absolute path is honored as-is. Either way the
+  result must stay inside the root — a `../` escape or an absolute path
+  above the root returns `{:error, reason}` instead of touching disk.
   """
   @spec resolve_path(map() | keyword(), String.t() | nil) ::
           {:ok, String.t()} | {:error, String.t()}
@@ -21,8 +22,18 @@ defmodule Long.Jido.Tools.Workspace do
       (ctx[:workspace_root] || File.cwd!())
       |> Path.expand()
 
-    resolved = base |> Path.join(path) |> Path.expand()
+    # An absolute path — e.g. the absolute marker we hand the model for an
+    # inbound file (`<workspace_root>/wechat_inbox/…`) — must be honored as
+    # given. `Path.join(base, "/abs")` wrongly nests it *under* base, so the
+    # staged file is never found (the inbound-file "no permission to read"
+    # bug). A relative path still resolves against the workspace root.
+    resolved =
+      if Path.type(path) == :absolute,
+        do: Path.expand(path),
+        else: base |> Path.join(path) |> Path.expand()
 
+    # Confine is unchanged: the result must stay inside the workspace root,
+    # so an absolute path outside it (or a `../` escape) is still rejected.
     if resolved == base or String.starts_with?(resolved, base <> "/") do
       {:ok, resolved}
     else
