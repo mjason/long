@@ -171,4 +171,21 @@ defmodule Long.Agent.CodeRunnerTest do
       assert m2 =~ "no such file"
     end
   end
+
+  describe "port_env/1" do
+    # Without a writable DENO_DIR the release (running as `nobody`, HOME
+    # /nonexistent) can't cache remote modules, so every `import` fails EACCES
+    # and code_run can't pull a library (mammoth/.docx, unpdf/PDF, std, …).
+    test "sets a writable DENO_DIR so remote imports can cache" do
+      env = CodeRunner.port_env("/some/workspace")
+      assert {_, dir} = List.keyfind(env, ~c"DENO_DIR", 0)
+      assert to_string(dir) =~ ".deno_cache"
+    end
+
+    test "prepends the workspace to PATH" do
+      env = CodeRunner.port_env("/some/workspace")
+      assert {_, path} = List.keyfind(env, ~c"PATH", 0)
+      assert to_string(path) =~ "/some/workspace"
+    end
+  end
 end

@@ -139,10 +139,28 @@ defmodule Long.Agent.CodeRunner do
     ]
   end
 
-  @doc "PATH env for child processes: prepend the workspace so workspace-local tools resolve."
+  @doc """
+  Env for code_run child processes: PATH (workspace-local tools resolve first)
+  plus a writable DENO_DIR. The release runs as `nobody`, whose HOME is
+  `/nonexistent`, so without an explicit DENO_DIR Deno can't cache remote
+  modules and every `import` (mammoth for .docx, unpdf for PDF, std, …) fails
+  with EACCES. The cache lives under the workspace root — writable, persistent
+  on the /data volume, and safe to share across members (a read-mostly module
+  cache, not member data).
+  """
   def port_env(workspace) do
     parent = System.get_env("PATH") || ""
-    [{~c"PATH", String.to_charlist(Enum.join([workspace, parent], ":"))}]
+
+    [
+      {~c"PATH", String.to_charlist(Enum.join([workspace, parent], ":"))},
+      {~c"DENO_DIR", String.to_charlist(deno_cache_dir())}
+    ]
+  end
+
+  defp deno_cache_dir do
+    dir = Path.join(DenoEnv.root(), ".deno_cache")
+    File.mkdir_p!(dir)
+    dir
   end
 
   @doc """
