@@ -30,6 +30,7 @@ defmodule Long.Agent.Bots.Telegram do
 
   alias Long.Agent.Bots
   alias Long.Agent.Bots.Telegram.{Credential, Format, Media}
+  alias Long.Agent.DenoEnv
 
   @default_long_poll_timeout 25
   @default_poll_interval_ms 1_000
@@ -377,7 +378,12 @@ defmodule Long.Agent.Bots.Telegram do
   defp download_inbound(_state, []), do: []
 
   defp download_inbound(state, descriptors) do
-    Media.download_all(descriptors, state.media_dir, state.token, state.http)
+    # Stage into the member's own workspace inbox so the sandboxed code_run can
+    # open the files (to parse .docx/PDF); unbound strangers fall back to the
+    # shared inbox.
+    dir = DenoEnv.member_inbox(state.member_id) || state.media_dir
+    File.mkdir_p!(dir)
+    Media.download_all(descriptors, dir, state.token, state.http)
   end
 
   # Multi-file albums often arrive; fan out the uploads so a 5-image

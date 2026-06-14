@@ -41,6 +41,20 @@ defmodule Long.Agent.DenoEnv do
     do: Path.join([base || root(), @members_dir, member_id])
 
   @doc """
+  Inbound-file directory for a bound member — `members/<id>/inbox/`, *inside*
+  that member's own workspace. Staging user-sent files here (instead of a
+  global `wechat_inbox`/`telegram_inbox`) is what lets the sandboxed `code_run`
+  (rooted at the member dir) open them to parse `.docx`/PDF, while `file_read`
+  reaches them too. Returns `nil` for a `nil` member, so bot callers fall back
+  to their shared inbox for unbound/stranger sessions.
+  """
+  def member_inbox(base \\ nil, member_id)
+  def member_inbox(base, member_id) when is_binary(member_id),
+    do: Path.join(workspace(base, member_id), "inbox")
+
+  def member_inbox(_base, _), do: nil
+
+  @doc """
   Workspace for an unbound / web-chat session (no group member) — an
   isolated `unbound/<session_id>` dir so anonymous sessions don't share one
   directory and read each other's files. A `nil` session falls back to the

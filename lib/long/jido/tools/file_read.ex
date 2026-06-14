@@ -27,7 +27,9 @@ defmodule Long.Jido.Tools.FileRead do
   def run(params, ctx) do
     with {:ok, path} <- Workspace.resolve_path(ctx, params[:path]),
          {:ok, contents} <- File.read(path) do
-      render(contents, params)
+      if binary_blob?(contents),
+        do: {:ok, %{status: "error", msg: binary_hint()}},
+        else: render(contents, params)
     else
       {:error, reason} when is_binary(reason) ->
         {:ok, %{status: "error", msg: reason}}
@@ -35,6 +37,21 @@ defmodule Long.Jido.Tools.FileRead do
       {:error, reason} ->
         {:ok, %{status: "error", msg: :file.format_error(reason) |> to_string()}}
     end
+  end
+
+  # A NUL byte means this isn't UTF-8 text the model can use — it's a binary
+  # blob (.docx is a zip; .pdf / .doc are binary). file_read would only hand
+  # back mojibake, so point the model at code_run + a parser instead. The file
+  # now lives in the member's own workspace inbox, so code_run (sandboxed to
+  # that dir) can open it.
+  defp binary_blob?(contents), do: String.contains?(contents, <<0>>)
+
+  defp binary_hint do
+    "This file looks binary (e.g. .docx / .pdf / .doc), not text — file_read " <>
+      "can't extract its content. Use code_run instead: `Deno.readFile(path)`, " <>
+      "then parse with a library from esm.sh (`mammoth` for .docx, `unpdf` or a " <>
+      "pdf.js build for .pdf) and print the extracted text. A legacy .doc has no " <>
+      "good JS parser — ask the user to resend it as .docx, PDF, or plain text."
   end
 
   defp render(contents, params) do

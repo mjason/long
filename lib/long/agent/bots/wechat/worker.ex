@@ -24,6 +24,7 @@ defmodule Long.Agent.Bots.Wechat.Worker do
   alias Long.Agent.Bots
   alias Long.Agent.Bots.Wechat
   alias Long.Agent.Bots.Wechat.{Client, Credential, Media}
+  alias Long.Agent.DenoEnv
 
   @poll_timeout_seconds 30
   @retry_delay_ms 5_000
@@ -196,7 +197,10 @@ defmodule Long.Agent.Bots.Wechat.Worker do
     text = Client.extract_text(msg) |> String.trim()
     uid = Map.get(msg, "from_user_id", "")
     ctx_token = Map.get(msg, "context_token", "")
-    media_paths = Media.download_all(msg, media_dir())
+    # Stage inbound files into the member's own workspace inbox so the agent's
+    # sandboxed code_run can open them (to parse .docx/PDF); unbound strangers
+    # fall back to the shared inbox.
+    media_paths = Media.download_all(msg, DenoEnv.member_inbox(member_id) || media_dir())
 
     {image_paths, file_paths} = Enum.split_with(media_paths, &image?/1)
     body = build_body(text, file_paths)
