@@ -57,6 +57,12 @@ jobs:
       # pulls the arm64 precompiled OTP (builds.hex.pm has ubuntu-22.04 arm64).
       - name: Install Erlang & Elixir (setup-beam)
         if: matrix.install == 'setup-beam'
+        # GitHub's ubuntu-22.04-arm runner sets ImageOS=ubuntu22-arm64, which
+        # setup-beam's OS map doesn't recognise (it accepts ubuntu22/ubuntu24).
+        # Force the OS hint; setup-beam detects the arm64 arch itself and pulls
+        # the matching precompiled OTP. No-op on the x64 runner (already ubuntu22).
+        env:
+          ImageOS: ubuntu22
         uses: erlef/setup-beam@v1.24.0
         with:
           otp-version: ${{ env.OTP_VERSION }}
