@@ -109,35 +109,56 @@ defmodule Long.Agent.Bots.Wechat.Worker do
   def handle_info(:poll, %{token: nil} = state), do: {:noreply, state}
 
   def handle_info(:poll, %{token: tok} = state) do
-    state =
-      case Client.get_updates(tok, @poll_timeout_seconds) do
-        {:ok, %{msgs: msgs, updates_buf: buf, stale_cursor: true}} ->
-          Logger.warning("Wechat[#{state.name}]: cursor went stale, reset")
-          Credential.save_buf(buf, state.name)
-          dispatch_messages(msgs, %{state | token: %{tok | updates_buf: buf}})
+    # Long-poll OFF the GenServer. `get_updates` blocks ~35s synchronously; if it
+    # ran here it would freeze the whole GenServer mailbox — including the 2s
+    # coalesce `{:flush, uid}` timer message — so a lone inbound message would
+    # only be processed when the next poll returns (up to ~35s later). Running
+    # the poll in a Task keeps the worker responsive: flushes fire on time.
+    worker = self()
 
-        {:ok, %{msgs: msgs, updates_buf: buf}} ->
-          token =
-            if buf != tok.updates_buf do
-              Credential.save_buf(buf, state.name)
-              %{tok | updates_buf: buf}
-            else
-              tok
-            end
+    Task.Supervisor.start_child(Long.Agent.TaskSup, fn ->
+      # Always send a result back, even on a raise/exit — otherwise the worker
+      # never receives {:updates} and the poll loop stalls silently.
+      result =
+        try do
+          Client.get_updates(tok, @poll_timeout_seconds)
+        rescue
+          e -> {:error, e}
+        catch
+          kind, reason -> {:error, {kind, reason}}
+        end
 
-          dispatch_messages(msgs, %{state | token: token})
+      send(worker, {:updates, result})
+    end)
 
-        {:error, e} ->
-          Logger.error(
-            "Wechat: get_updates failed: #{inspect(e)}; retrying in #{@retry_delay_ms}ms"
-          )
-
-          Process.send_after(self(), :poll, @retry_delay_ms)
-          state
-      end
-
-    send(self(), :poll)
     {:noreply, state}
+  end
+
+  # A poll Task's result arrived after the credential was unloaded — drop it.
+  def handle_info({:updates, _result}, %{token: nil} = state), do: {:noreply, state}
+
+  def handle_info({:updates, result}, state) do
+    case result do
+      {:ok, %{msgs: msgs, updates_buf: buf} = r} ->
+        token =
+          if buf != state.token.updates_buf do
+            Credential.save_buf(buf, state.name)
+            %{state.token | updates_buf: buf}
+          else
+            state.token
+          end
+
+        if r[:stale_cursor], do: Logger.warning("Wechat[#{state.name}]: cursor went stale, reset")
+
+        state = dispatch_messages(msgs, %{state | token: token})
+        send(self(), :poll)
+        {:noreply, state}
+
+      {:error, e} ->
+        Logger.error("Wechat: get_updates failed: #{inspect(e)}; retrying in #{@retry_delay_ms}ms")
+        Process.send_after(self(), :poll, @retry_delay_ms)
+        {:noreply, state}
+    end
   end
 
   def handle_info(:reload, state) do
