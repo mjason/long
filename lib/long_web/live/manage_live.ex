@@ -2445,8 +2445,16 @@ defmodule LongWeb.ManageLive do
                   else: "Off — no session reflects and none are auto-enrolled."}
               </div>
             </div>
+            <.badge
+              color={if @reflection_enabled, do: "success", else: "silver"}
+              size="extra_small"
+              rounded="full"
+            >
+              {if @reflection_enabled, do: "on", else: "off"}
+            </.badge>
             <.button
               phx-click="toggle_reflection"
+              variant="base"
               color={if @reflection_enabled, do: "natural", else: "primary"}
               icon={if @reflection_enabled, do: "hero-pause", else: "hero-play"}
               size="small"
@@ -2457,21 +2465,30 @@ defmodule LongWeb.ManageLive do
           </div>
 
           <div class="flex items-center gap-3">
-            <span class="text-sm text-zinc-600">Off-peak hour (UTC)</span>
+            <div class="flex-1">
+              <div class="text-sm font-medium text-zinc-800">Off-peak hour (UTC)</div>
+              <div class="text-xs text-zinc-500">
+                Minute is spread per session to avoid a thundering herd.
+              </div>
+            </div>
             <form phx-change="set_reflection_hour">
-              <select
+              <.native_select
+                id="reflection-hour"
                 name="hour"
+                color="natural"
+                rounded="small"
+                size="small"
                 disabled={!@reflection_enabled}
-                class="rounded-md border border-zinc-300 text-sm px-2 py-1 disabled:opacity-50"
               >
-                <option :for={h <- 0..23} value={h} selected={h == @reflection_hour}>
+                <:option
+                  :for={h <- 0..23}
+                  value={Integer.to_string(h)}
+                  selected={h == @reflection_hour}
+                >
                   {String.pad_leading(Integer.to_string(h), 2, "0")}:xx UTC
-                </option>
-              </select>
+                </:option>
+              </.native_select>
             </form>
-            <span class="text-xs text-zinc-400">
-              minute is spread per session to avoid a thundering herd
-            </span>
           </div>
         </div>
       </.card>
@@ -2491,38 +2508,39 @@ defmodule LongWeb.ManageLive do
             <tr :for={t <- @reflection_tasks} class="border-t border-zinc-100">
               <td class="px-4 py-2 font-mono text-xs">{reflection_session_label(t)}</td>
               <td class="px-4 py-2">{t.schedule_time} UTC</td>
-              <td class="px-4 py-2">{reflection_dt(t.next_run_at)}</td>
+              <td class="px-4 py-2 text-xs text-zinc-500">{reflection_dt(t.next_run_at)}</td>
               <td class="px-4 py-2">
-                <span class={[
-                  "inline-flex px-2 py-0.5 rounded-full text-xs",
-                  if(t.enabled,
-                    do: "bg-emerald-100 text-emerald-700",
-                    else: "bg-zinc-100 text-zinc-500"
-                  )
-                ]}>
+                <.badge
+                  color={if t.enabled, do: "success", else: "silver"}
+                  size="extra_small"
+                  rounded="full"
+                >
                   {if t.enabled, do: "enabled", else: "disabled"}
-                </span>
+                </.badge>
               </td>
-              <td class="px-4 py-2 text-right space-x-1 whitespace-nowrap">
-                <.button
-                  phx-click="run_reflection_now"
-                  phx-value-id={t.id}
-                  color="natural"
-                  size="extra_small"
-                  icon="hero-bolt"
-                  rounded="medium"
-                >
-                  Run now
-                </.button>
-                <.button
-                  phx-click="toggle_reflection_task"
-                  phx-value-id={t.id}
-                  color="natural"
-                  size="extra_small"
-                  rounded="medium"
-                >
-                  {if t.enabled, do: "Disable", else: "Enable"}
-                </.button>
+              <td class="px-4 py-2">
+                <div class="flex justify-end gap-1.5">
+                  <.button
+                    phx-click="run_reflection_now"
+                    phx-value-id={t.id}
+                    variant="base"
+                    color="natural"
+                    size="extra_small"
+                    icon="hero-bolt"
+                    rounded="medium"
+                    title="Run now"
+                  />
+                  <.button
+                    phx-click="toggle_reflection_task"
+                    phx-value-id={t.id}
+                    variant="base"
+                    color="natural"
+                    size="extra_small"
+                    icon={if t.enabled, do: "hero-pause", else: "hero-play"}
+                    rounded="medium"
+                    title={if t.enabled, do: "Disable", else: "Enable"}
+                  />
+                </div>
               </td>
             </tr>
             <tr :if={@reflection_tasks == []}>
