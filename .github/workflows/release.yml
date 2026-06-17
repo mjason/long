@@ -51,10 +51,13 @@ jobs:
           mix local.hex --force
           mix local.rebar --force
 
-      # Linux: setup-beam is faster + caches.
+      # Linux: setup-beam is faster + caches. Pinned to v1.24.0 — the
+      # floating @v1 didn't recognise the GitHub arm64 runner's
+      # ImageOS=ubuntu22-arm64 and failed `linux-arm64`. v1.24 maps it and
+      # pulls the arm64 precompiled OTP (builds.hex.pm has ubuntu-22.04 arm64).
       - name: Install Erlang & Elixir (setup-beam)
         if: matrix.install == 'setup-beam'
-        uses: erlef/setup-beam@v1
+        uses: erlef/setup-beam@v1.24.0
         with:
           otp-version: ${{ env.OTP_VERSION }}
           elixir-version: ${{ env.ELIXIR_VERSION }}
@@ -88,6 +91,48 @@ jobs:
 
       - name: Build release
         run: mix release
+
+      # macOS only: the crypto NIF links Homebrew's openssl@3 by absolute
+      # path, so the "self-contained" tarball won't start on a Mac without
+      # Homebrew. Bundle the openssl dylibs into the release and rewrite the
+      # links to @loader_path, then re-sign (arm64 macOS rejects unsigned /
+      # tampered Mach-O on dlopen).
+      - name: Bundle OpenSSL into the macOS release
+        if: matrix.install == 'brew'
+        run: |
+          set -euo pipefail
+          REL=_build/prod/rel/long
+          CRYPTO=$(find "$REL" -name crypto.so | head -1)
+          [ -n "$CRYPTO" ] || { echo "crypto.so not found"; exit 1; }
+          LIBDIR=$(dirname "$CRYPTO")
+          echo "crypto.so: $CRYPTO"
+          otool -L "$CRYPTO"
+
+          # Copy each Homebrew openssl dylib the NIF references into the NIF's
+          # own dir and repoint the link to @loader_path.
+          for dep in $(otool -L "$CRYPTO" | awk '/opt\/homebrew.*lib(crypto|ssl).*\.dylib/{print $1}'); do
+            base=$(basename "$dep")
+            cp -f "$dep" "$LIBDIR/$base"
+            chmod u+w "$LIBDIR/$base"
+            install_name_tool -id "@loader_path/$base" "$LIBDIR/$base"
+            install_name_tool -change "$dep" "@loader_path/$base" "$CRYPTO"
+          done
+
+          # libssl depends on libcrypto — rewrite inter-dylib refs too.
+          for lib in "$LIBDIR"/libssl*.dylib "$LIBDIR"/libcrypto*.dylib; do
+            [ -e "$lib" ] || continue
+            for dep in $(otool -L "$lib" | awk '/opt\/homebrew.*lib(crypto|ssl).*\.dylib/{print $1}'); do
+              install_name_tool -change "$dep" "@loader_path/$(basename "$dep")" "$lib"
+            done
+          done
+
+          # Re-sign the rewritten Mach-O (ad-hoc) so dlopen accepts them.
+          for f in "$CRYPTO" "$LIBDIR"/libssl*.dylib "$LIBDIR"/libcrypto*.dylib; do
+            [ -e "$f" ] || continue
+            codesign --force --sign - "$f"
+          done
+
+          echo "=== after ==="; otool -L "$CRYPTO"
 
       - name: Package tarball
         run: |
