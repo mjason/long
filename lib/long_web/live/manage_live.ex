@@ -32,6 +32,7 @@ defmodule LongWeb.ManageLive do
     {:search, "Search", "hero-magnifying-glass"},
     {:credentials, "Channels", "hero-signal"},
     {:scheduled, "Scheduled", "hero-clock"},
+    {:reflection, "Reflection", "hero-sparkles"},
     {:secrets, "Secrets", "hero-lock-closed"},
     {:phrases, "Phrases", "hero-language"}
   ]
@@ -75,6 +76,9 @@ defmodule LongWeb.ManageLive do
      |> assign(:bot_users, [])
      |> assign(:telegram_credentials, [])
      |> assign(:scheduled_tasks, [])
+     |> assign(:reflection_enabled, true)
+     |> assign(:reflection_hour, 18)
+     |> assign(:reflection_tasks, [])
      |> assign(:secrets, [])
      |> assign(:phrase_rows, [])}
   end
@@ -202,11 +206,20 @@ defmodule LongWeb.ManageLive do
   defp load_section(socket, :scheduled) do
     rows =
       case Agent.list_scheduled_tasks() do
-        {:ok, list} -> Enum.sort_by(list, &sort_key_next_run/1)
+        # Silent reflection tasks are system-managed and live on their own
+        # /manage/reflection page — keep them out of the user's task list.
+        {:ok, list} -> list |> Enum.reject(& &1.silent) |> Enum.sort_by(&sort_key_next_run/1)
         _ -> []
       end
 
     assign(socket, :scheduled_tasks, rows)
+  end
+
+  defp load_section(socket, :reflection) do
+    socket
+    |> assign(:reflection_enabled, Agent.reflection_enabled?())
+    |> assign(:reflection_hour, Agent.reflection_hour())
+    |> assign(:reflection_tasks, Agent.list_reflection_tasks())
   end
 
   defp load_section(socket, :secrets) do
@@ -947,6 +960,63 @@ defmodule LongWeb.ManageLive do
     end
   end
 
+  # ── Events: Reflection ───────────────────────────────────────────────
+
+  def handle_event("toggle_reflection", _params, socket) do
+    on? = !socket.assigns.reflection_enabled
+    _ = Agent.set_reflection_enabled(on?)
+
+    {:noreply,
+     socket
+     |> assign(:reflection_enabled, on?)
+     |> put_flash(:info, if(on?, do: "Silent reflection enabled", else: "Silent reflection disabled"))}
+  end
+
+  def handle_event("set_reflection_hour", %{"hour" => hour}, socket) do
+    case Integer.parse(hour) do
+      {h, _} when h in 0..23 ->
+        _ = Agent.set_reflection_hour(h)
+        {:noreply, assign(socket, :reflection_hour, h)}
+
+      _ ->
+        {:noreply, socket}
+    end
+  end
+
+  def handle_event("toggle_reflection_task", %{"id" => id}, socket) do
+    case Agent.get_scheduled_task(id) do
+      {:ok, %{enabled: true} = task} ->
+        _ = Agent.disable_scheduled_task(task)
+
+      {:ok, task} ->
+        next = Long.Agent.Schedule.compute_next_run_at(task, DateTime.utc_now())
+        _ = Agent.update_scheduled_task(task, %{enabled: true, next_run_at: next})
+
+      _ ->
+        :ok
+    end
+
+    {:noreply, assign(socket, :reflection_tasks, Agent.list_reflection_tasks())}
+  end
+
+  # Trigger a reflection turn right now, bypassing the schedule + activity
+  # gate (it's a manual "run it now"). Silent end-to-end as always.
+  def handle_event("run_reflection_now", %{"id" => id}, socket) do
+    case Agent.get_scheduled_task(id) do
+      {:ok, task} ->
+        _ =
+          Long.Agent.Server.send_user_message(task.session_id, task.prompt,
+            reflection?: true,
+            internal: true
+          )
+
+        {:noreply, put_flash(socket, :info, "Reflection triggered for this session")}
+
+      _ ->
+        {:noreply, put_flash(socket, :error, "Task not found")}
+    end
+  end
+
   # ── Events: Secrets ──────────────────────────────────────────────────
 
   def handle_event("new_secret", _params, socket) do
@@ -1112,6 +1182,7 @@ defmodule LongWeb.ManageLive do
   defp section_view(%{section: :search} = assigns), do: search_section(assigns)
   defp section_view(%{section: :credentials} = assigns), do: credentials_section(assigns)
   defp section_view(%{section: :scheduled} = assigns), do: scheduled_section(assigns)
+  defp section_view(%{section: :reflection} = assigns), do: reflection_section(assigns)
   defp section_view(%{section: :secrets} = assigns), do: secrets_section(assigns)
   defp section_view(%{section: :phrases} = assigns), do: phrases_section(assigns)
   defp section_view(assigns), do: placeholder(%{title: section_title(assigns.section)})
@@ -2350,6 +2421,130 @@ defmodule LongWeb.ManageLive do
     """
   end
 
+  defp reflection_section(assigns) do
+    ~H"""
+    <div class="p-6 space-y-4">
+      <div>
+        <h1 class="text-xl font-semibold">Reflection</h1>
+        <p class="text-sm text-zinc-500 mt-1 max-w-2xl">
+          Silent reflection: off-peak, each session's agent quietly consolidates its own
+          memory and never messages anyone. These tasks are system-managed and are kept out
+          of the Scheduled list on purpose.
+        </p>
+      </div>
+
+      <.card variant="bordered" color="natural" rounded="large" padding="none">
+        <div class="p-5 space-y-4">
+          <div class="flex items-center gap-4">
+            <div class="flex-1">
+              <div class="font-medium">Silent reflection</div>
+              <div class="text-sm text-zinc-500">
+                {if @reflection_enabled,
+                  do:
+                    "On — sessions reflect daily; new ones are auto-enrolled after their first conversation.",
+                  else: "Off — no session reflects and none are auto-enrolled."}
+              </div>
+            </div>
+            <.button
+              phx-click="toggle_reflection"
+              color={if @reflection_enabled, do: "natural", else: "primary"}
+              icon={if @reflection_enabled, do: "hero-pause", else: "hero-play"}
+              size="small"
+              rounded="medium"
+            >
+              {if @reflection_enabled, do: "Turn off", else: "Turn on"}
+            </.button>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <span class="text-sm text-zinc-600">Off-peak hour (UTC)</span>
+            <form phx-change="set_reflection_hour">
+              <select
+                name="hour"
+                disabled={!@reflection_enabled}
+                class="rounded-md border border-zinc-300 text-sm px-2 py-1 disabled:opacity-50"
+              >
+                <option :for={h <- 0..23} value={h} selected={h == @reflection_hour}>
+                  {String.pad_leading(Integer.to_string(h), 2, "0")}:xx UTC
+                </option>
+              </select>
+            </form>
+            <span class="text-xs text-zinc-400">
+              minute is spread per session to avoid a thundering herd
+            </span>
+          </div>
+        </div>
+      </.card>
+
+      <.card variant="bordered" color="natural" rounded="large" padding="none">
+        <table class="w-full text-sm">
+          <thead class="text-xs uppercase text-zinc-500 bg-zinc-50">
+            <tr>
+              <th class="text-left px-4 py-2.5">Session</th>
+              <th class="text-left px-4 py-2.5">At</th>
+              <th class="text-left px-4 py-2.5">Next run (UTC)</th>
+              <th class="text-left px-4 py-2.5">Status</th>
+              <th class="text-right px-4 py-2.5">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr :for={t <- @reflection_tasks} class="border-t border-zinc-100">
+              <td class="px-4 py-2 font-mono text-xs">{reflection_session_label(t)}</td>
+              <td class="px-4 py-2">{t.schedule_time} UTC</td>
+              <td class="px-4 py-2">{reflection_dt(t.next_run_at)}</td>
+              <td class="px-4 py-2">
+                <span class={[
+                  "inline-flex px-2 py-0.5 rounded-full text-xs",
+                  if(t.enabled,
+                    do: "bg-emerald-100 text-emerald-700",
+                    else: "bg-zinc-100 text-zinc-500"
+                  )
+                ]}>
+                  {if t.enabled, do: "enabled", else: "disabled"}
+                </span>
+              </td>
+              <td class="px-4 py-2 text-right space-x-1 whitespace-nowrap">
+                <.button
+                  phx-click="run_reflection_now"
+                  phx-value-id={t.id}
+                  color="natural"
+                  size="extra_small"
+                  icon="hero-bolt"
+                  rounded="medium"
+                >
+                  Run now
+                </.button>
+                <.button
+                  phx-click="toggle_reflection_task"
+                  phx-value-id={t.id}
+                  color="natural"
+                  size="extra_small"
+                  rounded="medium"
+                >
+                  {if t.enabled, do: "Disable", else: "Enable"}
+                </.button>
+              </td>
+            </tr>
+            <tr :if={@reflection_tasks == []}>
+              <td colspan="5" class="px-4 py-8 text-center text-zinc-400 text-sm">
+                No reflection tasks yet — one is created automatically after a session's first
+                real conversation (when reflection is on).
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </.card>
+    </div>
+    """
+  end
+
+  defp reflection_session_label(%{name: "reflection:" <> sid}), do: String.slice(sid, 0, 8)
+  defp reflection_session_label(%{name: name}), do: name
+
+  defp reflection_dt(nil), do: "—"
+  defp reflection_dt(%DateTime{} = dt), do: Calendar.strftime(dt, "%Y-%m-%d %H:%M")
+  defp reflection_dt(other), do: to_string(other)
+
   defp secrets_section(assigns) do
     ~H"""
     <div class="p-6 space-y-4">
@@ -2662,6 +2857,7 @@ defmodule LongWeb.ManageLive do
   defp section_path(:search), do: ~p"/manage/search"
   defp section_path(:credentials), do: ~p"/manage/credentials"
   defp section_path(:scheduled), do: ~p"/manage/scheduled"
+  defp section_path(:reflection), do: ~p"/manage/reflection"
   defp section_path(:secrets), do: ~p"/manage/secrets"
   defp section_path(:phrases), do: ~p"/manage/phrases"
 

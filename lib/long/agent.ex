@@ -512,12 +512,59 @@ defmodule Long.Agent do
     end
   end
 
-  @doc "Whether silent reflection is enabled for this instance (kill switch)."
+  @doc """
+  Whether silent reflection is enabled for this instance. The DB `Setting`
+  (editable at /manage/reflection) wins; the `config` value is the fallback
+  default. This is the runtime kill switch checked before every reflection.
+  """
   @spec reflection_enabled?() :: boolean()
-  def reflection_enabled?,
-    do: Keyword.get(reflection_config(), :enabled, true)
+  def reflection_enabled? do
+    case get_setting("reflection_enabled") do
+      {:ok, %{value: v}} -> v not in ["false", "0", "off", ""]
+      _ -> Keyword.get(reflection_config(), :enabled, true)
+    end
+  end
 
-  defp reflection_hour, do: Keyword.get(reflection_config(), :hour, 18)
+  @doc "Off-peak UTC hour (0–23) seeded reflection tasks fire at. Setting overrides config."
+  @spec reflection_hour() :: non_neg_integer()
+  def reflection_hour do
+    with {:ok, %{value: v}} <- get_setting("reflection_hour"),
+         {h, ""} <- Integer.parse(v),
+         true <- h in 0..23 do
+      h
+    else
+      _ -> Keyword.get(reflection_config(), :hour, 18)
+    end
+  end
+
+  @doc "Enable/disable silent reflection instance-wide (persisted in `Setting`)."
+  @spec set_reflection_enabled(boolean()) :: :ok | :error
+  def set_reflection_enabled(on?) when is_boolean(on?) do
+    case put_setting(%{key: "reflection_enabled", value: to_string(on?)}) do
+      {:ok, _} -> :ok
+      _ -> :error
+    end
+  end
+
+  @doc "Set the off-peak UTC hour (0–23) for reflection (persisted in `Setting`)."
+  @spec set_reflection_hour(integer()) :: :ok | :error
+  def set_reflection_hour(hour) when is_integer(hour) and hour in 0..23 do
+    case put_setting(%{key: "reflection_hour", value: to_string(hour)}) do
+      {:ok, _} -> :ok
+      _ -> :error
+    end
+  end
+
+  def set_reflection_hour(_), do: :error
+
+  @doc "All silent-reflection tasks (one per reflecting session), newest-scheduled first."
+  @spec list_reflection_tasks() :: [Long.Agent.ScheduledTask.t()]
+  def list_reflection_tasks do
+    case list_scheduled_tasks() do
+      {:ok, tasks} -> tasks |> Enum.filter(& &1.silent) |> Enum.sort_by(& &1.name)
+      _ -> []
+    end
+  end
 
   defp reflection_config, do: Application.get_env(:long, Long.Agent.Reflection, [])
 
