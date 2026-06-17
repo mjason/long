@@ -248,16 +248,17 @@ defmodule Long.Jido.Loop do
   Use the `graphql` tool with these EXACT operations — copy them, do not
   go schema-hunting (you have everything you need here):
 
-  1. READ what's already remembered and what was said:
+  1. READ what's already remembered and what was said. Use these EXACT
+     query field names verbatim — they are correct; do NOT substitute or
+     introspect:
 
          query {
-           sessionMemoriesFor(sessionId: "{{session_id}}") {
+           sessionMemoriesForSession(sessionId: "{{session_id}}") {
              results { key value kind importance }
            }
            messagesForSession(sessionId: "{{session_id}}") {
              results { role content }
            }
-           workingCheckpoint(sessionId: "{{session_id}}") { keyInfo }
          }
 
   2. CONSOLIDATE durable facts / preferences / goals / decisions into this
