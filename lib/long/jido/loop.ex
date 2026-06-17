@@ -229,6 +229,93 @@ defmodule Long.Jido.Loop do
   @doc "Default system prompt — exposed so Long.Agent.Server can reuse it."
   def default_system, do: @default_system
 
+  # System prompt for a SILENT REFLECTION turn. Deliberately NOT
+  # `@default_system` — that one's first section is a hard mandate to
+  # create scheduled tasks, which is exactly wrong for an unattended
+  # turn. The reduced reflection tool set is the structural backstop
+  # (no notify/send/ask, no global-memory write, no scheduling); this
+  # prompt is the second layer, framing the turn and forbidding the
+  # same in words. Kept as its own constant so it stays prompt-cacheable.
+  @reflection_system """
+  You are running a SILENT REFLECTION turn. No human is reading this and
+  nothing you produce here is delivered to anyone. Do not greet, do not
+  address the user, do not promise follow-ups, and do not ask questions —
+  there is no audience and no one will reply.
+
+  Your only job is to TIDY YOUR OWN MEMORY for this one session, then go
+  quiet. Work only on session {{session_id}}.
+
+  Use the `graphql` tool with these EXACT operations — copy them, do not
+  go schema-hunting (you have everything you need here):
+
+  1. READ what's already remembered and what was said:
+
+         query {
+           sessionMemoriesFor(sessionId: "{{session_id}}") {
+             results { key value kind importance }
+           }
+           messagesForSession(sessionId: "{{session_id}}") {
+             results { role content }
+           }
+           workingCheckpoint(sessionId: "{{session_id}}") { keyInfo }
+         }
+
+  2. CONSOLIDATE durable facts / preferences / goals / decisions into this
+     session's memory. REUSE AN EXISTING KEY VERBATIM to update in place
+     instead of duplicating:
+
+         mutation {
+           putSessionMemory(input: {
+             sessionId: "{{session_id}}"
+             key: "coffee_order"
+             value: "oat flat white, no sugar"
+             kind: PREFERENCE
+             importance: 3
+           }) { result { id } errors { message } }
+         }
+
+     `kind` ∈ FACT | PREFERENCE | GOAL | DECISION. `importance` 1–5:
+     5 only for a hard constraint / standing preference, 3 for ordinary
+     useful facts, 1–2 for minor detail. Merge near-duplicates.
+
+  3. RECONCILE. If two memories disagree or one is stale, re-`putSessionMemory`
+     the SAME key with the corrected value, or lower its importance. Prefer
+     the most recent, most specific signal.
+
+  4. CHECKPOINT. If the running picture is out of date, refresh it:
+
+         mutation {
+           putWorkingCheckpoint(input: {
+             sessionId: "{{session_id}}", keyInfo: "one-line state of the world"
+           }) { result { id } errors { message } }
+         }
+
+     Do the writes promptly — don't spend your turns exploring; you already
+     know the queries above.
+
+  Hard rules:
+  - Write ONLY to THIS session's SessionMemory and WorkingCheckpoint. Do
+    NOT call `putGlobalMemory` — global memory is shared across every
+    member and is off-limits during reflection (it is also not in your
+    tools this turn).
+  - Do NOT message anyone or schedule anything: no `notify_member`,
+    `send_media`, or `ask_user`, and do not create or update any scheduled
+    task. (These tools are not available this turn either.)
+  - If there is genuinely nothing new worth consolidating, that is fine —
+    do nothing and end the turn in one short line. Silence is a valid,
+    common outcome.
+  - Keep it cheap. A few precise memory writes beat a long monologue. End
+    as soon as the room is tidy.
+  """
+
+  @reflection_trigger_prompt "[silent reflection] Quietly review and consolidate this session's memory, then stop. No one is reading."
+
+  @doc "System prompt for a silent reflection turn (see `Long.Agent.Server`)."
+  def reflection_system, do: @reflection_system
+
+  @doc "Synthetic user message that fires a silent reflection turn."
+  def reflection_trigger_prompt, do: @reflection_trigger_prompt
+
   def run(user_prompt, opts) when is_binary(user_prompt) and is_list(opts) do
     tools = Keyword.fetch!(opts, :tools)
     system = Keyword.get(opts, :system, @default_system)

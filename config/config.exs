@@ -15,6 +15,12 @@ config :elixir, :time_zone_database, Tzdata.TimeZoneDatabase
 # Timezone the agent assumes for the user when converting local times to UTC.
 config :long, :user_timezone, "Asia/Shanghai"
 
+# Silent reflection (the autonomous "tidy your own memory" loop). `enabled`
+# is the instance-wide kill switch checked in Workers.RunScheduledTask;
+# `hour` is the off-peak UTC hour seeded reflection tasks fire at (the
+# minute is jittered per-session to spread load across a fleet).
+config :long, Long.Agent.Reflection, enabled: true, hour: 18
+
 config :ash_oban, pro?: false
 
 config :long, Oban,

@@ -93,7 +93,11 @@ defmodule Long.Agent.Memory do
 
     with {:ok, session} <- Agent.get_session(session_id),
          {:ok, messages} <- load_messages(session_id),
-         {:ok, %{title: title, summary: summary, insights: insights}} <- summarizer.(messages),
+         # Summarize only human-visible rows — a silent reflection's internal
+         # monologue must not bleed into the operator-facing summary/insights
+         # at /manage/sessions. The full payload keeps internal rows for replay.
+         visible = Enum.reject(messages, & &1.internal),
+         {:ok, %{title: title, summary: summary, insights: insights}} <- summarizer.(visible),
          {:ok, checkpoint} <- maybe_load_checkpoint(session_id) do
       payload = %{
         "session" => %{

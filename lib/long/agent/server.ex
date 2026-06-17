@@ -163,6 +163,12 @@ defmodule Long.Agent.Server do
 
       # State-machine fields
       stage: :idle,
+      # Silent-reflection turn? When true the turn runs a reduced,
+      # push-free tool set + the reflection system prompt, persists
+      # every row as `internal`, and emits NO PubSub (no spinner, no
+      # message reload) so it stays invisible to web + bot channels.
+      reflection?: false,
+      internal: false,
       # `turn` is a session-monotonic counter persisted on every
       # message row, used for `sort turn: :asc` history ordering and
       # snapshot semantics.
@@ -246,8 +252,8 @@ defmodule Long.Agent.Server do
 
   def handle_cast(:abort, state) do
     kill_subordinates(state)
-    broadcast(state.session_id, {:loop_error, "aborted"})
-    broadcast(state.session_id, :loop_ended)
+    broadcast(state, {:loop_error, "aborted"})
+    broadcast(state, :loop_ended)
 
     state =
       %{
@@ -349,6 +355,7 @@ defmodule Long.Agent.Server do
 
   defp start_turn(state, text, opts) do
     attachments = Keyword.get(opts, :attachments, [])
+    reflection? = Keyword.get(opts, :reflection?, false) == true
 
     alias_name =
       Keyword.get(opts, :llm_alias) || state.llm_alias || Agent.default_llm_alias()
@@ -364,55 +371,54 @@ defmodule Long.Agent.Server do
 
     state = %{state | max_turns: max_turns}
 
-    if is_nil(alias_name) do
-      # No LLM configured — delegate to the echo fallback runner which owns
-      # its own PubSub broadcasts and persistence. It is text-only, so any
-      # :attachments are dropped in echo (demo) mode.
-      Long.Agent.SessionRunner.send_user_message(state.session_id, text, opts)
-      state
-    else
-      start_llm_turn(state, text, alias_name, attachments)
+    cond do
+      reflection? and is_nil(alias_name) ->
+        # No LLM configured — a reflection turn has nothing to do and must
+        # NOT fall through to the (channel-visible, non-internal) echo path.
+        state
+
+      is_nil(alias_name) ->
+        # No LLM configured — delegate to the echo fallback runner which owns
+        # its own PubSub broadcasts and persistence. It is text-only, so any
+        # :attachments are dropped in echo (demo) mode.
+        Long.Agent.SessionRunner.send_user_message(state.session_id, text, opts)
+        state
+
+      true ->
+        start_llm_turn(
+          %{state | reflection?: reflection?, internal: reflection?},
+          text,
+          alias_name,
+          attachments
+        )
     end
   end
 
   defp start_llm_turn(state, text, alias_name, attachments) do
-    broadcast(state.session_id, :loop_started)
+    broadcast(state, :loop_started)
     turn_no = state.turn + 1
-    broadcast(state.session_id, {:turn_start, turn_no})
+    broadcast(state, {:turn_start, turn_no})
 
     # The current time rides the user turn (not the system prompt) so it never
     # busts the prompt cache; the persisted display_text stays time-free.
     user_msg = build_user_message(Long.Agent.Schedule.now_line() <> "\n\n" <> text, attachments)
     display_text = display_text_for(text, attachments)
-    persist_message(state.session_id, :user, display_text, [], [], turn_no, attachment_blocks(attachments))
+
+    persist_message(
+      state,
+      :user,
+      display_text,
+      [],
+      [],
+      turn_no,
+      attachment_blocks(attachments)
+    )
 
     %{system_addendum: summary_addendum, messages: history} =
       History.load_or_compress(state.session_id, alias_name)
 
-    memory_addendum =
-      text
-      |> Recall.recall(session_id: state.session_id, limit: 8, bump: false)
-      |> Recall.format_for_prompt()
-
-    skill_block = SkillStore.list_names_for_prompt(Agent.member_id_for_session(state.session_id))
-    addendum = merge_addenda([summary_addendum, memory_addendum, skill_block])
-
-    tools = default_tools()
-
-    # Prepend a flat tool inventory + mandate so the model's first
-    # impression every turn is "these are my real tools" rather than
-    # whatever it remembers from training. The system body itself
-    # references `{{session_id}}` in GraphQL cheatsheet examples;
-    # substitute the real id so the model can copy-paste directly.
-    system_text =
-      [
-        Long.Agent.ToolInventory.render(tools),
-        Long.Agent.Schedule.timezone_note(),
-        Loop.default_system() |> String.replace("{{session_id}}", state.session_id),
-        addendum
-      ]
-      |> Enum.reject(&(is_nil(&1) or &1 == ""))
-      |> Enum.join("\n\n")
+    tools = turn_tools(state)
+    system_text = build_system_text(state, tools, text, summary_addendum, history)
 
     system_msg = ReqLLM.Context.system(system_text)
     btw_msgs = Enum.map(state.btws, &ReqLLM.Context.user("[note] " <> &1))
@@ -441,6 +447,49 @@ defmodule Long.Agent.Server do
     spawn_llm(state)
   end
 
+  # A reflection turn runs the reduced, push-free tool set; a normal turn
+  # the full default set.
+  defp turn_tools(%{reflection?: true}), do: Long.Jido.SessionRunner.reflection_tools()
+  defp turn_tools(_state), do: default_tools()
+
+  # Reflection turns get a focused system prompt and deliberately SKIP the
+  # memory/skill addenda — reflection reads memory itself via graphql, and
+  # skipping the Recall addendum also avoids folding shared global-memory
+  # rows into a reflection turn's context.
+  defp build_system_text(%{reflection?: true} = state, tools, _text, _summary_addendum, _history) do
+    [
+      Long.Agent.ToolInventory.render(tools),
+      Long.Agent.Schedule.timezone_note(),
+      Loop.reflection_system() |> String.replace("{{session_id}}", state.session_id)
+    ]
+    |> Enum.reject(&(is_nil(&1) or &1 == ""))
+    |> Enum.join("\n\n")
+  end
+
+  defp build_system_text(state, tools, text, summary_addendum, _history) do
+    memory_addendum =
+      text
+      |> Recall.recall(session_id: state.session_id, limit: 8, bump: false)
+      |> Recall.format_for_prompt()
+
+    skill_block = SkillStore.list_names_for_prompt(Agent.member_id_for_session(state.session_id))
+    addendum = merge_addenda([summary_addendum, memory_addendum, skill_block])
+
+    # Prepend a flat tool inventory + mandate so the model's first
+    # impression every turn is "these are my real tools" rather than
+    # whatever it remembers from training. The system body itself
+    # references `{{session_id}}` in GraphQL cheatsheet examples;
+    # substitute the real id so the model can copy-paste directly.
+    [
+      Long.Agent.ToolInventory.render(tools),
+      Long.Agent.Schedule.timezone_note(),
+      Loop.default_system() |> String.replace("{{session_id}}", state.session_id),
+      addendum
+    ]
+    |> Enum.reject(&(is_nil(&1) or &1 == ""))
+    |> Enum.join("\n\n")
+  end
+
   defp spawn_llm(state) do
     ref = make_ref()
 
@@ -466,7 +515,7 @@ defmodule Long.Agent.Server do
             %{source: "server.spawn_llm", session_id: state.session_id, turn: state.turn}
           )
 
-        broadcast(state.session_id, {:loop_error, "spawn_llm: #{inspect(reason)}"})
+        broadcast(state, {:loop_error, "spawn_llm: #{inspect(reason)}"})
         end_turn(idle(state), nil)
     end
   end
@@ -474,7 +523,7 @@ defmodule Long.Agent.Server do
   defp handle_llm_result(state, {:ok, %{type: :final_answer, text: text}}) do
     assistant_msg = ReqLLM.Context.assistant(text || "")
 
-    persist_message(state.session_id, :assistant, text || "", [], [], state.turn)
+    persist_message(state, :assistant, text || "", [], [], state.turn)
 
     state = %{state | messages: state.messages ++ [assistant_msg]} |> idle()
     end_turn(state, {:done, %{reason: :no_tool_call}})
@@ -494,7 +543,7 @@ defmodule Long.Agent.Server do
     # the web UI — the referenced file was produced on an earlier turn, so it
     # already exists on disk by now.
     persist_message(
-      state.session_id,
+      state,
       :assistant,
       text || "",
       tcs,
@@ -537,7 +586,7 @@ defmodule Long.Agent.Server do
       )
 
     msg = if is_exception(exception), do: Exception.message(exception), else: inspect(exception)
-    broadcast(state.session_id, {:loop_error, msg})
+    broadcast(state, {:loop_error, msg})
     end_turn(idle(state), nil)
   end
 
@@ -554,7 +603,7 @@ defmodule Long.Agent.Server do
     monitors =
       Enum.reduce(tool_calls, state.tool_monitors, fn tc, acc ->
         broadcast(
-          state.session_id,
+          state,
           {:tool_start, %{id: tc.id, name: tc.name, args: tc.arguments, index: 0, count: 1}}
         )
 
@@ -579,17 +628,17 @@ defmodule Long.Agent.Server do
         pending_tool_calls: Map.delete(state.pending_tool_calls, id)
     }
 
-    persist_message(state.session_id, :tool, "", [], [req_message], state.turn)
+    persist_message(state, :tool, "", [], [req_message], state.turn)
 
     broadcast(
-      state.session_id,
+      state,
       {:tool_done, %{id: id, name: name, data: tool_data_for_event(req_message), exit?: false}}
     )
 
     cond do
       ask_user_payload ->
         broadcast(
-          state.session_id,
+          state,
           {:ask_user,
            %{
              "question" => ask_user_payload[:question],
@@ -627,7 +676,7 @@ defmodule Long.Agent.Server do
     if state.iteration >= state.max_turns do
       maybe_compress_and_continue(state)
     else
-      broadcast(state.session_id, {:turn_start, state.turn + 1})
+      broadcast(state, {:turn_start, state.turn + 1})
       spawn_llm(%{state | turn: state.turn + 1, iteration: state.iteration + 1})
     end
   end
@@ -644,7 +693,7 @@ defmodule Long.Agent.Server do
   defp maybe_compress_and_continue(state) do
     case compress_in_flight(state) do
       {:ok, compressed_state} ->
-        broadcast(state.session_id, {:turn_start, state.turn + 1})
+        broadcast(state, {:turn_start, state.turn + 1})
 
         spawn_llm(%{
           compressed_state
@@ -780,17 +829,39 @@ defmodule Long.Agent.Server do
   # for setting `:stage` (typically via `idle/1`, except `:asked_user`).
   defp end_turn(state, reason) do
     persist_snapshot(state)
-    if reason, do: broadcast(state.session_id, reason)
-    broadcast(state.session_id, :loop_ended)
+    if reason, do: broadcast(state, reason)
+    broadcast(state, :loop_ended)
     finish_turn(state)
   end
 
   defp finish_turn(state) do
-    if state.turn == 1 and title_unset?(state.session) do
-      _ = Long.Jido.TitleGen.maybe_generate_async(state.session_id, state.llm_alias)
+    # A reflection turn must not name the session or seed anything — those
+    # are reactions to *human* turns only.
+    unless state.reflection? do
+      if state.turn == 1 and title_unset?(state.session) do
+        _ = Long.Jido.TitleGen.maybe_generate_async(state.session_id, state.llm_alias)
+      end
+
+      maybe_seed_reflection(state)
     end
 
-    drain_inbox(state)
+    # Drop the silent identity now the turn is over (a crash mid-turn
+    # re-derives it from the snapshot instead). Reset BEFORE drain_inbox so
+    # a queued normal message never inherits reflection mode.
+    drain_inbox(%{state | reflection?: false, internal: false})
+  end
+
+  # Materialize this session's daily silent-reflection task once it has had a
+  # real human turn — this is what makes the loop autonomous (no manual
+  # seeding). Idempotent + skips unbound strangers, and fire-and-forget so it
+  # never blocks the turn. Honors the instance kill switch.
+  defp maybe_seed_reflection(state) do
+    if Agent.reflection_enabled?() do
+      sid = state.session_id
+      _ = Task.Supervisor.start_child(@task_sup, fn -> Agent.ensure_reflection_task(sid) end)
+    end
+
+    :ok
   end
 
   defp title_unset?(%{title: "untitled"}), do: true
@@ -1067,11 +1138,20 @@ defmodule Long.Agent.Server do
 
   # ── PubSub / persistence ─────────────────────────────────────────────
 
-  defp broadcast(session_id, msg) do
+  # A reflection turn is fully silent on PubSub — no spinner, no message
+  # reload, nothing — so it stays invisible to any web tab or bot watching
+  # the session. Every other turn broadcasts normally. Always called with
+  # the loop state; `persist_message` reaches `do_broadcast/2` directly.
+  defp broadcast(%{internal: true}, _msg), do: :ok
+  defp broadcast(%{session_id: session_id}, msg), do: do_broadcast(session_id, msg)
+
+  defp do_broadcast(session_id, msg) do
     Phoenix.PubSub.broadcast(Long.PubSub, @topic_prefix <> session_id, msg)
   end
 
-  defp persist_message(session_id, role, content, tool_calls, tool_results, turn, blocks \\ %{}) do
+  defp persist_message(state, role, content, tool_calls, tool_results, turn, blocks \\ %{}) do
+    %{session_id: session_id, internal: internal} = state
+
     tcs =
       Enum.map(tool_calls, fn tc ->
         %{"id" => tc.id, "name" => tc.name, "input" => tc.arguments}
@@ -1092,12 +1172,17 @@ defmodule Long.Agent.Server do
       tool_calls: tcs,
       tool_results: trs,
       turn: turn,
-      blocks: blocks
+      blocks: blocks,
+      internal: internal
     }
 
     case Agent.append_message(attrs) do
       {:ok, row} ->
-        broadcast(session_id, {:message_persisted, %{message: row}})
+        # Internal (reflection) rows never trigger a web reload — that's
+        # what keeps the monologue out of /chat.
+        unless internal do
+          do_broadcast(session_id, {:message_persisted, %{message: row}})
+        end
 
       other ->
         Logger.error(
@@ -1129,7 +1214,11 @@ defmodule Long.Agent.Server do
       pending_tool_calls_json: encode_term(state.pending_tool_calls),
       tool_results_json: encode_term(state.tool_results),
       last_assistant_text: last_assistant_text(state.messages),
-      llm_alias: state.llm_alias
+      llm_alias: state.llm_alias,
+      # Only an IN-FLIGHT reflection is silent-on-resume; a completed turn
+      # (stage back to :idle) snapshots reflection?: false so a later
+      # normal turn never inherits the silent identity.
+      reflection?: state.reflection? and state.stage != :idle
     }
 
     case Agent.upsert_turn_snapshot(attrs) do
@@ -1166,32 +1255,51 @@ defmodule Long.Agent.Server do
   end
 
   defp restore_from_snapshot(state, snap) do
-    state = %{
-      state
-      | turn: snap.turn,
-        stage: snap.stage,
-        messages: decode_term(snap.messages_json) || [],
-        pending_tool_calls: decode_term(snap.pending_tool_calls_json) || %{},
-        tool_results: decode_term(snap.tool_results_json) || %{},
-        llm_alias: snap.llm_alias || state.llm_alias
-    }
+    reflection? = Map.get(snap, :reflection?, false) == true
 
-    case snap.stage do
-      :calling_llm ->
-        # We were waiting on an LLM result — spawn a fresh consumer
-        # with the same messages.
-        spawn_llm(state)
+    cond do
+      # Never RESUME a half-finished reflection: re-running it would
+      # double-bill the LLM and bypass the kill switch + activity gate.
+      # Drop it and go idle — it reflects again on the next schedule.
+      reflection? and snap.stage in [:calling_llm, :running_tools] ->
+        _ = drop_turn_snapshot(state.session_id)
+        %{state | stage: :idle, reflection?: false, internal: false}
 
-      :running_tools ->
-        # Some tools were in-flight; we don't know which ones the
-        # crashed process had already gotten. Re-dispatch every
-        # pending tool_call. Already-finished ones live in
-        # `tool_results` and stay put.
-        pending = Map.values(state.pending_tool_calls)
-        spawn_tools(state, pending)
+      true ->
+        state = %{
+          state
+          | turn: snap.turn,
+            stage: snap.stage,
+            messages: decode_term(snap.messages_json) || [],
+            pending_tool_calls: decode_term(snap.pending_tool_calls_json) || %{},
+            tool_results: decode_term(snap.tool_results_json) || %{},
+            llm_alias: snap.llm_alias || state.llm_alias
+        }
 
-      _ ->
-        state
+        case snap.stage do
+          :calling_llm ->
+            # We were waiting on an LLM result — spawn a fresh consumer
+            # with the same messages.
+            spawn_llm(state)
+
+          :running_tools ->
+            # Some tools were in-flight; we don't know which ones the
+            # crashed process had already gotten. Re-dispatch every
+            # pending tool_call. Already-finished ones live in
+            # `tool_results` and stay put.
+            pending = Map.values(state.pending_tool_calls)
+            spawn_tools(state, pending)
+
+          _ ->
+            state
+        end
+    end
+  end
+
+  defp drop_turn_snapshot(session_id) do
+    case Agent.get_turn_snapshot(session_id) do
+      {:ok, snap} -> Agent.destroy_turn_snapshot(snap)
+      _ -> :ok
     end
   end
 

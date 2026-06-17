@@ -39,6 +39,21 @@ defmodule Long.Jido.SessionRunner do
   @doc "Default tool list — exposed so `Long.Agent.Server` can reuse it."
   def default_tools, do: @default_tools
 
+  # Tool set for a SILENT REFLECTION turn. This is the STRUCTURAL silence
+  # guarantee: the channel-reaching tools (NotifyMember / SendMedia reach
+  # `Outbound.push` inside the loop, independent of the dispatcher) and the
+  # side-effecting tools (CodeRun / HttpFetch / WebExecuteJs / FileWrite /
+  # SkillCreate — network, filesystem, shared state) are simply absent, and
+  # the GraphQL tool is swapped for the restricted reflection variant that
+  # can only write this session's own memory. A reflection turn therefore
+  # cannot message anyone, write global memory, or touch another member's
+  # data even if the model tries. Reflection only needs to read and tidy
+  # memory, so one restricted GraphQL tool is the whole set.
+  @reflection_tools [Long.Jido.Tools.GraphQLReflection]
+
+  @doc "Reduced, side-effect-free tool set for a silent reflection turn."
+  def reflection_tools, do: @reflection_tools
+
   def send_user_message(session_id, text, opts \\ [])
       when is_binary(session_id) and is_binary(text) do
     case Agent.get_session(session_id) do

@@ -30,9 +30,14 @@ defmodule Long.Agent.Message do
     # Long.Agent.Server during the loop and shouldn't be mutated
     # directly from GraphQL (that would corrupt the conversation).
     queries do
-      list :messages, :read
-      get :message, :read
-      list :messages_for_session, :by_session
+      # All GraphQL-facing reads go through `internal == false` actions so a
+      # silent-reflection turn's monologue never surfaces externally (the
+      # /graphql endpoint has no auth pipeline). In-process callers
+      # (History/TitleGen/L4) use the unfiltered `:read`/`:by_session`
+      # actions directly so reflection continuity survives.
+      list :messages, :read_public
+      get :message, :read_public
+      list :messages_for_session, :by_session_public
     end
   end
 
@@ -44,6 +49,15 @@ defmodule Long.Agent.Message do
       pagination keyset?: true, default_limit: 25, max_page_size: 100, required?: false
     end
 
+    # Whole-table read with `internal` (silent-reflection) rows hidden —
+    # backs the public GraphQL `messages`/`message` queries. The primary
+    # `:read` stays unfiltered for in-process callers (chat.ex filters at
+    # render; L4 needs all rows).
+    read :read_public do
+      filter expr(internal == false)
+      pagination keyset?: true, default_limit: 25, max_page_size: 100, required?: false
+    end
+
     read :by_session do
       argument :session_id, :uuid, allow_nil?: false
       filter expr(session_id == ^arg(:session_id))
@@ -52,11 +66,26 @@ defmodule Long.Agent.Message do
       # default page small to protect LLM context. GraphQL callers
       # paginate; in-process callers (History/TitleGen) ignore the
       # limit because paginate_by_default? is false.
+      #
+      # NOTE: this action stays UNFILTERED on `internal` — History.replay
+      # and TitleGen read through it and MUST keep seeing silent-reflection
+      # rows or the agent loses its own cross-turn reflection continuity.
+      # The public/GraphQL surface uses `:by_session_public` instead.
+      pagination keyset?: true, default_limit: 20, max_page_size: 100, required?: false
+    end
+
+    # Same as `:by_session` but hides `internal` (silent-reflection) rows.
+    # Backs the GraphQL `messagesForSession` query so a reflection turn's
+    # internal monologue never surfaces to external callers.
+    read :by_session_public do
+      argument :session_id, :uuid, allow_nil?: false
+      filter expr(session_id == ^arg(:session_id) and internal == false)
+      prepare build(sort: [inserted_at: :asc])
       pagination keyset?: true, default_limit: 20, max_page_size: 100, required?: false
     end
 
     create :append do
-      accept [:role, :content, :blocks, :tool_calls, :tool_results, :turn, :session_id]
+      accept [:role, :content, :blocks, :tool_calls, :tool_results, :turn, :session_id, :internal]
     end
   end
 
@@ -91,6 +120,16 @@ defmodule Long.Agent.Message do
       default 0
       allow_nil? false
       public? true
+    end
+
+    attribute :internal, :boolean do
+      description "True for rows produced by a silent reflection turn — hidden from the web /chat and the public GraphQL list, but still visible to in-process History/TitleGen replay."
+      default false
+      allow_nil? false
+      # Server-side filters (:read_public / :by_session_public) read this,
+      # but it is NOT exposed to GraphQL — external callers can neither
+      # select nor filter on it, so the silent-reflection flag stays internal.
+      public? false
     end
 
     timestamps()

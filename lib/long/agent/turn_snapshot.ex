@@ -55,7 +55,8 @@ defmodule Long.Agent.TurnSnapshot do
         :pending_tool_calls_json,
         :tool_results_json,
         :last_assistant_text,
-        :llm_alias
+        :llm_alias,
+        :reflection?
       ]
 
       upsert? true
@@ -69,6 +70,7 @@ defmodule Long.Agent.TurnSnapshot do
         :tool_results_json,
         :last_assistant_text,
         :llm_alias,
+        :reflection?,
         :updated_at
       ]
     end
@@ -118,6 +120,15 @@ defmodule Long.Agent.TurnSnapshot do
 
     attribute :llm_alias, :string do
       public? true
+    end
+
+    attribute :reflection?, :boolean do
+      description "True if the in-flight turn is a silent reflection — so a crash-resumed turn keeps its reduced tool set, reflection prompt, and internal marking instead of resuming as a normal (channel-visible) turn."
+      default false
+      allow_nil? false
+      # Internal crash-recovery state. Not exposed to GraphQL (the `?`
+      # is an invalid GraphQL field char anyway); `accept` still works.
+      public? false
     end
 
     timestamps()

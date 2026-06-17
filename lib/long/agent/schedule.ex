@@ -108,6 +108,12 @@ defmodule Long.Agent.Schedule do
 
   defp stale?(_target, _now, _), do: false
 
+  @doc ~s|Format an hour/minute pair as a zero-padded UTC "HH:MM" — the inverse of the internal `parse_hhmm/1`.|
+  def format_hhmm(hour, minute)
+      when is_integer(hour) and hour in 0..23 and is_integer(minute) and minute in 0..59 do
+    :io_lib.format("~2..0B:~2..0B", [hour, minute]) |> IO.iodata_to_binary()
+  end
+
   defp parse_hhmm(s) when is_binary(s) do
     case String.split(s, ":") do
       [h, m] ->

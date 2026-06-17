@@ -380,6 +380,147 @@ defmodule Long.Agent do
 
   def put_user_timezone(_), do: :error
 
+  # ── Silent reflection (autonomous "tidy your own memory" loop) ────────
+
+  @reflection_name_prefix "reflection:"
+
+  @doc "Deterministic per-session name for the reflection ScheduledTask (`:name` is globally unique)."
+  @spec reflection_task_name(String.t()) :: String.t()
+  def reflection_task_name(session_id) when is_binary(session_id),
+    do: @reflection_name_prefix <> session_id
+
+  @doc """
+  Timestamp of the most recent **human** message in a session — `role: :user`
+  AND `internal == false`, so the synthetic reflection-trigger user rows (which
+  are marked internal) never count as activity. Returns `nil` for a session with
+  no human messages (e.g. freshly `/clear`ed). Drives the reflection activity gate.
+  """
+  @spec last_human_message_at(String.t()) :: DateTime.t() | nil
+  def last_human_message_at(session_id) when is_binary(session_id) do
+    latest_message_at(session_id, role: :user, internal: false)
+  end
+
+  @doc """
+  Timestamp of the most recent **internal** (silent-reflection) message in a
+  session, or `nil` if it has never reflected. Paired with
+  `last_human_message_at/1` it forms the crash-safe activity gate: reflect
+  iff there's human activity newer than the last reflection. Because both
+  sides are real `message.inserted_at` values (same usec precision, and an
+  internal row exists only if a reflection actually ran), the gate never
+  spuriously double-fires and never permanently skips after a lost turn.
+  """
+  @spec last_internal_message_at(String.t()) :: DateTime.t() | nil
+  def last_internal_message_at(session_id) when is_binary(session_id) do
+    latest_message_at(session_id, internal: true)
+  end
+
+  defp latest_message_at(session_id, filters) do
+    require Ash.Query
+
+    role = Keyword.get(filters, :role)
+    internal = Keyword.fetch!(filters, :internal)
+
+    Long.Agent.Message
+    |> Ash.Query.filter(session_id == ^session_id and internal == ^internal)
+    |> then(fn q -> if role, do: Ash.Query.filter(q, role == ^role), else: q end)
+    |> Ash.Query.sort(inserted_at: :desc)
+    |> Ash.Query.limit(1)
+    |> Ash.read_one()
+    |> case do
+      {:ok, %{inserted_at: at}} -> at
+      _ -> nil
+    end
+  end
+
+  @doc """
+  Idempotently ensure a daily silent-reflection task exists for `session_id`.
+
+    * already has one → `{:ok, task}` (no duplicate; `:name` is globally unique);
+    * session has no member to act for (an unbound stranger on a hosted bot) →
+      `{:ok, :skipped}` — we don't reflect over a stranger's chat;
+    * otherwise create one: `silent: true`, `repeat: :daily`, an off-peak UTC
+      `schedule_time` whose **minute is jittered by a hash of the session id** so a
+      fleet of sessions doesn't stampede the LLM provider at one instant,
+      `max_delay_hours: 1` and an explicit `next_run_at` so a backfill run never
+      fires the whole fleet immediately on the next SchedulerTick.
+  """
+  @spec ensure_reflection_task(String.t(), keyword()) ::
+          {:ok, Long.Agent.ScheduledTask.t() | :skipped} | {:error, term()}
+  def ensure_reflection_task(session_id, opts \\ []) when is_binary(session_id) do
+    name = reflection_task_name(session_id)
+
+    case get_scheduled_task_by_name(name) do
+      # Re-enable a task that L4 archival disabled, now that the session is
+      # active again, and re-arm its next run.
+      {:ok, %Long.Agent.ScheduledTask{enabled: false} = task} ->
+        next = Long.Agent.Schedule.compute_next_run_at(task, DateTime.utc_now())
+        update_scheduled_task(task, %{enabled: true, next_run_at: next})
+
+      {:ok, %Long.Agent.ScheduledTask{} = task} ->
+        {:ok, task}
+
+      _ ->
+        if is_nil(member_id_for_session(session_id)) do
+          {:ok, :skipped}
+        else
+          create_reflection_task(session_id, name, opts)
+        end
+    end
+  end
+
+  defp create_reflection_task(session_id, name, opts) do
+    hour = Keyword.get(opts, :hour, reflection_hour())
+    minute = rem(:erlang.phash2(session_id, 60), 60)
+    schedule_time = Long.Agent.Schedule.format_hhmm(hour, minute)
+
+    seed = %Long.Agent.ScheduledTask{repeat: :daily, schedule_time: schedule_time}
+    next = Long.Agent.Schedule.compute_next_run_at(seed, DateTime.utc_now())
+
+    create_scheduled_task(%{
+      name: name,
+      session_id: session_id,
+      prompt: Long.Jido.Loop.reflection_trigger_prompt(),
+      repeat: :daily,
+      schedule_time: schedule_time,
+      silent: true,
+      max_delay_hours: 1,
+      next_run_at: next
+    })
+    |> case do
+      {:ok, task} ->
+        {:ok, task}
+
+      {:error, _} ->
+        # Lost a create race on the globally-unique `:name` — re-read the winner.
+        case get_scheduled_task_by_name(name) do
+          {:ok, task} -> {:ok, task}
+          other -> other
+        end
+    end
+  end
+
+  @doc "Disable a session's reflection task (called when its session is archived)."
+  @spec disable_reflection_task(String.t()) :: :ok
+  def disable_reflection_task(session_id) when is_binary(session_id) do
+    case get_scheduled_task_by_name(reflection_task_name(session_id)) do
+      {:ok, %Long.Agent.ScheduledTask{enabled: true} = task} ->
+        _ = disable_scheduled_task(task)
+        :ok
+
+      _ ->
+        :ok
+    end
+  end
+
+  @doc "Whether silent reflection is enabled for this instance (kill switch)."
+  @spec reflection_enabled?() :: boolean()
+  def reflection_enabled?,
+    do: Keyword.get(reflection_config(), :enabled, true)
+
+  defp reflection_hour, do: Keyword.get(reflection_config(), :hour, 18)
+
+  defp reflection_config, do: Application.get_env(:long, Long.Agent.Reflection, [])
+
   defp unique_web_inbox_path(dir, name) do
     safe = name |> Path.basename() |> String.replace(~r/[^\w.\-]+/u, "_")
     candidate = Path.join(dir, safe)

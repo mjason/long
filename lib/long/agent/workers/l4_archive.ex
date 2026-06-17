@@ -45,7 +45,19 @@ defmodule Long.Agent.Workers.L4Archive do
   defp eligible?(_session, [], _cutoff), do: false
 
   defp eligible?(_session, messages, cutoff) do
-    last_inserted_at = messages |> Enum.map(& &1.inserted_at) |> Enum.max(DateTime)
+    # Idle is measured from the last *human* (non-internal) message, NOT
+    # from silent-reflection rows. Otherwise a daily reflection would
+    # refresh the clock every 24h and the session would never archive —
+    # an infinite-billing deadlock. Fall back to all rows only when a
+    # session is purely internal (it has no human activity left, so it
+    # should still age out).
+    reference =
+      case Enum.reject(messages, & &1.internal) do
+        [] -> messages
+        human -> human
+      end
+
+    last_inserted_at = reference |> Enum.map(& &1.inserted_at) |> Enum.max(DateTime)
     DateTime.compare(last_inserted_at, cutoff) == :lt
   end
 
@@ -53,6 +65,8 @@ defmodule Long.Agent.Workers.L4Archive do
     case Memory.archive_session(session.id) do
       {:ok, _archive} ->
         Agent.archive_session(session.id)
+        # Stop reflecting over an archived (dead) conversation.
+        Agent.disable_reflection_task(session.id)
 
       _ ->
         :skip

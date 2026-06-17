@@ -71,6 +71,7 @@ defmodule Long.Agent.ScheduledTask do
         :every_n,
         :max_delay_hours,
         :enabled,
+        :silent,
         :next_run_at,
         :metadata
       ]
@@ -85,6 +86,7 @@ defmodule Long.Agent.ScheduledTask do
         :every_n,
         :max_delay_hours,
         :enabled,
+        :silent,
         :next_run_at,
         :metadata
       ]
@@ -139,6 +141,13 @@ defmodule Long.Agent.ScheduledTask do
 
     attribute :enabled, :boolean do
       default true
+      allow_nil? false
+      public? true
+    end
+
+    attribute :silent, :boolean do
+      description ~s|When true, the task runs as a SILENT reflection turn: a reduced, push-free tool set; rows marked internal; never delivered to a channel or the web /chat. Used by the autonomous "tidy your own memory" loop.|
+      default false
       allow_nil? false
       public? true
     end

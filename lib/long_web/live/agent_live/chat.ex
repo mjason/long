@@ -378,9 +378,17 @@ defmodule LongWeb.AgentLive.Chat do
   #    look like the AI is talking to itself.
   defp visible_messages(messages) do
     messages
+    |> Enum.reject(&internal?/1)
     |> Enum.reject(&synthetic_user?/1)
     |> merge_consecutive_assistants()
   end
+
+  # Silent-reflection rows never render in /chat. `Long.Agent.Server`
+  # already suppresses their `:message_persisted` broadcast, so they don't
+  # even trigger a reload; this is the render-time backstop for the
+  # `:loop_ended`/full-reload path.
+  defp internal?(%{internal: true}), do: true
+  defp internal?(_), do: false
 
   defp synthetic_user?(m) do
     m.role == :user and trimmed_empty?(m.content) and (m.tool_results || []) != []
