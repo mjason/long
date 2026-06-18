@@ -14,14 +14,24 @@ defmodule Long.Application do
       Long.Repo,
       {Ecto.Migrator,
        repos: Application.fetch_env!(:long, :ecto_repos), skip: skip_migrations?()},
+      # Liveness registry — started before Oban so the scheduler tick can beat
+      # into it and the watchdog / `/healthz` can read freshness.
+      Long.Heartbeat,
       {Oban,
        AshOban.config(
          Application.fetch_env!(:long, :ash_domains),
          Application.fetch_env!(:long, Oban)
        )},
+      # Detect + recover a silently-hung scheduler (an alive-but-idle Oban Cron
+      # GenServer that OTP supervision can't see). Sits right after Oban but is
+      # an independent process so it doesn't share fate with the cron timer.
+      Long.Agent.SchedulerWatchdog,
       {Task.Supervisor, name: Long.Agent.TaskSup},
       {Registry, keys: :unique, name: Long.Agent.Server.Registry},
       Long.Agent.Server.Supervisor,
+      # Owns Activity's ETS tables so they survive an Activity crash; must start
+      # before Activity (which adopts + re-monitors the survivors on restart).
+      Long.Agent.Activity.Tables,
       Long.Agent.Activity,
       Long.Agent.Skill.Store,
       Long.Agent.Browser.Cli.Limiter,
@@ -43,9 +53,30 @@ defmodule Long.Application do
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
-    # for other strategies and supported options
-    opts = [strategy: :one_for_one, name: Long.Supervisor]
-    Supervisor.start_link(children, opts)
+    # for other strategies and supported options.
+    #
+    # max_restarts/max_seconds are raised above the OTP default (3/5): under
+    # :one_for_one, a child that exceeds the *supervisor's* intensity takes down
+    # ALL siblings — including LongWeb.Endpoint — so a transient crash-loop in a
+    # background child (e.g. a Skill.Store FS hiccup) would blank the web. 10/60
+    # keeps a genuinely unrecoverable loop bounded while riding out a blip.
+    # Mirrors the 5/30 already set on Long.Agent.Server.Supervisor.
+    opts = [strategy: :one_for_one, name: Long.Supervisor, max_restarts: 10, max_seconds: 60]
+    result = Supervisor.start_link(children, opts)
+    log_oban_peer()
+    result
+  end
+
+  # Canary: this app runs Oban's Lite engine, which defaults to the Isolated
+  # peer (leader? is hardcoded true — no election, nothing to "lose"). If a
+  # future change ever flips this to the Database/Global peer, a whole class of
+  # leadership-loss failure modes becomes live again — this one line is how
+  # you'd notice at boot.
+  defp log_oban_peer do
+    require Logger
+    Logger.info("Oban peer: #{inspect(Oban.config().peer)}")
+  rescue
+    _ -> :ok
   end
 
   # Tell Phoenix to update the endpoint configuration

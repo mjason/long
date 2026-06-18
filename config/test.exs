@@ -22,6 +22,9 @@ config :error_tracker, enabled: false
 config :long, Long.Repo,
   database: Path.expand("../long_test.db", __DIR__),
   pool_size: 5,
+  # Wait out SQLite's single-writer lock instead of raising "Database busy"
+  # under concurrent async-test writes (default is only 2s). See dev.exs.
+  busy_timeout: 15_000,
   pool: Ecto.Adapters.SQL.Sandbox
 
 # We don't run a server during test. If one is required,

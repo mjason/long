@@ -116,20 +116,38 @@ defmodule Long.Agent.Bots.Wechat.Worker do
     # the poll in a Task keeps the worker responsive: flushes fire on time.
     worker = self()
 
-    Task.Supervisor.start_child(Long.Agent.TaskSup, fn ->
-      # Always send a result back, even on a raise/exit — otherwise the worker
-      # never receives {:updates} and the poll loop stalls silently.
-      result =
-        try do
-          Client.get_updates(tok, @poll_timeout_seconds)
-        rescue
-          e -> {:error, e}
-        catch
-          kind, reason -> {:error, {kind, reason}}
-        end
+    spawn =
+      Task.Supervisor.start_child(Long.Agent.TaskSup, fn ->
+        # Always send a result back, even on a raise/exit — otherwise the worker
+        # never receives {:updates} and the poll loop stalls silently.
+        result =
+          try do
+            Client.get_updates(tok, @poll_timeout_seconds)
+          rescue
+            e -> {:error, e}
+          catch
+            kind, reason -> {:error, {kind, reason}}
+          end
 
-      send(worker, {:updates, result})
-    end)
+        send(worker, {:updates, result})
+      end)
+
+    # The next :poll is re-armed by handle_info({:updates, _}). If the Task
+    # never spawns (TaskSup momentarily down), no {:updates} ever arrives and
+    # the poll loop would wedge alive-but-silent — re-arm here so it self-heals,
+    # the way Telegram's loop already does unconditionally.
+    case spawn do
+      {:ok, _pid} ->
+        :ok
+
+      {:error, reason} ->
+        Logger.error(
+          "Wechat[#{state.name}]: poll task spawn failed: #{inspect(reason)}; " <>
+            "retrying in #{@retry_delay_ms}ms"
+        )
+
+        Process.send_after(self(), :poll, @retry_delay_ms)
+    end
 
     {:noreply, state}
   end
@@ -138,6 +156,11 @@ defmodule Long.Agent.Bots.Wechat.Worker do
   def handle_info({:updates, _result}, %{token: nil} = state), do: {:noreply, state}
 
   def handle_info({:updates, result}, state) do
+    # Beat on every completed poll cycle (success OR error) — a liveness signal
+    # that the loop is still cycling, mirroring Telegram. A wedged loop stops
+    # beating; a transient getUpdates error does not falsely mark it stale.
+    Long.Heartbeat.beat({:wechat, state.name})
+
     case result do
       {:ok, %{msgs: msgs, updates_buf: buf} = r} ->
         token =

@@ -5,6 +5,11 @@ config :ash, policies: [show_policy_breakdowns?: true]
 config :long, Long.Repo,
   database: Path.expand("../long_dev.db", __DIR__),
   pool_size: 5,
+  # SQLite allows one writer at a time; the default 2s busy_timeout is too tight
+  # when a long write (an L4Archive bulk pass, a WAL checkpoint) overlaps another
+  # write — the loser raises "Database busy" instead of waiting. 15s lets it ride
+  # out the lock. It's a bounded sleep-retry, not a held lock, so no deadlock risk.
+  busy_timeout: 15_000,
   stacktrace: true,
   show_sensitive_data_on_connection_error: true
 

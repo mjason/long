@@ -159,6 +159,82 @@ defmodule Long.Agent.SchedulerTest do
 
       refute_enqueued(worker: RunScheduledTask)
     end
+
+    # Regression: a recurring task that missed its window by more than
+    # max_delay_hours used to wedge forever — `due?` stayed false (stale) and
+    # next_run_at was only advanced on the fire path, so it never recovered.
+    # It must now re-arm to a future slot instead of firing a stale run.
+    test "recurring task past the delay window is re-armed, not fired or wedged",
+         %{sess: sess} do
+      stale = DateTime.add(DateTime.utc_now(), -30 * 86_400)
+
+      {:ok, task} =
+        Agent.create_scheduled_task(%{
+          name: "wedged-daily",
+          session_id: sess.id,
+          prompt: "fill worklog",
+          repeat: :daily,
+          schedule_time: "10:00",
+          max_delay_hours: 6,
+          next_run_at: stale
+        })
+
+      :ok = perform_job(SchedulerTick, %{})
+
+      # Did NOT fire a stale run...
+      refute_enqueued(worker: RunScheduledTask)
+
+      {:ok, updated} = Agent.get_scheduled_task(task.id)
+      # ...still enabled, last_run_at untouched (it didn't actually run)...
+      assert updated.enabled
+      assert updated.last_run_at == nil
+      # ...and next_run_at rolled forward to a future slot (self-healed).
+      assert DateTime.compare(updated.next_run_at, DateTime.utc_now()) == :gt
+    end
+
+    test "one-shot task past the delay window is disabled, not fired", %{sess: sess} do
+      stale = DateTime.add(DateTime.utc_now(), -7 * 3600)
+
+      {:ok, task} =
+        Agent.create_scheduled_task(%{
+          name: "missed-one-shot",
+          session_id: sess.id,
+          prompt: "too late now",
+          repeat: :once,
+          max_delay_hours: 6,
+          next_run_at: stale
+        })
+
+      :ok = perform_job(SchedulerTick, %{})
+
+      refute_enqueued(worker: RunScheduledTask)
+
+      {:ok, updated} = Agent.get_scheduled_task(task.id)
+      refute updated.enabled
+    end
+  end
+
+  describe "list_scheduled_tasks pagination" do
+    test "page: false returns ALL tasks, not a capped first page" do
+      {:ok, sess} = Agent.start_session(%{title: "bulk"})
+
+      for i <- 1..30 do
+        {:ok, _} =
+          Agent.create_scheduled_task(%{
+            name: "bulk-#{i}-#{System.unique_integer([:positive])}",
+            session_id: sess.id,
+            prompt: "x",
+            repeat: :daily,
+            next_run_at: DateTime.utc_now()
+          })
+      end
+
+      # The :read action is keyset-paginated (default_limit 25) for GraphQL;
+      # the scheduler must see the whole table, so it passes page: false.
+      assert {:ok, tasks} = Agent.list_scheduled_tasks(page: false)
+      assert is_list(tasks)
+      assert length(tasks) >= 30
+    end
   end
 
   describe "RunScheduledTask worker" do

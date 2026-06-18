@@ -171,12 +171,53 @@ defmodule Long.Agent.Activity do
 
   # ── GenServer ────────────────────────────────────────────────────────
 
+  @table_specs [
+    {@owners, [:named_table, :public, :set, read_concurrency: true]},
+    {@queues, [:named_table, :public, :set]},
+    {@btws, [:named_table, :public, :set]}
+  ]
+
+  @doc """
+  Create the ETS tables if they don't already exist. Idempotent.
+
+  `Long.Agent.Activity.Tables` calls this first (at boot, before Activity), so
+  the tables are owned by that do-nothing keeper and SURVIVE an Activity crash
+  with their data intact. This is also the standalone fallback (e.g. a test that
+  starts Activity without the keeper) — then Activity owns them itself.
+  """
+  def ensure_tables do
+    Enum.each(@table_specs, fn {name, opts} ->
+      if :ets.whereis(name) == :undefined, do: :ets.new(name, opts)
+    end)
+  end
+
   @impl true
   def init(_) do
-    :ets.new(@owners, [:named_table, :public, :set, read_concurrency: true])
-    :ets.new(@queues, [:named_table, :public, :set])
-    :ets.new(@btws, [:named_table, :public, :set])
-    {:ok, %__MODULE__{}}
+    ensure_tables()
+    {:ok, %__MODULE__{monitors: remonitor_survivors(@owners)}}
+  end
+
+  @doc false
+  # When the tables survive an Activity crash (owned by Activity.Tables), every
+  # owner row still references a `watcher_ref` from the now-dead previous Activity
+  # — a monitor that will NEVER fire a DOWN. Re-establish a fresh monitor for each
+  # still-alive watcher (so slot cleanup works again), and free the slot of any
+  # watcher that died while we were down — matching `drop_owner/3`, which on DOWN
+  # deletes only the owner row and leaves the queue for the next acquirer. Without
+  # this walk a survived row would be permanently stuck-busy with no DOWN to clear
+  # it — strictly worse than the crash it's meant to survive. Takes the table as
+  # an arg so the adoption logic is unit-testable on a throwaway table.
+  def remonitor_survivors(owners) do
+    Enum.reduce(:ets.tab2list(owners), %{}, fn {sid, %{watcher_pid: pid} = info}, acc ->
+      if is_pid(pid) and Process.alive?(pid) do
+        ref = Process.monitor(pid)
+        :ets.insert(owners, {sid, %{info | watcher_ref: ref}})
+        Map.put(acc, ref, {sid, pid})
+      else
+        :ets.delete(owners, sid)
+        acc
+      end
+    end)
   end
 
   @impl true

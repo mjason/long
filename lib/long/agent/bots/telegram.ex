@@ -186,6 +186,7 @@ defmodule Long.Agent.Bots.Telegram do
 
   def handle_info(:poll, state) do
     new_offset = poll_once(state)
+    Long.Heartbeat.beat({:telegram, state.credential_name})
     Process.send_after(self(), :poll, state.poll_interval_ms)
     {:noreply, %{state | offset: new_offset}}
   end

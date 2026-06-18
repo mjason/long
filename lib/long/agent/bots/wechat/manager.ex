@@ -32,8 +32,7 @@ defmodule Long.Agent.Bots.Wechat.Manager do
 
   @impl true
   def init(:ok) do
-    Credential.subscribe()
-    {:ok, :ok, {:continue, :reconcile}}
+    {:ok, %{pubsub_ref: subscribe_pubsub()}, {:continue, :reconcile}}
   end
 
   @impl true
@@ -44,7 +43,41 @@ defmodule Long.Agent.Bots.Wechat.Manager do
 
   @impl true
   def handle_info(:wechat_connected, state), do: {:noreply, do_reconcile(state)}
+
+  # Long.PubSub restarted, taking our subscription with it (under :one_for_one
+  # we aren't restarted). Without recovery we'd never hear :wechat_connected
+  # again — a fresh login wouldn't start its worker. Re-subscribe + reconcile.
+  def handle_info({:DOWN, ref, :process, _pid, _reason}, %{pubsub_ref: ref} = state) do
+    Logger.warning("Wechat.Manager: Long.PubSub went down; re-subscribing and reconciling")
+    {:noreply, resubscribe(state)}
+  end
+
+  def handle_info(:resubscribe, state), do: {:noreply, resubscribe(state)}
   def handle_info(_other, state), do: {:noreply, state}
+
+  # Subscribe to the wechat-login topic and monitor Long.PubSub so we can detect
+  # its restart. Returns the monitor ref (or nil if PubSub isn't up yet).
+  defp subscribe_pubsub do
+    Credential.subscribe()
+
+    case Process.whereis(Long.PubSub) do
+      pid when is_pid(pid) -> Process.monitor(pid)
+      _ -> nil
+    end
+  end
+
+  # Re-establish the subscription after a PubSub restart. If PubSub isn't back
+  # yet (tiny race right after its crash), retry shortly rather than give up.
+  defp resubscribe(state) do
+    case subscribe_pubsub() do
+      nil ->
+        Process.send_after(self(), :resubscribe, 500)
+        %{state | pubsub_ref: nil}
+
+      ref ->
+        do_reconcile(%{state | pubsub_ref: ref})
+    end
+  end
 
   defp do_reconcile(state) do
     want = MapSet.new(Credential.names())

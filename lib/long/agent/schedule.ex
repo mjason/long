@@ -46,22 +46,48 @@ defmodule Long.Agent.Schedule do
     DateTime.add(now, n * 60, :second)
   end
 
-  @doc """
-  Returns `true` if the task should run right now: it's enabled, its
-  `next_run_at` (or fallback) has passed, and we're still inside the
-  `max_delay_hours` window so we don't fire stale tasks after a long outage.
-  """
-  def due?(%ScheduledTask{enabled: false}, _now), do: false
+  # Repeats that recur forever — a missed window should self-heal to the next
+  # occurrence, never disable the task. `:once` is deliberately excluded.
+  @recurring [:daily, :weekday, :weekly, :monthly, :every_n_hours, :every_n_minutes]
 
-  def due?(%ScheduledTask{} = task, now) do
+  @doc """
+  Decide what the scheduler should do with `task` at `now`. Returns one of:
+
+    * `:fire`   — due now and still inside the `max_delay_hours` catch-up
+      window: enqueue a run and advance `next_run_at`.
+    * `:rearm`  — a *recurring* task whose target slipped past the window
+      (e.g. the node was down over its target time). Firing it now would be a
+      stale, wrong-time run, so DON'T — but roll `next_run_at` forward to the
+      next future occurrence so it resumes on its next slot. This is the fix
+      for the class of bug where a missed run left `next_run_at` in the past
+      and the task wedged forever (advance was coupled to firing).
+    * `:expire` — a *one-shot* task that slipped past its window: it can never
+      fire on time again, so disable it instead of polling it forever.
+    * `:wait`   — disabled, or not due yet (target in the future): leave alone.
+
+  Keeping the whole policy in one pure function (no DB, no side effects) makes
+  every branch trivially unit-testable and keeps `SchedulerTick` a thin
+  executor of the verdict.
+  """
+  @spec classify(ScheduledTask.t(), DateTime.t()) :: :fire | :rearm | :expire | :wait
+  def classify(%ScheduledTask{enabled: false}, _now), do: :wait
+
+  def classify(%ScheduledTask{} = task, now) do
     target = task.next_run_at || initial_target(task, now)
 
     cond do
-      DateTime.compare(target, now) == :gt -> false
-      stale?(target, now, task.max_delay_hours) -> false
-      true -> true
+      DateTime.compare(target, now) == :gt -> :wait
+      not stale?(target, now, task.max_delay_hours) -> :fire
+      task.repeat in @recurring -> :rearm
+      true -> :expire
     end
   end
+
+  @doc """
+  Returns `true` if the task should run right now — i.e. `classify/2` says
+  `:fire`. Thin predicate kept for call sites that only care about firing.
+  """
+  def due?(%ScheduledTask{} = task, now), do: classify(task, now) == :fire
 
   @doc """
   Static timezone context for the (cached) system prompt — the user's zone and

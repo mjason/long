@@ -560,7 +560,7 @@ defmodule Long.Agent do
   @doc "All silent-reflection tasks (one per reflecting session), newest-scheduled first."
   @spec list_reflection_tasks() :: [Long.Agent.ScheduledTask.t()]
   def list_reflection_tasks do
-    case list_scheduled_tasks() do
+    case list_scheduled_tasks(page: false) do
       {:ok, tasks} -> tasks |> Enum.filter(& &1.silent) |> Enum.sort_by(& &1.name)
       _ -> []
     end

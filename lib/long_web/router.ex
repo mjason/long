@@ -67,6 +67,13 @@ defmodule LongWeb.Router do
             interface: :playground
   end
 
+  # Liveness probe for the background loops (scheduler tick, bot polls). No
+  # pipeline so a bare uptime check (no JSON Accept header) reaches it; returns
+  # 503 when a loop has gone stale — see `LongWeb.HealthController`.
+  scope "/", LongWeb do
+    get "/healthz", HealthController, :show
+  end
+
   # Operator dashboards — always mounted. `/errors` in particular is
   # load-bearing: it's the only way to inspect captured exceptions.
   # If exposed to the public internet, put basic auth on these via the

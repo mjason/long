@@ -150,4 +150,38 @@ defmodule Long.Agent.ActivityTest do
       assert text =~ "web_search"
     end
   end
+
+  describe "ETS table survival across an Activity crash" do
+    test "tables are owned by the Tables keeper, not Activity, so they outlive its crash" do
+      keeper = Process.whereis(Long.Agent.Activity.Tables)
+      assert is_pid(keeper)
+      # Owner is the keeper, so an Activity crash leaves the tables (and every
+      # in-flight session's slot) intact.
+      assert :ets.info(Long.Agent.Activity.Owners, :owner) == keeper
+      refute :ets.info(Long.Agent.Activity.Owners, :owner) == Process.whereis(Activity)
+    end
+
+    test "remonitor_survivors re-monitors live owners and drops dead ones" do
+      # Isolated throwaway owners table — does NOT touch the global Activity, so
+      # this can't race with concurrent tests.
+      owners = :ets.new(:test_owners, [:set, :public])
+      live = spawn(fn -> Process.sleep(:infinity) end)
+      dead = spawn(fn -> :ok end)
+      eventually(fn -> not Process.alive?(dead) end)
+
+      row = fn pid -> %{watcher_pid: pid, watcher_ref: make_ref(), since: 0, turn: nil, tool: nil, request: nil} end
+      :ets.insert(owners, {"live", row.(live)})
+      :ets.insert(owners, {"dead", row.(dead)})
+
+      monitors = Activity.remonitor_survivors(owners)
+
+      # Dead watcher's slot freed (no DOWN would ever come for it otherwise).
+      assert :ets.lookup(owners, "dead") == []
+      # Live watcher kept, with a FRESH monitor ref tracked in the returned map.
+      assert [{"live", %{watcher_pid: ^live, watcher_ref: ref}}] = :ets.lookup(owners, "live")
+      assert monitors[ref] == {"live", live}
+
+      Process.exit(live, :kill)
+    end
+  end
 end
