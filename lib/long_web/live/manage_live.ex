@@ -507,6 +507,42 @@ defmodule LongWeb.ManageLive do
     end
   end
 
+  def handle_event("edit_session_memory", %{"id" => id}, socket) do
+    case Enum.find(socket.assigns.session_memories, &(&1.id == id)) do
+      nil ->
+        {:noreply, socket}
+
+      row ->
+        editing = %{
+          __action__: :edit_session,
+          id: row.id,
+          session_id: row.session_id,
+          key: row.key,
+          value: row.value,
+          kind: to_string(row.kind || :fact),
+          importance: row.importance || 3
+        }
+
+        {:noreply, assign(socket, :editing, editing)}
+    end
+  end
+
+  def handle_event("save_session_memory", %{"memory" => params}, socket) do
+    # Upsert keyed on (session_id, key) — same session + key updates in place.
+    attrs = %{
+      session_id: params["session_id"],
+      key: String.trim(params["key"] || ""),
+      value: params["value"] || "",
+      kind: safe_atom(params["kind"], :fact, memory_kinds()),
+      importance: parse_int(params["importance"], 3)
+    }
+
+    case Agent.put_session_memory(attrs) do
+      {:ok, _} -> {:noreply, socket |> assign(:editing, nil) |> load_section(:memories)}
+      {:error, e} -> {:noreply, put_flash(socket, :error, "Save failed: #{inspect(e)}")}
+    end
+  end
+
   # ── Events: Skills ───────────────────────────────────────────────────
 
   def handle_event("save_phrase", %{"key" => key, "locale" => locale, "text" => text}, socket) do
@@ -1132,6 +1168,11 @@ defmodule LongWeb.ManageLive do
           scopes={memory_scopes()}
           kinds={memory_kinds()}
         />
+        <.session_memory_modal
+          :if={editing_kind(@editing) == :session_memory}
+          editing={@editing}
+          kinds={memory_kinds()}
+        />
         <.search_modal
           :if={editing_kind(@editing) == :search}
           editing={@editing}
@@ -1158,6 +1199,7 @@ defmodule LongWeb.ManageLive do
   defp editing_kind(nil), do: nil
   defp editing_kind(%{__action__: a}) when a in [:create, :edit_llm], do: :llm
   defp editing_kind(%{__action__: :edit_global}), do: :global_memory
+  defp editing_kind(%{__action__: :edit_session}), do: :session_memory
   defp editing_kind(%{__action__: a}) when a in [:create_search, :edit_search], do: :search
 
   defp editing_kind(%{__action__: a}) when a in [:create_scheduled, :edit_scheduled],
@@ -1434,16 +1476,28 @@ defmodule LongWeb.ManageLive do
                 <td class="px-4 py-2 font-medium text-zinc-800">{row.key}</td>
                 <td class="px-4 py-2 text-zinc-600 leading-snug">{Text.preview(row.value, 140)}</td>
                 <td class="px-4 py-2 text-right">
-                  <.button
-                    phx-click="destroy_session_memory"
-                    phx-value-id={row.id}
-                    variant="base"
-                    color="danger"
-                    size="extra_small"
-                    icon="hero-trash"
-                    rounded="medium"
-                    data-confirm={"Delete \"#{row.key}\"?"}
-                  />
+                  <div class="flex justify-end gap-1.5">
+                    <.button
+                      phx-click="edit_session_memory"
+                      phx-value-id={row.id}
+                      variant="base"
+                      color="natural"
+                      size="extra_small"
+                      icon="hero-pencil-square"
+                      rounded="medium"
+                      title="Edit / view full"
+                    />
+                    <.button
+                      phx-click="destroy_session_memory"
+                      phx-value-id={row.id}
+                      variant="base"
+                      color="danger"
+                      size="extra_small"
+                      icon="hero-trash"
+                      rounded="medium"
+                      data-confirm={"Delete \"#{row.key}\"?"}
+                    />
+                  </div>
                 </td>
               </tr>
               <tr :if={@session_memories == []}>
@@ -2844,6 +2898,77 @@ defmodule LongWeb.ManageLive do
             max="5"
             class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm"
           />
+        </label>
+        <div class="flex justify-end gap-2 pt-2">
+          <.button
+            type="button"
+            phx-click="cancel_edit"
+            variant="base"
+            color="natural"
+            rounded="medium"
+            size="small"
+          >
+            Cancel
+          </.button>
+          <.button type="submit" color="primary" rounded="medium" size="small">
+            Save
+          </.button>
+        </div>
+      </form>
+    </.modal>
+    """
+  end
+
+  defp session_memory_modal(assigns) do
+    ~H"""
+    <.modal
+      id="session-memory-edit-modal"
+      show
+      title={"Edit \"#{@editing.key}\""}
+      on_cancel={JS.push("cancel_edit")}
+      size="medium"
+    >
+      <form phx-submit="save_session_memory" class="space-y-3">
+        <input type="hidden" name="memory[session_id]" value={@editing.session_id} />
+        <div class="grid grid-cols-2 gap-3">
+          <label class="block">
+            <span class="text-xs font-medium text-zinc-600">Kind</span>
+            <select
+              name="memory[kind]"
+              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm"
+            >
+              <option :for={k <- @kinds} value={k} selected={@editing.kind == k}>{k}</option>
+            </select>
+          </label>
+          <label class="block">
+            <span class="text-xs font-medium text-zinc-600">Importance (1-5)</span>
+            <input
+              type="number"
+              name="memory[importance]"
+              value={@editing.importance}
+              min="1"
+              max="5"
+              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm"
+            />
+          </label>
+        </div>
+        <label class="block">
+          <span class="text-xs font-medium text-zinc-600">Key</span>
+          <input
+            name="memory[key]"
+            value={@editing.key}
+            required
+            readonly
+            class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm font-mono bg-zinc-50"
+          />
+        </label>
+        <label class="block">
+          <span class="text-xs font-medium text-zinc-600">Value (full)</span>
+          <textarea
+            name="memory[value]"
+            rows="6"
+            class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm leading-snug"
+          >{@editing.value}</textarea>
         </label>
         <div class="flex justify-end gap-2 pt-2">
           <.button

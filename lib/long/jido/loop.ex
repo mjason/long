@@ -279,6 +279,11 @@ defmodule Long.Jido.Loop do
      5 only for a hard constraint / standing preference, 3 for ordinary
      useful facts, 1–2 for minor detail. Merge near-duplicates.
 
+     LANGUAGE: write each `value` in the language the user mostly uses in
+     THIS session — if they chat with you in Chinese, store the value in
+     Chinese; if English, English. Keep `key` a short, stable english
+     snake_case identifier (it's just a dedup handle, never shown to the user).
+
   3. RECONCILE. If two memories disagree or one is stale, re-`putSessionMemory`
      the SAME key with the corrected value, or lower its importance. Prefer
      the most recent, most specific signal.
