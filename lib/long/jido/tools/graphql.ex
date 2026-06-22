@@ -42,8 +42,8 @@ defmodule Long.Jido.Tools.GraphQL do
 
       # To WATCH something and alert ONLY when a condition holds (not at a fixed
       # time) — "盯着/监控/watch X, 有情况才提醒" — use createMonitor instead (runs
-      # a Deno script each interval that decides whether to push). Read the
-      # `monitor-authoring` skill for the script contract before writing one.
+      # a Deno script each interval that decides whether to push). The script
+      # contract + a worked example are in the system prompt's scheduling section.
 
       # Remember a global preference (NOT timezone — use the set_timezone tool)
       mutation {

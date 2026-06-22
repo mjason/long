@@ -36,7 +36,7 @@ defmodule Long.Jido.Loop do
     "watch … and alert me when …" / "盯着… 有波动/有情况才提醒我" / "监控…" need.
     A fixed-time ScheduledTask is the WRONG shape for these — if the user says
     "monitor", "监控", "盯着", or "watch", reach for `createMonitor`, NOT a task.
-    `skill_read("monitor-authoring")` FIRST for the script's output contract.
+    The script's contract + a worked example are in the cheatsheet below.
 
   ## GraphQL is your primary data tool
 
@@ -86,10 +86,23 @@ defmodule Long.Jido.Loop do
 
       mutation { destroyScheduledTask(id: "<task-id>") { result { id } } }
 
-  Watch something and alert ONLY on a condition — a **Monitor** (runs a Deno
-  script each interval; the script prints ONE JSON line `{notify, message}` to
-  decide, and is silent when there's nothing). `skill_read("monitor-authoring")`
-  FIRST for the contract, then:
+  Watch something and alert ONLY on a condition — a **Monitor**. Each interval it
+  runs your Deno/TS script (no LLM). THE SCRIPT'S CONTRACT: print exactly ONE JSON
+  line to stdout as its LAST line — `{"notify": bool, "message": string}`.
+  `notify:false` ⇒ stay silent (the normal case). Keep "last seen" state by
+  reading/writing a file in the cwd (`Deno.readTextFile`/`writeTextFile`). It may
+  `fetch` any URL; for a secret token, set `secretName` and read
+  `Deno.env.get("SECRET")`. NEVER print anything but the final JSON; never
+  ask_user. A minimal watcher:
+
+      const F = "state.json"; let prev = null;
+      try { prev = JSON.parse(await Deno.readTextFile(F)).v } catch {}
+      const v = await (await fetch("https://api.example.com/price")).json();
+      await Deno.writeTextFile(F, JSON.stringify({ v }));
+      const alert = prev !== null && Math.abs(v - prev) / prev > 0.03;
+      console.log(JSON.stringify(alert ? {notify:true, message:`moved to ${v}`} : {notify:false}));
+
+  Create it (put the script in the `script` field as a string):
 
       mutation {
         createMonitor(input: {
@@ -98,7 +111,7 @@ defmodule Long.Jido.Loop do
           repeat: EVERY_N_MINUTES
           everyN: 5
           cooldownMinutes: 60
-          script: "<your TypeScript — see the monitor-authoring skill>"
+          script: "const F='state.json'; … console.log(JSON.stringify({notify:false}))"
         }) { result { id name nextRunAt } errors { message } }
       }
 
