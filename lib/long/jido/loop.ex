@@ -19,15 +19,24 @@ defmodule Long.Jido.Loop do
   request. When a tool returns data, read it carefully and answer in the
   user's language.
 
-  ## Scheduling — MANDATORY for any future / recurring / 定时 work
+  ## Scheduling & watching — MANDATORY for any future / recurring / 定时 / 监控 work
 
   Whenever the user asks for something to happen **later**, **on a
   schedule**, **every day**, **每天**, **定时**, **定期**, **自动跑**,
-  **每隔**, or similar, you MUST use the `graphql` tool with the
-  `createScheduledTask` mutation (example below). Do NOT propose
-  `launchd`, `cron`, `crontab`, systemd timers, or background scripts
-  for periodicity — the host's scheduler is the right answer and is
-  always available.
+  **每隔**, or to **watch / 盯着 / 监控 / monitor** something and be alerted,
+  you MUST use the `graphql` tool — NOT `launchd`, `cron`, `crontab`, systemd
+  timers, or background scripts. There are TWO tools; pick by INTENT:
+
+  - **ScheduledTask** (`createScheduledTask`) — *always do/deliver X at time T*.
+    Fires a full agent turn on the schedule and ALWAYS sends a reply. Use for
+    "every day at 7pm send me the worklog", "remind me at 3pm".
+  - **Monitor** (`createMonitor`) — *watch X and notify ONLY when something*.
+    Runs a cheap Deno script every interval (no LLM); the script itself decides
+    whether to push, staying SILENT when there's nothing. Use this for ANY
+    "watch … and alert me when …" / "盯着… 有波动/有情况才提醒我" / "监控…" need.
+    A fixed-time ScheduledTask is the WRONG shape for these — if the user says
+    "monitor", "监控", "盯着", or "watch", reach for `createMonitor`, NOT a task.
+    `skill_read("monitor-authoring")` FIRST for the script's output contract.
 
   ## GraphQL is your primary data tool
 
@@ -76,6 +85,28 @@ defmodule Long.Jido.Loop do
       } }
 
       mutation { destroyScheduledTask(id: "<task-id>") { result { id } } }
+
+  Watch something and alert ONLY on a condition — a **Monitor** (runs a Deno
+  script each interval; the script prints ONE JSON line `{notify, message}` to
+  decide, and is silent when there's nothing). `skill_read("monitor-authoring")`
+  FIRST for the contract, then:
+
+      mutation {
+        createMonitor(input: {
+          sessionId: "{{session_id}}"
+          name: "xiaomi_stock_watch"
+          repeat: EVERY_N_MINUTES
+          everyN: 5
+          cooldownMinutes: 60
+          script: "<your TypeScript — see the monitor-authoring skill>"
+        }) { result { id name nextRunAt } errors { message } }
+      }
+
+      query { monitorsForSession(sessionId: "{{session_id}}") {
+        results { id name enabled repeat everyN lastStatus lastNotifiedAt }
+      } }
+
+      mutation { destroyMonitor(id: "<monitor-id>") { result { id } } }
 
   Remember something globally (survives every future session):
 

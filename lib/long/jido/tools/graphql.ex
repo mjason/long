@@ -40,6 +40,11 @@ defmodule Long.Jido.Tools.GraphQL do
         }) { result { id name nextRunAt } errors { message } }
       }
 
+      # To WATCH something and alert ONLY when a condition holds (not at a fixed
+      # time) — "盯着/监控/watch X, 有情况才提醒" — use createMonitor instead (runs
+      # a Deno script each interval that decides whether to push). Read the
+      # `monitor-authoring` skill for the script contract before writing one.
+
       # Remember a global preference (NOT timezone — use the set_timezone tool)
       mutation {
         putGlobalMemory(input: {
