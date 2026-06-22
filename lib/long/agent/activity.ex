@@ -82,6 +82,10 @@ defmodule Long.Agent.Activity do
     end
   end
 
+  @doc "Whether `session_id` currently has an owner — i.e. a watcher is mid-turn."
+  @spec owned?(String.t()) :: boolean()
+  def owned?(session_id) when is_binary(session_id), do: lookup(session_id) != nil
+
   @doc """
   Full snapshot — owner info (may be nil), queue depth, pending btw
   count. Used by the `/status` magic command (bots/web chat).

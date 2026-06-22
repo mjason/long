@@ -1,8 +1,14 @@
 defmodule Long.Agent.Workers.SchedulerTick do
   @moduledoc """
-  Cron tick (every minute). Lists every enabled `Long.Agent.ScheduledTask`,
-  marks the due ones as run, and enqueues a `RunScheduledTask` job for each.
-  Mirrors the polling behaviour of `reflect/scheduler.py:check`.
+  Cron tick (every minute). Drives BOTH periodic subsystems off one scan:
+
+    * `Long.Agent.ScheduledTask` → enqueue `RunScheduledTask` (an LLM turn that
+      always delivers) for each due row.
+    * `Long.Agent.Monitor` → enqueue `RunMonitor` (a Deno script that decides
+      whether to notify) for each due row.
+
+  Both share `Schedule.classify/2` (fire / rearm / expire / wait) so a missed
+  window self-heals identically. Mirrors `reflect/scheduler.py:check`.
   """
 
   use Oban.Worker, queue: :agent, max_attempts: 3
@@ -10,7 +16,7 @@ defmodule Long.Agent.Workers.SchedulerTick do
   require Logger
 
   alias Long.Agent
-  alias Long.Agent.{Schedule, Workers.RunScheduledTask}
+  alias Long.Agent.{Schedule, ScheduledTask, Workers.RunMonitor, Workers.RunScheduledTask}
   alias Long.Heartbeat
 
   @impl true
@@ -24,6 +30,7 @@ defmodule Long.Agent.Workers.SchedulerTick do
     case Agent.list_scheduled_tasks(page: false) do
       {:ok, tasks} ->
         Enum.each(tasks, &handle(&1, now))
+        scan_monitors(now)
         # Liveness heartbeat — recorded on EVERY completed tick, including ones
         # that fired nothing (the common case). Tracks execution, not insertion;
         # `SchedulerWatchdog` and `/healthz` read it. Never moved to the
@@ -34,6 +41,61 @@ defmodule Long.Agent.Workers.SchedulerTick do
       {:error, e} ->
         {:error, e}
     end
+  end
+
+  # ── monitors (Long.Agent.Monitor) ────────────────────────────────────
+
+  defp scan_monitors(now) do
+    case Agent.list_monitors(page: false) do
+      {:ok, monitors} -> Enum.each(monitors, &handle_monitor(&1, now))
+      _ -> :ok
+    end
+  end
+
+  defp handle_monitor(monitor, now) do
+    case Schedule.classify(monitor_as_task(monitor), now) do
+      :fire -> fire_monitor(monitor, now)
+      :rearm -> rearm_monitor(monitor, now)
+      :expire -> Agent.disable_monitor(monitor)
+      :wait -> :ok
+    end
+  rescue
+    e ->
+      Logger.error("SchedulerTick: crash handling monitor #{monitor.id}: #{inspect(e)}")
+      :ok
+  end
+
+  # `Schedule.classify`/`compute_next_run_at` pattern-match `%ScheduledTask{}`;
+  # reuse them by projecting the monitor's scheduling fields into a transient one.
+  defp monitor_as_task(m) do
+    %ScheduledTask{
+      repeat: m.repeat,
+      schedule_time: m.schedule_time,
+      every_n: m.every_n,
+      next_run_at: m.next_run_at,
+      max_delay_hours: m.max_delay_hours,
+      enabled: m.enabled
+    }
+  end
+
+  defp fire_monitor(monitor, now) do
+    next = Schedule.compute_next_run_at(monitor_as_task(monitor), now)
+
+    with {:ok, _job} <- Oban.insert(RunMonitor.new(%{monitor_id: monitor.id})),
+         {:ok, _} <- Agent.record_monitor_run(monitor, %{next_run_at: next}) do
+      if monitor.repeat == :once, do: Agent.disable_monitor(monitor)
+      :ok
+    else
+      error ->
+        Logger.warning("SchedulerTick: failed to fire monitor #{monitor.id}: #{inspect(error)}")
+        :ok
+    end
+  end
+
+  defp rearm_monitor(monitor, now) do
+    next = Schedule.compute_next_run_at(monitor_as_task(monitor), now)
+    _ = Agent.record_monitor_run(monitor, %{next_run_at: next})
+    :ok
   end
 
   # Act on the pure `Schedule.classify/2` verdict. Each task is isolated in

@@ -41,6 +41,7 @@ defmodule LongWeb.Router do
     live "/manage/search", ManageLive, :search
     live "/manage/credentials", ManageLive, :credentials
     live "/manage/scheduled", ManageLive, :scheduled
+    live "/manage/monitors", ManageLive, :monitors
     live "/manage/reflection", ManageLive, :reflection
     live "/manage/secrets", ManageLive, :secrets
     live "/manage/phrases", ManageLive, :phrases

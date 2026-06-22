@@ -103,6 +103,17 @@ defmodule Long.Agent do
       define :destroy_scheduled_task, action: :destroy
     end
 
+    resource Long.Agent.Monitor do
+      define :create_monitor, action: :create
+      define :list_monitors, action: :read
+      define :list_monitors_for_session, action: :by_session, args: [:session_id]
+      define :get_monitor, action: :read, get_by: [:id]
+      define :update_monitor, action: :update
+      define :record_monitor_run, action: :record_run
+      define :disable_monitor, action: :disable
+      define :destroy_monitor, action: :destroy
+    end
+
     resource Long.Agent.Group do
       define :create_group, action: :create
       define :list_groups, action: :read

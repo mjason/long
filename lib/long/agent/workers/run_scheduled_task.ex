@@ -34,6 +34,7 @@ defmodule Long.Agent.Workers.RunScheduledTask do
   require Logger
 
   alias Long.Agent
+  alias Long.Agent.Activity
   alias Long.Agent.Bots
   alias Long.Agent.Bots.Outbound
   alias Long.Agent.Server
@@ -129,6 +130,23 @@ defmodule Long.Agent.Workers.RunScheduledTask do
   end
 
   defp fire_sync_and_push(task, bot_user) do
+    if Activity.owned?(task.session_id) do
+      # An inbound turn is already mid-flight on this session. Firing now would
+      # put a SECOND collector on the same PubSub topic; both would receive the
+      # single :ask_user broadcast and both push it — the duplicate the user saw.
+      # Skip this occurrence: the user is already interacting live.
+      Logger.info(
+        "RunScheduledTask: session #{task.session_id} busy (inbound turn in flight); " <>
+          "skipping scheduled fire to avoid a duplicate push"
+      )
+
+      :ok
+    else
+      run_and_deliver(task, bot_user)
+    end
+  end
+
+  defp run_and_deliver(task, bot_user) do
     case Bots.run_on_session(task.session_id, task.prompt) do
       {:ok, result} ->
         if empty_reply?(result) do
@@ -161,25 +179,37 @@ defmodule Long.Agent.Workers.RunScheduledTask do
       :ok ->
         :ok
 
-      {:error, reason} when attempt < @push_attempts ->
-        Logger.warning(
-          "RunScheduledTask: push attempt #{attempt}/#{@push_attempts} failed " <>
-            "(platform=#{bot_user.platform}, session=#{task.session_id}): #{inspect(reason)}; retrying"
-        )
-
-        Process.sleep(@push_retry_delay_ms)
-        deliver(task, bot_user, result, attempt + 1)
-
       {:error, reason} ->
-        Logger.error(
-          "RunScheduledTask: push FAILED after #{@push_attempts} attempts " <>
-            "(platform=#{bot_user.platform}, session=#{task.session_id}): #{inspect(reason)}"
-        )
+        if attempt < @push_attempts and retriable?(reason) do
+          Logger.warning(
+            "RunScheduledTask: push attempt #{attempt}/#{@push_attempts} failed " <>
+              "(platform=#{bot_user.platform}, session=#{task.session_id}): #{inspect(reason)}; retrying"
+          )
 
-        report_push_failure(task, bot_user, reason)
-        :ok
+          Process.sleep(@push_retry_delay_ms)
+          deliver(task, bot_user, result, attempt + 1)
+        else
+          Logger.error(
+            "RunScheduledTask: push FAILED " <>
+              "(platform=#{bot_user.platform}, session=#{task.session_id}): #{inspect(reason)}"
+          )
+
+          report_push_failure(task, bot_user, reason)
+          :ok
+        end
     end
   end
+
+  # Retry ONLY errors that mean NOTHING was sent yet — never a post-send transport
+  # error, which may have actually delivered (WeChat returns no message-id, so a
+  # blind resend would duplicate, which is what the user saw on ask_user). The
+  # config / no-target errors below couldn't have delivered, so a resend is safe.
+  defp retriable?(reason)
+       when reason in [:no_credential, :no_uid, :no_chat_id, :no_open_id, :telegram_worker_not_running],
+       do: true
+
+  defp retriable?({:unsupported_platform, _}), do: true
+  defp retriable?(_), do: false
 
   defp report_push_failure(task, bot_user, reason) do
     ErrorTracker.report(

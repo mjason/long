@@ -32,6 +32,7 @@ defmodule LongWeb.ManageLive do
     {:search, "Search", "hero-magnifying-glass"},
     {:credentials, "Channels", "hero-signal"},
     {:scheduled, "Scheduled", "hero-clock"},
+    {:monitors, "Monitors", "hero-bell-alert"},
     {:reflection, "Reflection", "hero-sparkles"},
     {:secrets, "Secrets", "hero-lock-closed"},
     {:phrases, "Phrases", "hero-language"}
@@ -76,6 +77,7 @@ defmodule LongWeb.ManageLive do
      |> assign(:bot_users, [])
      |> assign(:telegram_credentials, [])
      |> assign(:scheduled_tasks, [])
+     |> assign(:monitors, [])
      |> assign(:reflection_enabled, true)
      |> assign(:reflection_hour, 18)
      |> assign(:reflection_tasks, [])
@@ -213,6 +215,16 @@ defmodule LongWeb.ManageLive do
       end
 
     assign(socket, :scheduled_tasks, rows)
+  end
+
+  defp load_section(socket, :monitors) do
+    rows =
+      case Agent.list_monitors(page: false) do
+        {:ok, list} -> Enum.sort_by(list, &sort_key_next_run/1)
+        _ -> []
+      end
+
+    assign(socket, :monitors, rows)
   end
 
   defp load_section(socket, :reflection) do
@@ -996,6 +1008,108 @@ defmodule LongWeb.ManageLive do
     end
   end
 
+  # ── Events: Monitors ─────────────────────────────────────────────────
+
+  def handle_event("new_monitor", _params, socket) do
+    blank = %{
+      __action__: :create_monitor,
+      name: "",
+      script: "// Print one JSON line: {\"notify\": bool, \"message\": string}\nconsole.log(JSON.stringify({ notify: false }));",
+      repeat: "every_n_minutes",
+      schedule_time: "00:00",
+      every_n: 5,
+      max_delay_hours: 6,
+      cooldown_minutes: 60,
+      secret_name: "",
+      enabled: true,
+      session_id: ""
+    }
+
+    {:noreply, assign(socket, :editing, blank)}
+  end
+
+  def handle_event("edit_monitor", %{"id" => id}, socket) do
+    case Agent.get_monitor(id) do
+      {:ok, row} ->
+        editing = %{
+          __action__: :edit_monitor,
+          id: row.id,
+          name: row.name,
+          script: row.script || "",
+          repeat: to_string(row.repeat),
+          schedule_time: row.schedule_time || "00:00",
+          every_n: row.every_n || 5,
+          max_delay_hours: row.max_delay_hours || 6,
+          cooldown_minutes: row.cooldown_minutes || 0,
+          secret_name: row.secret_name || "",
+          enabled: row.enabled,
+          session_id: row.session_id || "",
+          last_output: row.last_output || %{}
+        }
+
+        {:noreply, assign(socket, :editing, editing)}
+
+      _ ->
+        {:noreply, socket}
+    end
+  end
+
+  def handle_event("save_monitor", %{"monitor" => params}, socket) do
+    attrs = %{
+      name: String.trim(params["name"] || ""),
+      script: params["script"] || "",
+      repeat: safe_atom(params["repeat"], :every_n_minutes, scheduled_repeats()),
+      schedule_time: String.trim(params["schedule_time"] || "00:00"),
+      every_n: parse_int(params["every_n"], 5),
+      max_delay_hours: parse_int(params["max_delay_hours"], 6),
+      cooldown_minutes: parse_int(params["cooldown_minutes"], 0),
+      secret_name: trim_or_nil(params["secret_name"]),
+      enabled: params["enabled"] == "true"
+    }
+
+    result =
+      case socket.assigns.editing do
+        %{__action__: :edit_monitor, id: id} ->
+          with {:ok, row} <- Agent.get_monitor(id), do: Agent.update_monitor(row, attrs)
+
+        _ ->
+          Agent.create_monitor(Map.put(attrs, :session_id, trim_or_nil(params["session_id"])))
+      end
+
+    case result do
+      {:ok, _} -> {:noreply, socket |> assign(:editing, nil) |> load_section(:monitors)}
+      {:error, e} -> {:noreply, put_flash(socket, :error, "Save failed: #{inspect(e)}")}
+    end
+  end
+
+  def handle_event("toggle_monitor_enabled", %{"id" => id}, socket) do
+    with {:ok, row} <- Agent.get_monitor(id),
+         {:ok, _} <- toggle_monitor(row) do
+      {:noreply, load_section(socket, :monitors)}
+    else
+      {:error, e} -> {:noreply, put_flash(socket, :error, "Toggle failed: #{inspect(e)}")}
+    end
+  end
+
+  def handle_event("destroy_monitor", %{"id" => id}, socket) do
+    with {:ok, row} <- Agent.get_monitor(id),
+         :ok <- Agent.destroy_monitor(row) do
+      {:noreply, load_section(socket, :monitors)}
+    else
+      {:ok, _} -> {:noreply, load_section(socket, :monitors)}
+      {:error, e} -> {:noreply, put_flash(socket, :error, "Delete failed: #{inspect(e)}")}
+    end
+  end
+
+  def handle_event("run_monitor_now", %{"id" => id}, socket) do
+    Oban.insert(Long.Agent.Workers.RunMonitor.new(%{monitor_id: id}))
+
+    {:noreply,
+     socket
+     |> put_flash(:info, "Monitor queued — refresh in a few seconds to see its result.")
+     |> load_section(:monitors)}
+  end
+
   # ── Events: Reflection ───────────────────────────────────────────────
 
   def handle_event("toggle_reflection", _params, socket) do
@@ -1183,6 +1297,11 @@ defmodule LongWeb.ManageLive do
           editing={@editing}
           repeats={scheduled_repeats()}
         />
+        <.monitor_modal
+          :if={editing_kind(@editing) == :monitor}
+          editing={@editing}
+          repeats={scheduled_repeats()}
+        />
         <.secret_modal :if={editing_kind(@editing) == :secret} editing={@editing} />
         <.telegram_modal :if={editing_kind(@editing) == :telegram} editing={@editing} />
         <.skill_modal :if={editing_kind(@editing) == :skill} editing={@editing} />
@@ -1205,6 +1324,9 @@ defmodule LongWeb.ManageLive do
   defp editing_kind(%{__action__: a}) when a in [:create_scheduled, :edit_scheduled],
     do: :scheduled
 
+  defp editing_kind(%{__action__: a}) when a in [:create_monitor, :edit_monitor],
+    do: :monitor
+
   defp editing_kind(%{__action__: a}) when a in [:create_secret, :edit_secret], do: :secret
 
   defp editing_kind(%{__action__: a}) when a in [:create_telegram, :edit_telegram],
@@ -1224,6 +1346,7 @@ defmodule LongWeb.ManageLive do
   defp section_view(%{section: :search} = assigns), do: search_section(assigns)
   defp section_view(%{section: :credentials} = assigns), do: credentials_section(assigns)
   defp section_view(%{section: :scheduled} = assigns), do: scheduled_section(assigns)
+  defp section_view(%{section: :monitors} = assigns), do: monitors_section(assigns)
   defp section_view(%{section: :reflection} = assigns), do: reflection_section(assigns)
   defp section_view(%{section: :secrets} = assigns), do: secrets_section(assigns)
   defp section_view(%{section: :phrases} = assigns), do: phrases_section(assigns)
@@ -2184,6 +2307,265 @@ defmodule LongWeb.ManageLive do
     """
   end
 
+  defp monitors_section(assigns) do
+    ~H"""
+    <div class="p-6 space-y-4">
+      <div class="flex items-center gap-3">
+        <h1 class="text-xl font-semibold flex-1">Monitors</h1>
+        <p class="text-xs text-zinc-500 max-w-sm">
+          Scripts that run on an interval and notify only when there's something. The agent
+          authors these (skill <code>monitor-authoring</code>); <strong>⚡</strong> runs one now.
+        </p>
+        <.button
+          phx-click="new_monitor"
+          color="primary"
+          icon="hero-plus"
+          rounded="medium"
+          size="small"
+        >
+          New monitor
+        </.button>
+      </div>
+
+      <.card variant="bordered" color="natural" rounded="large" padding="none">
+        <table class="w-full text-sm">
+          <thead class="text-xs uppercase text-zinc-500 bg-zinc-50">
+            <tr>
+              <th class="text-left px-4 py-2.5">Name</th>
+              <th class="text-left px-4 py-2.5">Every</th>
+              <th class="text-left px-4 py-2.5">On</th>
+              <th class="text-left px-4 py-2.5">Last status</th>
+              <th class="text-left px-4 py-2.5">Next run</th>
+              <th class="text-left px-4 py-2.5">Last run</th>
+              <th class="text-right px-4 py-2.5">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr :for={m <- @monitors} class="border-t border-zinc-100">
+              <td class="px-4 py-2 font-medium">{m.name}</td>
+              <td class="px-4 py-2">
+                <.badge color="info" size="extra_small" rounded="full">{repeat_label(m)}</.badge>
+              </td>
+              <td class="px-4 py-2">
+                <.badge
+                  color={if m.enabled, do: "success", else: "silver"}
+                  size="extra_small"
+                  rounded="full"
+                >
+                  {if m.enabled, do: "on", else: "off"}
+                </.badge>
+              </td>
+              <td class="px-4 py-2">
+                <.badge color={monitor_status_color(m.last_status)} size="extra_small" rounded="full">
+                  {m.last_status || "—"}
+                </.badge>
+              </td>
+              <td class="px-4 py-2 text-xs text-zinc-500">{format_dt(m.next_run_at)}</td>
+              <td class="px-4 py-2 text-xs text-zinc-500">{format_dt(m.last_run_at)}</td>
+              <td class="px-4 py-2">
+                <div class="flex justify-end gap-1.5">
+                  <.button
+                    phx-click="run_monitor_now"
+                    phx-value-id={m.id}
+                    variant="base"
+                    color="natural"
+                    size="extra_small"
+                    icon="hero-bolt"
+                    rounded="medium"
+                  />
+                  <.button
+                    phx-click="toggle_monitor_enabled"
+                    phx-value-id={m.id}
+                    variant="base"
+                    color="natural"
+                    size="extra_small"
+                    icon={if m.enabled, do: "hero-pause", else: "hero-play"}
+                    rounded="medium"
+                  />
+                  <.button
+                    phx-click="edit_monitor"
+                    phx-value-id={m.id}
+                    variant="base"
+                    color="natural"
+                    size="extra_small"
+                    icon="hero-pencil-square"
+                    rounded="medium"
+                  />
+                  <.button
+                    phx-click="destroy_monitor"
+                    phx-value-id={m.id}
+                    variant="base"
+                    color="danger"
+                    size="extra_small"
+                    icon="hero-trash"
+                    rounded="medium"
+                    data-confirm={"Delete \"#{m.name}\"?"}
+                  />
+                </div>
+              </td>
+            </tr>
+            <tr :if={@monitors == []}>
+              <td colspan="7" class="px-4 py-8 text-center text-zinc-400 text-sm">
+                No monitors. Click <strong>New monitor</strong>, or let the agent create one via
+                GraphQL <code>createMonitor</code>.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </.card>
+    </div>
+    """
+  end
+
+  defp monitor_status_color("notified"), do: "success"
+  defp monitor_status_color("silent"), do: "silver"
+  defp monitor_status_color("error"), do: "danger"
+  defp monitor_status_color(_), do: "info"
+
+  attr :editing, :map, required: true
+  attr :repeats, :list, required: true
+
+  defp monitor_modal(assigns) do
+    assigns = assign(assigns, :is_new?, assigns.editing.__action__ == :create_monitor)
+
+    ~H"""
+    <.modal
+      id="monitor-edit-modal"
+      show
+      title={if @is_new?, do: "New monitor", else: "Edit #{@editing.name}"}
+      on_cancel={JS.push("cancel_edit")}
+      size="large"
+    >
+      <form phx-submit="save_monitor" class="space-y-3">
+        <div class="grid grid-cols-2 gap-3">
+          <label class="block">
+            <span class="text-xs font-medium text-zinc-600">Name</span>
+            <input
+              name="monitor[name]"
+              value={@editing.name}
+              required
+              readonly={!@is_new?}
+              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm font-mono"
+              placeholder="e.g. xiaomi_stock_watch"
+            />
+          </label>
+          <label class="block">
+            <span class="text-xs font-medium text-zinc-600">Repeat</span>
+            <select
+              name="monitor[repeat]"
+              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm"
+            >
+              <option :for={r <- @repeats} value={r} selected={@editing.repeat == r}>{r}</option>
+            </select>
+          </label>
+        </div>
+
+        <label class="block">
+          <span class="text-xs font-medium text-zinc-600">
+            Script — Deno/TS. Print one JSON line as the last stdout line:
+            notify (bool), message (string), optional key.
+          </span>
+          <textarea
+            name="monitor[script]"
+            rows="12"
+            required
+            class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-xs font-mono leading-snug"
+          >{@editing.script}</textarea>
+        </label>
+
+        <div class="grid grid-cols-4 gap-3">
+          <label class="block">
+            <span class="text-xs font-medium text-zinc-600">Every N</span>
+            <input
+              type="number"
+              min="1"
+              name="monitor[every_n]"
+              value={@editing.every_n}
+              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm"
+            />
+          </label>
+          <label class="block">
+            <span class="text-xs font-medium text-zinc-600">Time (UTC)</span>
+            <input
+              name="monitor[schedule_time]"
+              value={@editing.schedule_time}
+              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm font-mono"
+              placeholder="08:00"
+            />
+          </label>
+          <label class="block">
+            <span class="text-xs font-medium text-zinc-600">Cooldown (min)</span>
+            <input
+              type="number"
+              min="0"
+              name="monitor[cooldown_minutes]"
+              value={@editing.cooldown_minutes}
+              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm"
+            />
+          </label>
+          <label class="block">
+            <span class="text-xs font-medium text-zinc-600">Max delay (h)</span>
+            <input
+              type="number"
+              min="0"
+              name="monitor[max_delay_hours]"
+              value={@editing.max_delay_hours}
+              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm"
+            />
+          </label>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <label class="block">
+            <span class="text-xs font-medium text-zinc-600">Secret name (optional → SECRET env)</span>
+            <input
+              name="monitor[secret_name]"
+              value={@editing.secret_name}
+              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm font-mono"
+            />
+          </label>
+          <label :if={@is_new?} class="block">
+            <span class="text-xs font-medium text-zinc-600">Session id (where to notify)</span>
+            <input
+              name="monitor[session_id]"
+              value={@editing.session_id}
+              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm font-mono"
+              placeholder="UUID"
+            />
+          </label>
+        </div>
+
+        <div
+          :if={!@is_new? and map_size(@editing.last_output) > 0}
+          class="rounded-md bg-zinc-50 border border-zinc-200 p-3"
+        >
+          <div class="text-xs font-medium text-zinc-600 mb-1">Last run output</div>
+          <pre class="text-xs text-zinc-700 whitespace-pre-wrap break-all max-h-40 overflow-auto">{Jason.encode!(@editing.last_output, pretty: true)}</pre>
+        </div>
+
+        <label class="flex items-center gap-2 text-sm text-zinc-700 pt-1">
+          <input type="checkbox" name="monitor[enabled]" value="true" checked={@editing.enabled} />
+          Enabled
+        </label>
+
+        <div class="flex justify-end gap-2 pt-2">
+          <.button
+            type="button"
+            phx-click="cancel_edit"
+            variant="base"
+            color="natural"
+            rounded="medium"
+            size="small"
+          >
+            Cancel
+          </.button>
+          <.button type="submit" color="primary" rounded="medium" size="small">Save</.button>
+        </div>
+      </form>
+    </.modal>
+    """
+  end
+
   defp groups_section(assigns) do
     ~H"""
     <div class="p-6 space-y-6">
@@ -3000,6 +3382,7 @@ defmodule LongWeb.ManageLive do
   defp section_path(:search), do: ~p"/manage/search"
   defp section_path(:credentials), do: ~p"/manage/credentials"
   defp section_path(:scheduled), do: ~p"/manage/scheduled"
+  defp section_path(:monitors), do: ~p"/manage/monitors"
   defp section_path(:reflection), do: ~p"/manage/reflection"
   defp section_path(:secrets), do: ~p"/manage/secrets"
   defp section_path(:phrases), do: ~p"/manage/phrases"
@@ -3008,6 +3391,7 @@ defmodule LongWeb.ManageLive do
   defp section_title(:search), do: "Search providers"
   defp section_title(:credentials), do: "Channels"
   defp section_title(:scheduled), do: "Scheduled tasks"
+  defp section_title(:monitors), do: "Monitors"
   defp section_title(:secrets), do: "Secrets"
   defp section_title(_), do: "—"
 
@@ -3096,6 +3480,9 @@ defmodule LongWeb.ManageLive do
 
   defp toggle_scheduled(%{enabled: true} = row), do: Agent.disable_scheduled_task(row)
   defp toggle_scheduled(row), do: Agent.update_scheduled_task(row, %{enabled: true})
+
+  defp toggle_monitor(%{enabled: true} = row), do: Agent.disable_monitor(row)
+  defp toggle_monitor(row), do: Agent.update_monitor(row, %{enabled: true})
 
   defp session_status_color(:active), do: "success"
   defp session_status_color(:archived), do: "silver"

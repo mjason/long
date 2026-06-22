@@ -210,6 +210,56 @@ defmodule Long.Agent.CodeRunner do
   end
 
   @doc """
+  Open a port for `exe`/`args` in `cwd` (with `env`), collect all stdout
+  (stderr merged) until the process exits, the output exceeds `max_bytes`, or
+  `timeout_ms` elapses. Returns `{exit_status | :killed | :timeout, output}`.
+
+  A shared synchronous port-collect loop so callers (e.g. `RunMonitor`) don't
+  each hand-roll a receive loop. (The streaming `code_run` tools keep their own
+  loops — they emit output incrementally; this is for "run to completion, give
+  me the bytes".)
+  """
+  @spec run_and_collect([char] | String.t(), [String.t()], String.t(), list(), pos_integer(), pos_integer()) ::
+          {non_neg_integer() | :killed | :timeout, binary()}
+  def run_and_collect(exe, args, cwd, env, timeout_ms, max_bytes) do
+    port =
+      Port.open({:spawn_executable, System.find_executable(exe) || exe}, [
+        :exit_status,
+        :binary,
+        :stderr_to_stdout,
+        {:cd, cwd},
+        {:args, args},
+        {:env, env},
+        :hide
+      ])
+
+    collect_loop(port, System.monotonic_time(:millisecond) + timeout_ms, [], 0, max_bytes)
+  end
+
+  defp collect_loop(port, deadline, acc, size, max_bytes) do
+    remaining = max(0, deadline - System.monotonic_time(:millisecond))
+
+    receive do
+      {^port, {:data, chunk}} ->
+        if size + byte_size(chunk) > max_bytes do
+          kill_port(port)
+          {:killed, flatten([chunk | acc])}
+        else
+          collect_loop(port, deadline, [chunk | acc], size + byte_size(chunk), max_bytes)
+        end
+
+      {^port, {:exit_status, status}} ->
+        {status, flatten(acc)}
+    after
+      remaining ->
+        kill_port(port)
+        {:timeout, flatten(acc)}
+    end
+  end
+
+  defp flatten(acc), do: acc |> Enum.reverse() |> IO.iodata_to_binary()
+
+  @doc """
   Truncate an output string to `max` bytes by keeping the head and tail
   with a marker in the middle. Useful for long stdout/stderr captures.
   """
