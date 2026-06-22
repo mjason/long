@@ -39,6 +39,12 @@ defmodule Long.Agent.Workers.RunScheduledTask do
   alias Long.Agent.Server
   alias Long.SessionRunner
 
+  # A push is cheap (no LLM), so a transient delivery failure (e.g. a flaky
+  # network at fire time) is retried IN PLACE rather than by replaying the whole
+  # Oban job — which would re-run the agent loop and double-bill the LLM.
+  @push_attempts 3
+  @push_retry_delay_ms 2_000
+
   @impl true
   def perform(%Oban.Job{args: %{"task_id" => task_id}}) do
     with {:ok, task} <- Agent.get_scheduled_task(task_id) do
@@ -125,21 +131,16 @@ defmodule Long.Agent.Workers.RunScheduledTask do
   defp fire_sync_and_push(task, bot_user) do
     case Bots.run_on_session(task.session_id, task.prompt) do
       {:ok, result} ->
-        case Outbound.push(bot_user, result) do
-          :ok ->
-            :ok
-
-          {:error, reason} ->
-            Logger.warning(
-              "RunScheduledTask: outbound push failed " <>
-                "(platform=#{bot_user.platform}, session=#{task.session_id}): #{inspect(reason)}"
-            )
-
-            # Don't retry — Oban would replay the prompt and double-bill the
-            # LLM. The reply is already persisted in the session; user can
-            # check via the LiveView UI.
-            :ok
+        if empty_reply?(result) do
+          # The loop ran but we collected nothing to deliver — push would be a
+          # silent no-op. Surface it instead of quietly delivering nothing.
+          Logger.warning(
+            "RunScheduledTask: agent produced no deliverable reply " <>
+              "(session=#{task.session_id}); nothing to push"
+          )
         end
+
+        deliver(task, bot_user, result)
 
       {:error, reason} ->
         Logger.error(
@@ -149,5 +150,57 @@ defmodule Long.Agent.Workers.RunScheduledTask do
 
         {:error, inspect(reason)}
     end
+  end
+
+  # Push the reply, retrying transient failures in place. After the last
+  # attempt, surface loudly (ErrorTracker) instead of swallowing it — a failed
+  # scheduled push used to vanish with no trace. Still returns `:ok`: the reply
+  # is persisted and we must NOT replay the LLM via an Oban retry.
+  defp deliver(task, bot_user, result, attempt \\ 1) do
+    case Outbound.push(bot_user, result) do
+      :ok ->
+        :ok
+
+      {:error, reason} when attempt < @push_attempts ->
+        Logger.warning(
+          "RunScheduledTask: push attempt #{attempt}/#{@push_attempts} failed " <>
+            "(platform=#{bot_user.platform}, session=#{task.session_id}): #{inspect(reason)}; retrying"
+        )
+
+        Process.sleep(@push_retry_delay_ms)
+        deliver(task, bot_user, result, attempt + 1)
+
+      {:error, reason} ->
+        Logger.error(
+          "RunScheduledTask: push FAILED after #{@push_attempts} attempts " <>
+            "(platform=#{bot_user.platform}, session=#{task.session_id}): #{inspect(reason)}"
+        )
+
+        report_push_failure(task, bot_user, reason)
+        :ok
+    end
+  end
+
+  defp report_push_failure(task, bot_user, reason) do
+    ErrorTracker.report(
+      %RuntimeError{message: "scheduled push failed after retries: #{inspect(reason)}"},
+      [],
+      %{
+        source: "run_scheduled_task",
+        task: task.name,
+        session_id: task.session_id,
+        platform: bot_user.platform
+      }
+    )
+
+    :ok
+  rescue
+    _ -> :ok
+  end
+
+  defp empty_reply?(result) do
+    String.trim(Map.get(result, :text, "") || "") == "" and
+      (Map.get(result, :attachments, []) || []) == [] and
+      is_nil(Map.get(result, :ask))
   end
 end

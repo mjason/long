@@ -59,13 +59,14 @@ defmodule Long.Agent.Bots.Wechat do
     cleaned = Markdown.clean(text)
     full = cleaned <> ask_suffix(ask)
 
-    full
-    |> chunk_text()
-    |> Enum.each(&send_text_chunk(token, uid, ctx, &1))
+    results =
+      (full |> chunk_text() |> Enum.map(&send_text_chunk(token, uid, ctx, &1))) ++
+        Enum.map(attachments, &send_attachment(token, uid, ctx, &1))
 
-    Enum.each(attachments, &send_attachment(token, uid, ctx, &1))
-
-    :ok
+    # Surface the first send failure instead of swallowing it. A scheduled
+    # (proactive) push that failed here used to vanish with no trace and no
+    # retry — `RunScheduledTask` now uses this result to retry + alert.
+    Enum.find(results, &match?({:error, _}, &1)) || :ok
   end
 
   # ── helpers ──────────────────────────────────────────────────────────
@@ -78,8 +79,12 @@ defmodule Long.Agent.Bots.Wechat do
 
   defp send_text_chunk(token, uid, ctx, text) do
     case Client.send_text(token, uid, text, context_token: ctx) do
-      {:ok, _} -> :ok
-      err -> Logger.warning("Wechat send_text failed: #{inspect(err)}")
+      {:ok, _} ->
+        :ok
+
+      err ->
+        Logger.warning("Wechat send_text failed: #{inspect(err)}")
+        {:error, err}
     end
   end
 
@@ -92,8 +97,12 @@ defmodule Long.Agent.Bots.Wechat do
       end
 
     case sender.(token, uid, path, context_token: ctx) do
-      {:ok, _} -> :ok
-      err -> Logger.warning("Wechat send_media #{path} (#{kind}) failed: #{inspect(err)}")
+      {:ok, _} ->
+        :ok
+
+      err ->
+        Logger.warning("Wechat send_media #{path} (#{kind}) failed: #{inspect(err)}")
+        {:error, err}
     end
   end
 
