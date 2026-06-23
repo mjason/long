@@ -123,5 +123,44 @@ defmodule Long.Agent.MonitorTest do
       assert updated.last_status == "error"
       assert updated.last_output["decision"] == "notified"
     end
+
+    test "notable runs are recorded in history; silent ticks are not", %{sess: sess} do
+      {:ok, silent} =
+        Agent.create_monitor(%{
+          name: "hist-silent",
+          session_id: sess.id,
+          script: "console.log(JSON.stringify({notify:false}))",
+          repeat: :every_n_minutes,
+          every_n: 5
+        })
+
+      :ok = perform_job(RunMonitor, %{"monitor_id" => silent.id})
+      assert monitor_runs(silent.id) == []
+
+      {:ok, noisy} =
+        Agent.create_monitor(%{
+          name: "hist-noisy",
+          session_id: sess.id,
+          script: ~s|console.log(JSON.stringify({notify:true, message:"hi"}))|,
+          repeat: :every_n_minutes,
+          every_n: 5
+        })
+
+      :ok = perform_job(RunMonitor, %{"monitor_id" => noisy.id})
+      :ok = perform_job(RunMonitor, %{"monitor_id" => noisy.id})
+
+      runs = monitor_runs(noisy.id)
+      assert length(runs) == 2
+      assert Enum.all?(runs, &(&1.decision == "notified"))
+      assert hd(runs).message == "hi"
+    end
+  end
+
+  defp monitor_runs(id) do
+    case Agent.list_monitor_runs(id, page: [limit: 100]) do
+      {:ok, %{results: rows}} -> rows
+      {:ok, rows} when is_list(rows) -> rows
+      _ -> []
+    end
   end
 end

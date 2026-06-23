@@ -1022,7 +1022,8 @@ defmodule LongWeb.ManageLive do
       cooldown_minutes: 60,
       secret_name: "",
       enabled: true,
-      session_id: ""
+      session_id: "",
+      runs: []
     }
 
     {:noreply, assign(socket, :editing, blank)}
@@ -1044,7 +1045,8 @@ defmodule LongWeb.ManageLive do
           secret_name: row.secret_name || "",
           enabled: row.enabled,
           session_id: row.session_id || "",
-          last_output: row.last_output || %{}
+          last_output: row.last_output || %{},
+          runs: recent_monitor_runs(row.id)
         }
 
         {:noreply, assign(socket, :editing, editing)}
@@ -2539,8 +2541,35 @@ defmodule LongWeb.ManageLive do
           :if={!@is_new? and map_size(@editing.last_output) > 0}
           class="rounded-md bg-zinc-50 border border-zinc-200 p-3"
         >
-          <div class="text-xs font-medium text-zinc-600 mb-1">Last run output</div>
-          <pre class="text-xs text-zinc-700 whitespace-pre-wrap break-all max-h-40 overflow-auto">{Jason.encode!(@editing.last_output, pretty: true)}</pre>
+          <div class="text-xs font-medium text-zinc-600 mb-1">Latest tick</div>
+          <pre class="text-xs text-zinc-700 whitespace-pre-wrap break-all max-h-32 overflow-auto">{Jason.encode!(@editing.last_output, pretty: true)}</pre>
+        </div>
+
+        <div :if={!@is_new?} class="rounded-md border border-zinc-200">
+          <div class="text-xs font-medium text-zinc-600 px-3 py-2 bg-zinc-50 border-b border-zinc-200">
+            Recent runs — notifications &amp; errors (silent ticks aren't recorded)
+          </div>
+          <div class="max-h-56 overflow-auto">
+            <table class="w-full text-xs">
+              <tbody>
+                <tr :for={r <- @editing.runs} class="border-t border-zinc-100 align-top">
+                  <td class="px-3 py-1.5 whitespace-nowrap text-zinc-500">{format_dt(r.ran_at)}</td>
+                  <td class="px-2 py-1.5">
+                    <.badge color={monitor_status_color(r.status)} size="extra_small" rounded="full">
+                      {r.status}
+                    </.badge>
+                  </td>
+                  <td class="px-2 py-1.5 text-zinc-600">{r.decision}</td>
+                  <td class="px-3 py-1.5 text-zinc-700 break-all">{r.message || Text.preview(r.stdout_tail || "", 80)}</td>
+                </tr>
+                <tr :if={@editing.runs == []}>
+                  <td colspan="4" class="px-3 py-4 text-center text-zinc-400">
+                    No notifications or errors recorded yet.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <label class="flex items-center gap-2 text-sm text-zinc-700 pt-1">
@@ -3483,6 +3512,14 @@ defmodule LongWeb.ManageLive do
 
   defp toggle_monitor(%{enabled: true} = row), do: Agent.disable_monitor(row)
   defp toggle_monitor(row), do: Agent.update_monitor(row, %{enabled: true})
+
+  defp recent_monitor_runs(monitor_id) do
+    case Agent.list_monitor_runs(monitor_id, page: [limit: 20]) do
+      {:ok, %{results: rows}} -> rows
+      {:ok, rows} when is_list(rows) -> rows
+      _ -> []
+    end
+  end
 
   defp session_status_color(:active), do: "success"
   defp session_status_color(:archived), do: "silver"

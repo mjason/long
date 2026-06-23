@@ -25,6 +25,8 @@ defmodule Long.Agent.Workers.RunMonitor do
   @timeout_ms 60_000
   @max_output_bytes 16_000
   @stdout_tail 800
+  # How many notable runs to keep in history per monitor (older are pruned).
+  @keep_runs 100
 
   @impl true
   def perform(%Oban.Job{args: %{"monitor_id" => id}}) do
@@ -156,13 +158,15 @@ defmodule Long.Agent.Workers.RunMonitor do
   # ── persistence ──────────────────────────────────────────────────────
 
   defp record(monitor, status, output, stdout, extra \\ []) do
+    tail = tail(stdout)
+
     attrs =
       extra
       |> Map.new()
       |> Map.merge(%{
         last_run_at: now(),
         last_status: status,
-        last_output: Map.put(output, "stdout_tail", tail(stdout))
+        last_output: Map.put(output, "stdout_tail", tail)
       })
 
     case Agent.record_monitor_run(monitor, attrs) do
@@ -170,11 +174,64 @@ defmodule Long.Agent.Workers.RunMonitor do
       err -> Logger.warning("RunMonitor: record_run failed for #{monitor.name}: #{inspect(err)}")
     end
 
+    decision = Map.get(output, "decision")
+
+    # History: keep NOTABLE runs (an alert, a suppressed alert, an error) — never
+    # the silent "no_notify" heartbeat. `last_*` above already shows the latest
+    # tick; recording every "nothing happened" would just be noise.
+    if decision != "no_notify", do: log_run(monitor, status, decision, output, tail)
+
     if status == "error" do
       Logger.warning("RunMonitor: #{monitor.name} → error: #{inspect(output)}")
+      report_error(monitor, decision, output)
     end
 
     :ok
+  end
+
+  defp log_run(monitor, status, decision, output, tail) do
+    attrs = %{
+      monitor_id: monitor.id,
+      status: status,
+      decision: decision,
+      message: Map.get(output, "message"),
+      stdout_tail: tail,
+      ran_at: now()
+    }
+
+    case Agent.create_monitor_run_record(attrs) do
+      {:ok, _} -> prune_runs(monitor.id)
+      err -> Logger.warning("RunMonitor: failed to log run for #{monitor.name}: #{inspect(err)}")
+    end
+  end
+
+  defp prune_runs(monitor_id) do
+    require Ash.Query
+
+    query =
+      Long.Agent.MonitorRun
+      |> Ash.Query.filter(monitor_id == ^monitor_id)
+      |> Ash.Query.sort(inserted_at: :desc)
+
+    case Ash.read(query, page: false, authorize?: false) do
+      {:ok, runs} when length(runs) > @keep_runs ->
+        runs |> Enum.drop(@keep_runs) |> Enum.each(&Ash.destroy(&1, authorize?: false))
+
+      _ ->
+        :ok
+    end
+  end
+
+  defp report_error(monitor, decision, output) do
+    ErrorTracker.report(
+      %RuntimeError{message: "monitor run #{decision}: #{monitor.name}"},
+      [],
+      %{source: "run_monitor", monitor: monitor.name, monitor_id: monitor.id, output: inspect(output)}
+    )
+
+    :ok
+  rescue
+    _ -> :ok
   end
 
   defp tail(nil), do: ""

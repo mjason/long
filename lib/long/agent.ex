@@ -114,6 +114,12 @@ defmodule Long.Agent do
       define :destroy_monitor, action: :destroy
     end
 
+    resource Long.Agent.MonitorRun do
+      define :create_monitor_run_record, action: :create
+      define :list_monitor_runs, action: :by_monitor, args: [:monitor_id]
+      define :destroy_monitor_run, action: :destroy
+    end
+
     resource Long.Agent.Group do
       define :create_group, action: :create
       define :list_groups, action: :read
