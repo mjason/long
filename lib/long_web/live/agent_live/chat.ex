@@ -7,6 +7,9 @@ defmodule LongWeb.AgentLive.Chat do
 
   use LongWeb, :live_view
 
+  # Petal Components are called qualified during the gradual migration off mishka.
+  alias PetalComponents.Button
+
   alias Long.Agent
   alias Long.SessionRunner
 
@@ -564,16 +567,15 @@ defmodule LongWeb.AgentLive.Chat do
       !@open? && "w-0"
     ]}>
       <div class="p-3 border-b border-zinc-200">
-        <.button
+        <Button.button
           phx-click="new_session"
           color="primary"
-          full_width
+          radius="lg"
           icon="hero-plus"
-          rounded="large"
-          size="medium"
+          class="w-full"
         >
-          New session
-        </.button>
+          {gettext("New session")}
+        </Button.button>
       </div>
       <ul class="flex-1 overflow-y-auto text-sm">
         <li
@@ -598,26 +600,26 @@ defmodule LongWeb.AgentLive.Chat do
             type="button"
             phx-click="destroy_session"
             phx-value-id={s.id}
-            data-confirm={"Delete \"#{s.title}\" and all its messages?"}
+            data-confirm={gettext("Delete \"%{title}\" and all its messages?", title: s.title)}
             class="px-2 py-2 mr-1 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded opacity-0 group-hover:opacity-100 transition"
-            title="Delete session"
+            title={gettext("Delete session")}
           >
             <.icon name="hero-trash" class="size-4" />
           </button>
         </li>
       </ul>
       <div class="p-2 border-t border-zinc-200">
-        <.button_link
-          navigate={~p"/manage"}
-          variant="base"
-          color="natural"
-          full_width
-          size="small"
+        <Button.button
+          link_type="live_redirect"
+          to={~p"/manage"}
+          variant="outline"
+          color="gray"
+          size="sm"
           icon="hero-cog-6-tooth"
-          rounded="medium"
+          class="w-full"
         >
-          Manage
-        </.button_link>
+          {gettext("Manage")}
+        </Button.button>
       </div>
     </aside>
     """
@@ -632,41 +634,38 @@ defmodule LongWeb.AgentLive.Chat do
   defp chat_header(assigns) do
     ~H"""
     <header class="bg-white border-b border-zinc-200 px-4 sm:px-6 h-14 flex items-center gap-3 shrink-0">
-      <.button
+      <Button.icon_button
         phx-click="toggle_sidebar"
-        variant="base"
-        color="natural"
-        rounded="small"
-        size="extra_small"
-        icon="hero-bars-3"
-        class="!p-2"
-        title={if @sidebar_open?, do: "Hide sessions", else: "Show sessions"}
-      />
+        color="gray"
+        title={if @sidebar_open?, do: gettext("Hide sessions"), else: gettext("Show sessions")}
+      >
+        <.icon name="hero-bars-3" class="size-5" />
+      </Button.icon_button>
       <.session_title session={@session} editing?={@editing_title?} />
       <div class="flex-1" />
       <form phx-change="set_llm" class="flex items-center gap-2 text-xs text-zinc-500">
-        <span>Model</span>
-        <.native_select name="alias" size="extra_small" space="none">
-          <:option value="" selected={is_nil(@session && @session.llm_alias)}>echo (demo)</:option>
-          <:option
+        <span>{gettext("Model")}</span>
+        <select
+          name="alias"
+          class="rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+        >
+          <option value="" selected={is_nil(@session && @session.llm_alias)}>{gettext("echo (demo)")}</option>
+          <option
             :for={llm <- @available_llms}
             value={llm.alias}
             selected={@session && @session.llm_alias == llm.alias}
           >
             {llm_label(llm)}
-          </:option>
-        </.native_select>
+          </option>
+        </select>
       </form>
-      <.button
+      <Button.icon_button
         phx-click="toggle_memory"
-        variant="base"
-        color="natural"
-        rounded="small"
-        size="extra_small"
-        icon="hero-bars-4"
-        class="!p-2"
-        title={if @memory_open?, do: "Hide memory", else: "Show memory"}
-      />
+        color="gray"
+        title={if @memory_open?, do: gettext("Hide memory"), else: gettext("Show memory")}
+      >
+        <.icon name="hero-bars-4" class="size-5" />
+      </Button.icon_button>
     </header>
     """
   end
@@ -686,18 +685,18 @@ defmodule LongWeb.AgentLive.Chat do
         phx-keyup="cancel_title"
         class="font-semibold border border-zinc-300 rounded px-2 py-0.5 text-sm bg-white focus:ring-2 focus:ring-blue-400 outline-none min-w-0 max-w-xs"
       />
-      <.button type="submit" color="primary" size="extra_small" rounded="medium" icon="hero-check" class="!p-1.5" title="Save (Enter)" />
-      <.button
+      <Button.icon_button type="submit" color="primary" size="xs" title={gettext("Save (Enter)")}>
+        <.icon name="hero-check" class="size-4" />
+      </Button.icon_button>
+      <Button.icon_button
         type="button"
         phx-click="cancel_title"
-        variant="base"
-        color="natural"
-        size="extra_small"
-        rounded="medium"
-        icon="hero-x-mark"
-        class="!p-1.5"
-        title="Cancel (Esc)"
-      />
+        color="gray"
+        size="xs"
+        title={gettext("Cancel (Esc)")}
+      >
+        <.icon name="hero-x-mark" class="size-4" />
+      </Button.icon_button>
     </form>
     """
   end
@@ -708,7 +707,7 @@ defmodule LongWeb.AgentLive.Chat do
       type="button"
       phx-click="edit_title"
       class="font-semibold truncate hover:bg-zinc-100 px-2 py-0.5 rounded transition text-left max-w-md"
-      title="Click to rename"
+      title={gettext("Click to rename")}
     >
       {(@session && @session.title) || "—"}
     </button>
@@ -719,10 +718,9 @@ defmodule LongWeb.AgentLive.Chat do
     ~H"""
     <div class="h-full flex flex-col items-center justify-center text-center text-zinc-400 py-20">
       <.icon name="hero-chat-bubble-left-right" class="size-14 mb-4 text-zinc-300" />
-      <div class="text-zinc-500 font-medium">Start a conversation</div>
+      <div class="text-zinc-500 font-medium">{gettext("Start a conversation")}</div>
       <div class="text-xs mt-1.5 max-w-xs">
-        Type a message below. The agent has access to file I/O, code execution,
-        memory, HTTP fetch, and browser tools.
+        {gettext("Type a message below. The agent has access to file I/O, code execution, memory, HTTP fetch, and browser tools.")}
       </div>
     </div>
     """
@@ -872,7 +870,7 @@ defmodule LongWeb.AgentLive.Chat do
           :if={@streaming.text == "" and @streaming.tool_runs == []}
           class="flex items-center gap-2 text-sm text-zinc-400"
         >
-          <.spinner color="natural" size="extra_small" /> thinking
+          <.spinner color="natural" size="extra_small" /> {gettext("thinking")}
         </div>
         <.tool_run_card :for={run <- @streaming.tool_runs} run={run} />
       </.chat_section>
@@ -936,7 +934,7 @@ defmodule LongWeb.AgentLive.Chat do
           phx-click="dismiss_notice"
           class="text-xs underline opacity-70 hover:opacity-100"
         >
-          dismiss
+          {gettext("dismiss")}
         </button>
       </div>
     </.alert>
@@ -949,7 +947,7 @@ defmodule LongWeb.AgentLive.Chat do
     ~H"""
     <.alert
       kind={:warning}
-      title="The agent is asking"
+      title={gettext("The agent is asking")}
       rounded="extra_large"
       class="max-w-2xl mx-auto"
     >
@@ -959,22 +957,22 @@ defmodule LongWeb.AgentLive.Chat do
           name="answer"
           autofocus
           class="flex-1 border border-amber-300 rounded-lg px-3 py-2 bg-white focus:ring-2 focus:ring-amber-400 outline-none"
-          placeholder="Type your answer…"
+          placeholder={gettext("Type your answer…")}
         />
-        <.button type="submit" color="warning" rounded="large" size="small">Send</.button>
+        <Button.button type="submit" color="warning" radius="lg" size="sm">{gettext("Send")}</Button.button>
       </form>
       <div :if={(@ask["candidates"] || []) != []} class="flex gap-2 flex-wrap">
-        <.button
+        <Button.button
           :for={c <- @ask["candidates"]}
           phx-click="answer_ask_user"
           phx-value-answer={c}
-          size="extra_small"
-          rounded="full"
+          size="xs"
+          radius="full"
           variant="outline"
           color="warning"
         >
           {c}
-        </.button>
+        </Button.button>
       </div>
     </.alert>
     """
@@ -1029,7 +1027,7 @@ defmodule LongWeb.AgentLive.Chat do
         <div class="flex items-end gap-2">
           <label
             class="shrink-0 size-[50px] flex items-center justify-center rounded-2xl border border-zinc-300 text-zinc-500 hover:bg-zinc-50 cursor-pointer"
-            title="Attach images or files"
+            title={gettext("Attach images or files")}
           >
             <.icon name="hero-paper-clip" class="size-5" />
             <.live_file_input upload={@uploads.attachments} class="hidden" />
@@ -1040,24 +1038,26 @@ defmodule LongWeb.AgentLive.Chat do
             rows="1"
             placeholder={
               if @loop_running?,
-                do: "Working…",
-                else: "Send a message  (Enter to send · Shift+Enter for newline)"
+                do: gettext("Working…"),
+                else: gettext("Send a message  (Enter to send · Shift+Enter for newline)")
             }
-            class="flex-1 resize-none border border-zinc-300 rounded-2xl px-4 py-3 leading-relaxed bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none max-h-60"
+            class="flex-1 resize-none border border-zinc-300 rounded-2xl px-4 py-3 leading-relaxed bg-white focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none max-h-60"
             autofocus
           ></textarea>
 
-          <.button
+          <Button.icon_button
             type="submit"
             disabled={@loop_running?}
-            color={if @loop_running?, do: "natural", else: "primary"}
-            rounded="full"
-            size="medium"
-            icon={if @loop_running?, do: "hero-arrow-path", else: "hero-paper-airplane"}
-            icon_class={@loop_running? && "animate-spin"}
-            class="!h-[50px] !w-[50px] !p-0 shrink-0 flex items-center justify-center"
-            title="Send"
-          />
+            color={if @loop_running?, do: "gray", else: "primary"}
+            radius="full"
+            class="!h-[50px] !w-[50px] shrink-0"
+            title={gettext("Send")}
+          >
+            <.icon
+              name={if @loop_running?, do: "hero-arrow-path", else: "hero-paper-airplane"}
+              class={["size-5", @loop_running? && "animate-spin"]}
+            />
+          </Button.icon_button>
         </div>
       </div>
     </form>
@@ -1077,13 +1077,13 @@ defmodule LongWeb.AgentLive.Chat do
     ]}>
       <div class="p-4 space-y-4">
         <.card variant="bordered" color="natural" rounded="large" padding="small">
-          <.card_title title="L1 · Working memory" size="extra_small" class="text-zinc-500 uppercase" />
-          <pre class="text-xs whitespace-pre-wrap text-zinc-700 leading-snug min-h-[1.5em]">{(@checkpoint && @checkpoint.key_info) || "(empty)"}</pre>
+          <.card_title title={gettext("L1 · Working memory")} size="extra_small" class="text-zinc-500 uppercase" />
+          <pre class="text-xs whitespace-pre-wrap text-zinc-700 leading-snug min-h-[1.5em]">{(@checkpoint && @checkpoint.key_info) || gettext("(empty)")}</pre>
         </.card>
 
         <.card variant="bordered" color="natural" rounded="large" padding="small">
-          <.card_title title="L2 · Global memory" size="extra_small" class="text-zinc-500 uppercase" />
-          <p :if={@global_memory == []} class="text-xs text-zinc-400">(empty)</p>
+          <.card_title title={gettext("L2 · Global memory")} size="extra_small" class="text-zinc-500 uppercase" />
+          <p :if={@global_memory == []} class="text-xs text-zinc-400">{gettext("(empty)")}</p>
           <ul :if={@global_memory != []} class="space-y-2 text-xs">
             <li :for={entry <- @global_memory} class="border-l-2 border-zinc-200 pl-2.5">
               <div class="text-[10px] uppercase tracking-wide text-zinc-400">{entry.scope}</div>
@@ -1129,8 +1129,8 @@ defmodule LongWeb.AgentLive.Chat do
   defp strip_attachment_note(text),
     do: String.replace(text, ~r/\n\[attachments:[^\]]*\]\s*\z/, "")
 
-  defp upload_error_to_string(:too_large), do: "too large (max 25MB)"
-  defp upload_error_to_string(:too_many_files), do: "too many files"
-  defp upload_error_to_string(:not_accepted), do: "type not accepted"
+  defp upload_error_to_string(:too_large), do: gettext("too large (max 25MB)")
+  defp upload_error_to_string(:too_many_files), do: gettext("too many files")
+  defp upload_error_to_string(:not_accepted), do: gettext("type not accepted")
   defp upload_error_to_string(other), do: to_string(other)
 end

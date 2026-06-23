@@ -377,3 +377,150 @@ msgstr "会话"
 #, elixir-autogen, elixir-format
 msgid "Skills"
 msgstr "技能"
+
+#: lib/long_web/live/agent_live/chat.ex:1081
+#: lib/long_web/live/agent_live/chat.ex:1086
+#, elixir-autogen, elixir-format
+msgid "(empty)"
+msgstr "(空)"
+
+#: lib/long_web/live/agent_live/chat.ex:1030
+#, elixir-autogen, elixir-format
+msgid "Attach images or files"
+msgstr "附加图片或文件"
+
+#: lib/long_web/live/agent_live/chat.ex:696
+#, elixir-autogen, elixir-format
+msgid "Cancel (Esc)"
+msgstr "取消(Esc)"
+
+#: lib/long_web/live/agent_live/chat.ex:710
+#, elixir-autogen, elixir-format
+msgid "Click to rename"
+msgstr "点击重命名"
+
+#: lib/long_web/live/agent_live/chat.ex:603
+#, elixir-autogen, elixir-format
+msgid "Delete \"%{title}\" and all its messages?"
+msgstr "删除「%{title}」及其所有消息?"
+
+#: lib/long_web/live/agent_live/chat.ex:605
+#, elixir-autogen, elixir-format
+msgid "Delete session"
+msgstr "删除会话"
+
+#: lib/long_web/live/agent_live/chat.ex:665
+#, elixir-autogen, elixir-format
+msgid "Hide memory"
+msgstr "隐藏记忆"
+
+#: lib/long_web/live/agent_live/chat.ex:640
+#, elixir-autogen, elixir-format
+msgid "Hide sessions"
+msgstr "隐藏会话列表"
+
+#: lib/long_web/live/agent_live/chat.ex:1080
+#, elixir-autogen, elixir-format
+msgid "L1 · Working memory"
+msgstr "L1 · 工作记忆"
+
+#: lib/long_web/live/agent_live/chat.ex:1085
+#, elixir-autogen, elixir-format
+msgid "L2 · Global memory"
+msgstr "L2 · 全局记忆"
+
+#: lib/long_web/live/agent_live/chat.ex:621
+#, elixir-autogen, elixir-format
+msgid "Manage"
+msgstr "管理"
+
+#: lib/long_web/live/agent_live/chat.ex:647
+#, elixir-autogen, elixir-format
+msgid "Model"
+msgstr "模型"
+
+#: lib/long_web/live/agent_live/chat.ex:577
+#, elixir-autogen, elixir-format
+msgid "New session"
+msgstr "新会话"
+
+#: lib/long_web/live/agent_live/chat.ex:688
+#, elixir-autogen, elixir-format
+msgid "Save (Enter)"
+msgstr "保存(回车)"
+
+#: lib/long_web/live/agent_live/chat.ex:962
+#: lib/long_web/live/agent_live/chat.ex:1054
+#, elixir-autogen, elixir-format
+msgid "Send"
+msgstr "发送"
+
+#: lib/long_web/live/agent_live/chat.ex:1042
+#, elixir-autogen, elixir-format
+msgid "Send a message  (Enter to send · Shift+Enter for newline)"
+msgstr "输入消息(回车发送 · Shift+回车换行)"
+
+#: lib/long_web/live/agent_live/chat.ex:665
+#, elixir-autogen, elixir-format
+msgid "Show memory"
+msgstr "显示记忆"
+
+#: lib/long_web/live/agent_live/chat.ex:640
+#, elixir-autogen, elixir-format
+msgid "Show sessions"
+msgstr "显示会话列表"
+
+#: lib/long_web/live/agent_live/chat.ex:721
+#, elixir-autogen, elixir-format
+msgid "Start a conversation"
+msgstr "开始对话"
+
+#: lib/long_web/live/agent_live/chat.ex:950
+#, elixir-autogen, elixir-format
+msgid "The agent is asking"
+msgstr "agent 在询问"
+
+#: lib/long_web/live/agent_live/chat.ex:723
+#, elixir-autogen, elixir-format
+msgid "Type a message below. The agent has access to file I/O, code execution, memory, HTTP fetch, and browser tools."
+msgstr "在下面输入消息。agent 可以读写文件、执行代码、使用记忆、HTTP 抓取和浏览器工具。"
+
+#: lib/long_web/live/agent_live/chat.ex:960
+#, elixir-autogen, elixir-format
+msgid "Type your answer…"
+msgstr "输入你的回答…"
+
+#: lib/long_web/live/agent_live/chat.ex:1041
+#, elixir-autogen, elixir-format
+msgid "Working…"
+msgstr "处理中…"
+
+#: lib/long_web/live/agent_live/chat.ex:937
+#, elixir-autogen, elixir-format
+msgid "dismiss"
+msgstr "忽略"
+
+#: lib/long_web/live/agent_live/chat.ex:652
+#, elixir-autogen, elixir-format
+msgid "echo (demo)"
+msgstr "echo(演示)"
+
+#: lib/long_web/live/agent_live/chat.ex:873
+#, elixir-autogen, elixir-format
+msgid "thinking"
+msgstr "思考中"
+
+#: lib/long_web/live/agent_live/chat.ex:1132
+#, elixir-autogen, elixir-format
+msgid "too large (max 25MB)"
+msgstr "文件太大(最大 25MB)"
+
+#: lib/long_web/live/agent_live/chat.ex:1133
+#, elixir-autogen, elixir-format
+msgid "too many files"
+msgstr "文件太多"
+
+#: lib/long_web/live/agent_live/chat.ex:1134
+#, elixir-autogen, elixir-format
+msgid "type not accepted"
+msgstr "不支持的文件类型"
