@@ -479,7 +479,7 @@ defmodule LongWeb.AgentLive.Chat do
   @impl true
   def render(assigns) do
     ~H"""
-    <div class="flex h-screen bg-zinc-100 text-zinc-900">
+    <div class="flex h-screen bg-zinc-50 text-zinc-900">
       <.sessions_pane sessions={@sessions} session_id={@session_id} open?={@sidebar_open?} />
 
       <main class="flex-1 flex flex-col min-w-0">
@@ -582,7 +582,7 @@ defmodule LongWeb.AgentLive.Chat do
           :for={s <- @sessions}
           class={[
             "group border-b border-zinc-100 flex items-center transition",
-            s.id == @session_id && "bg-blue-50 border-l-2 border-l-blue-500"
+            s.id == @session_id && "bg-primary-50 border-l-2 border-l-primary-500"
           ]}
         >
           <button
@@ -683,7 +683,7 @@ defmodule LongWeb.AgentLive.Chat do
         autofocus
         phx-key="escape"
         phx-keyup="cancel_title"
-        class="font-semibold border border-zinc-300 rounded px-2 py-0.5 text-sm bg-white focus:ring-2 focus:ring-blue-400 outline-none min-w-0 max-w-xs"
+        class="font-semibold border border-zinc-300 rounded px-2 py-0.5 text-sm bg-white focus:ring-2 focus:ring-primary-400 outline-none min-w-0 max-w-xs"
       />
       <Button.icon_button type="submit" color="primary" size="xs" title={gettext("Save (Enter)")}>
         <.icon name="hero-check" class="size-4" />
@@ -716,10 +716,12 @@ defmodule LongWeb.AgentLive.Chat do
 
   defp empty_state(assigns) do
     ~H"""
-    <div class="h-full flex flex-col items-center justify-center text-center text-zinc-400 py-20">
-      <.icon name="hero-chat-bubble-left-right" class="size-14 mb-4 text-zinc-300" />
-      <div class="text-zinc-500 font-medium">{gettext("Start a conversation")}</div>
-      <div class="text-xs mt-1.5 max-w-xs">
+    <div class="h-full flex flex-col items-center justify-center text-center py-20">
+      <div class="mb-4 inline-flex size-14 items-center justify-center rounded-2xl bg-primary-50 text-primary-500 ring-1 ring-inset ring-primary-100">
+        <.icon name="hero-chat-bubble-left-right" class="size-7" />
+      </div>
+      <div class="font-medium text-zinc-700">{gettext("Start a conversation")}</div>
+      <div class="mt-1.5 max-w-xs text-xs leading-relaxed text-zinc-400">
         {gettext("Type a message below. The agent has access to file I/O, code execution, memory, HTTP fetch, and browser tools.")}
       </div>
     </div>

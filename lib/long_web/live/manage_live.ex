@@ -1364,15 +1364,15 @@ defmodule LongWeb.ManageLive do
     ~H"""
     <div class="p-6 space-y-4">
       <div class="flex items-center gap-3">
-        <h1 class="text-xl font-semibold flex-1">{gettext("LLM configurations")}</h1>
+        <h1 class="text-xl font-semibold tracking-tight flex-1">{gettext("LLM configurations")}</h1>
         <Button.button phx-click="new_llm" color="primary" icon="hero-plus" radius="md" size="sm">
           {gettext("New LLM")}
         </Button.button>
       </div>
 
-      <div class="rounded-lg border border-zinc-200 bg-white overflow-hidden">
+      <div class="rounded-xl border border-zinc-200/80 bg-white shadow-sm overflow-hidden">
         <table class="w-full text-sm">
-          <thead class="text-xs uppercase text-zinc-500 bg-zinc-50">
+          <thead class="text-[11px] uppercase tracking-wider text-zinc-400 bg-zinc-50/80">
             <tr>
               <th class="text-left px-4 py-2.5">{gettext("Alias")}</th>
               <th class="text-left px-4 py-2.5">{gettext("Provider")}</th>
@@ -1462,15 +1462,15 @@ defmodule LongWeb.ManageLive do
   defp memory_section(assigns) do
     ~H"""
     <div class="p-6 space-y-6">
-      <h1 class="text-xl font-semibold">{gettext("Memory editor")}</h1>
+      <h1 class="text-xl font-semibold tracking-tight">{gettext("Memory editor")}</h1>
 
       <section class="space-y-2">
         <h2 class="text-sm font-semibold text-zinc-700 uppercase tracking-wide">
           {gettext("L1 · Working checkpoints")}
         </h2>
-        <div class="rounded-lg border border-zinc-200 bg-white overflow-hidden">
+        <div class="rounded-xl border border-zinc-200/80 bg-white shadow-sm overflow-hidden">
           <table class="w-full text-sm">
-            <thead class="text-xs uppercase text-zinc-500 bg-zinc-50">
+            <thead class="text-[11px] uppercase tracking-wider text-zinc-400 bg-zinc-50/80">
               <tr>
                 <th class="text-left px-4 py-2.5">{gettext("Session")}</th>
                 <th class="text-left px-4 py-2.5">key_info</th>
@@ -1513,9 +1513,9 @@ defmodule LongWeb.ManageLive do
         <h2 class="text-sm font-semibold text-zinc-700 uppercase tracking-wide">
           {gettext("L2 · Global memory")}
         </h2>
-        <div class="rounded-lg border border-zinc-200 bg-white overflow-hidden">
+        <div class="rounded-xl border border-zinc-200/80 bg-white shadow-sm overflow-hidden">
           <table class="w-full text-sm">
-            <thead class="text-xs uppercase text-zinc-500 bg-zinc-50">
+            <thead class="text-[11px] uppercase tracking-wider text-zinc-400 bg-zinc-50/80">
               <tr>
                 <th class="text-left px-4 py-2.5">{gettext("Scope")}</th>
                 <th class="text-left px-4 py-2.5">{gettext("Kind")}</th>
@@ -1572,9 +1572,9 @@ defmodule LongWeb.ManageLive do
         <h2 class="text-sm font-semibold text-zinc-700 uppercase tracking-wide">
           {gettext("L2 · Session memory")}
         </h2>
-        <div class="rounded-lg border border-zinc-200 bg-white overflow-hidden">
+        <div class="rounded-xl border border-zinc-200/80 bg-white shadow-sm overflow-hidden">
           <table class="w-full text-sm">
-            <thead class="text-xs uppercase text-zinc-500 bg-zinc-50">
+            <thead class="text-[11px] uppercase tracking-wider text-zinc-400 bg-zinc-50/80">
               <tr>
                 <th class="text-left px-4 py-2.5">{gettext("Session")}</th>
                 <th class="text-left px-4 py-2.5">{gettext("Kind")}</th>
@@ -1630,7 +1630,7 @@ defmodule LongWeb.ManageLive do
     ~H"""
     <div class="p-6 space-y-4">
       <div class="flex items-center gap-3">
-        <h1 class="text-xl font-semibold flex-1">{gettext("Skills")}</h1>
+        <h1 class="text-xl font-semibold tracking-tight flex-1">{gettext("Skills")}</h1>
         <span class="text-xs text-zinc-400 font-mono">{SkillStore.root()}</span>
         <Button.button phx-click="skill_reindex" color="primary" variant="outline" icon="hero-arrow-path" radius="md" size="sm">
           {gettext("Reindex")}
@@ -1670,9 +1670,9 @@ defmodule LongWeb.ManageLive do
         </form>
       </div>
 
-      <div class="rounded-lg border border-zinc-200 bg-white overflow-hidden">
+      <div class="rounded-xl border border-zinc-200/80 bg-white shadow-sm overflow-hidden">
         <table class="w-full text-sm">
-          <thead class="text-xs uppercase text-zinc-500 bg-zinc-50">
+          <thead class="text-[11px] uppercase tracking-wider text-zinc-400 bg-zinc-50/80">
             <tr>
               <th class="text-left px-4 py-2.5">{gettext("Name")}</th>
               <th class="text-left px-4 py-2.5">{gettext("Scope")}</th>
@@ -1756,7 +1756,7 @@ defmodule LongWeb.ManageLive do
   defp placeholder(assigns) do
     ~H"""
     <div class="p-8">
-      <h1 class="text-xl font-semibold mb-2">{@title}</h1>
+      <h1 class="text-xl font-semibold tracking-tight mb-2">{@title}</h1>
       <p class="text-sm text-zinc-500">{gettext("Coming soon.")}</p>
     </div>
     """
@@ -1765,10 +1765,10 @@ defmodule LongWeb.ManageLive do
   defp sessions_section(assigns) do
     ~H"""
     <div class="p-6 space-y-4">
-      <h1 class="text-xl font-semibold">{gettext("Sessions")}</h1>
-      <div class="rounded-lg border border-zinc-200 bg-white overflow-hidden">
+      <h1 class="text-xl font-semibold tracking-tight">{gettext("Sessions")}</h1>
+      <div class="rounded-xl border border-zinc-200/80 bg-white shadow-sm overflow-hidden">
         <table class="w-full text-sm">
-          <thead class="text-xs uppercase text-zinc-500 bg-zinc-50">
+          <thead class="text-[11px] uppercase tracking-wider text-zinc-400 bg-zinc-50/80">
             <tr>
               <th class="text-left px-4 py-2.5">{gettext("Title")}</th>
               <th class="text-left px-4 py-2.5">{gettext("Status")}</th>
@@ -1832,15 +1832,15 @@ defmodule LongWeb.ManageLive do
     ~H"""
     <div class="p-6 space-y-4">
       <div class="flex items-center gap-3">
-        <h1 class="text-xl font-semibold flex-1">{gettext("Search providers")}</h1>
+        <h1 class="text-xl font-semibold tracking-tight flex-1">{gettext("Search providers")}</h1>
         <Button.button phx-click="new_search" color="primary" icon="hero-plus" radius="md" size="sm">
           {gettext("New provider")}
         </Button.button>
       </div>
 
-      <div class="rounded-lg border border-zinc-200 bg-white overflow-hidden">
+      <div class="rounded-xl border border-zinc-200/80 bg-white shadow-sm overflow-hidden">
         <table class="w-full text-sm">
-          <thead class="text-xs uppercase text-zinc-500 bg-zinc-50">
+          <thead class="text-[11px] uppercase tracking-wider text-zinc-400 bg-zinc-50/80">
             <tr>
               <th class="text-left px-4 py-2.5">{gettext("Alias")}</th>
               <th class="text-left px-4 py-2.5">{gettext("Provider")}</th>
@@ -1909,7 +1909,7 @@ defmodule LongWeb.ManageLive do
   defp credentials_section(assigns) do
     ~H"""
     <div class="p-6 space-y-6">
-      <h1 class="text-xl font-semibold">{gettext("Channels")}</h1>
+      <h1 class="text-xl font-semibold tracking-tight">{gettext("Channels")}</h1>
 
       <section class="space-y-2">
         <h2 class="text-sm font-semibold text-zinc-700 uppercase tracking-wide">{gettext("WeChat accounts")}</h2>
@@ -1917,9 +1917,9 @@ defmodule LongWeb.ManageLive do
           {gettext("Connect one or more WeChat accounts. Assign each to a group member so every message arriving on that account runs as that role.")}
         </p>
 
-        <div class="rounded-lg border border-zinc-200 bg-white overflow-hidden">
+        <div class="rounded-xl border border-zinc-200/80 bg-white shadow-sm overflow-hidden">
           <table class="w-full text-sm">
-            <thead class="text-xs uppercase text-zinc-500 bg-zinc-50">
+            <thead class="text-[11px] uppercase tracking-wider text-zinc-400 bg-zinc-50/80">
               <tr>
                 <th class="text-left px-4 py-2">{gettext("Account")}</th>
                 <th class="text-left px-4 py-2">{gettext("Status")}</th>
@@ -2022,9 +2022,9 @@ defmodule LongWeb.ManageLive do
 
       <section class="space-y-2">
         <h2 class="text-sm font-semibold text-zinc-700 uppercase tracking-wide">{gettext("Bot users")}</h2>
-        <div class="rounded-lg border border-zinc-200 bg-white overflow-hidden">
+        <div class="rounded-xl border border-zinc-200/80 bg-white shadow-sm overflow-hidden">
           <table class="w-full text-sm">
-            <thead class="text-xs uppercase text-zinc-500 bg-zinc-50">
+            <thead class="text-[11px] uppercase tracking-wider text-zinc-400 bg-zinc-50/80">
               <tr>
                 <th class="text-left px-4 py-2.5">{gettext("Platform")}</th>
                 <th class="text-left px-4 py-2.5">{gettext("External id")}</th>
@@ -2073,9 +2073,9 @@ defmodule LongWeb.ManageLive do
             {gettext("New Telegram bot")}
           </Button.button>
         </div>
-        <div class="rounded-lg border border-zinc-200 bg-white overflow-hidden">
+        <div class="rounded-xl border border-zinc-200/80 bg-white shadow-sm overflow-hidden">
           <table class="w-full text-sm">
-            <thead class="text-xs uppercase text-zinc-500 bg-zinc-50">
+            <thead class="text-[11px] uppercase tracking-wider text-zinc-400 bg-zinc-50/80">
               <tr>
                 <th class="text-left px-4 py-2.5">{gettext("Name")}</th>
                 <th class="text-left px-4 py-2.5">{gettext("Username")}</th>
@@ -2173,15 +2173,15 @@ defmodule LongWeb.ManageLive do
     ~H"""
     <div class="p-6 space-y-4">
       <div class="flex items-center gap-3">
-        <h1 class="text-xl font-semibold flex-1">{gettext("Scheduled tasks")}</h1>
+        <h1 class="text-xl font-semibold tracking-tight flex-1">{gettext("Scheduled tasks")}</h1>
         <Button.button phx-click="new_scheduled" color="primary" icon="hero-plus" radius="md" size="sm">
           {gettext("New task")}
         </Button.button>
       </div>
 
-      <div class="rounded-lg border border-zinc-200 bg-white overflow-hidden">
+      <div class="rounded-xl border border-zinc-200/80 bg-white shadow-sm overflow-hidden">
         <table class="w-full text-sm">
-          <thead class="text-xs uppercase text-zinc-500 bg-zinc-50">
+          <thead class="text-[11px] uppercase tracking-wider text-zinc-400 bg-zinc-50/80">
             <tr>
               <th class="text-left px-4 py-2.5">{gettext("Name")}</th>
               <th class="text-left px-4 py-2.5">{gettext("Repeat")}</th>
@@ -2255,7 +2255,7 @@ defmodule LongWeb.ManageLive do
     ~H"""
     <div class="p-6 space-y-4">
       <div class="flex items-center gap-3">
-        <h1 class="text-xl font-semibold flex-1">{gettext("Monitors")}</h1>
+        <h1 class="text-xl font-semibold tracking-tight flex-1">{gettext("Monitors")}</h1>
         <p class="text-xs text-zinc-500 max-w-sm">
           {gettext("Scripts that run on an interval and notify only when there's something. ⚡ runs one now.")}
         </p>
@@ -2264,9 +2264,9 @@ defmodule LongWeb.ManageLive do
         </Button.button>
       </div>
 
-      <div class="rounded-lg border border-zinc-200 bg-white overflow-hidden">
+      <div class="rounded-xl border border-zinc-200/80 bg-white shadow-sm overflow-hidden">
         <table class="w-full text-sm">
-          <thead class="text-xs uppercase text-zinc-500 bg-zinc-50">
+          <thead class="text-[11px] uppercase tracking-wider text-zinc-400 bg-zinc-50/80">
             <tr>
               <th class="text-left px-4 py-2.5">{gettext("Name")}</th>
               <th class="text-left px-4 py-2.5">{gettext("Every")}</th>
@@ -2516,10 +2516,10 @@ defmodule LongWeb.ManageLive do
     ~H"""
     <div class="p-6 space-y-6">
       <div class="flex items-center gap-3">
-        <h1 class="text-xl font-semibold flex-1">{gettext("Groups")}</h1>
+        <h1 class="text-xl font-semibold tracking-tight flex-1">{gettext("Groups")}</h1>
       </div>
 
-      <div class="rounded-lg border border-zinc-200 bg-white">
+      <div class="rounded-xl border border-zinc-200/80 bg-white shadow-sm">
         <div class="flex items-center gap-3 p-4">
           <div class="flex-1">
             <div class="text-sm font-medium text-zinc-800">{gettext("System default language")}</div>
@@ -2537,7 +2537,7 @@ defmodule LongWeb.ManageLive do
         </div>
       </div>
 
-      <div class="rounded-lg border border-zinc-200 bg-white">
+      <div class="rounded-xl border border-zinc-200/80 bg-white shadow-sm">
         <div class="flex items-center gap-3 p-4">
           <div class="flex-1">
             <div class="text-sm font-medium text-zinc-800">{gettext("System timezone")}</div>
@@ -2563,11 +2563,11 @@ defmodule LongWeb.ManageLive do
         </div>
       </div>
 
-      <div class="rounded-lg border border-blue-200 bg-blue-50 p-4 text-xs text-zinc-600 max-w-3xl leading-relaxed space-y-2">
+      <div class="rounded-xl border border-primary-200/70 bg-primary-50/60 p-4 text-xs text-zinc-600 max-w-3xl leading-relaxed space-y-2">
         <p class="font-medium text-zinc-800">How members link their WeChat / Telegram</p>
         <p>
           <span class="font-medium">Set up once (owner):</span>
-          on the <.link navigate={~p"/manage/credentials"} class="text-blue-700 underline">Channels</.link>
+          on the <.link navigate={~p"/manage/credentials"} class="text-primary-700 underline">Channels</.link>
           page, scan the WeChat QR to host the group's <em>single</em> WeChat account, and/or add a
           Telegram bot. This is a one-time login — members do <em>not</em> each scan a QR.
         </p>
@@ -2583,7 +2583,7 @@ defmodule LongWeb.ManageLive do
         </p>
       </div>
 
-      <div class="rounded-lg border border-zinc-200 bg-white">
+      <div class="rounded-xl border border-zinc-200/80 bg-white shadow-sm">
         <form phx-submit="new_group" class="flex items-end gap-3 p-4">
           <label class="flex-1 block">
             <span class="text-xs font-medium text-zinc-600">{gettext("New group")}</span>
@@ -2600,7 +2600,7 @@ defmodule LongWeb.ManageLive do
         </form>
       </div>
 
-      <div :for={hh <- @groups} class="rounded-lg border border-zinc-200 bg-white overflow-hidden">
+      <div :for={hh <- @groups} class="rounded-xl border border-zinc-200/80 bg-white shadow-sm overflow-hidden">
         <div class="flex items-center gap-2 px-4 py-3 border-b border-zinc-200 bg-zinc-50">
           <.icon name="hero-user-group" class="size-4 text-zinc-500" />
           <span class="font-semibold flex-1">{hh.name}</span>
@@ -2738,14 +2738,14 @@ defmodule LongWeb.ManageLive do
   defp phrases_section(assigns) do
     ~H"""
     <div class="p-6 space-y-4">
-      <h1 class="text-xl font-semibold">{gettext("Phrases")}</h1>
+      <h1 class="text-xl font-semibold tracking-tight">{gettext("Phrases")}</h1>
       <p class="text-xs text-zinc-500 max-w-3xl leading-relaxed">
         {gettext("Central catalog of bot / system copy, per locale. Each phrase has a built-in default; set an override here to customize the wording. Placeholder tokens are filled at runtime — keep them. Leave an override blank to fall back to the default.")}
       </p>
 
-      <div class="rounded-lg border border-zinc-200 bg-white overflow-hidden">
+      <div class="rounded-xl border border-zinc-200/80 bg-white shadow-sm overflow-hidden">
         <table class="w-full text-sm">
-          <thead class="text-xs uppercase text-zinc-500 bg-zinc-50">
+          <thead class="text-[11px] uppercase tracking-wider text-zinc-400 bg-zinc-50/80">
             <tr>
               <th class="text-left px-4 py-2">{gettext("Key")}</th>
               <th class="text-left px-4 py-2">{gettext("Locale")}</th>
@@ -2789,13 +2789,13 @@ defmodule LongWeb.ManageLive do
     ~H"""
     <div class="p-6 space-y-4">
       <div>
-        <h1 class="text-xl font-semibold">{gettext("Reflection")}</h1>
+        <h1 class="text-xl font-semibold tracking-tight">{gettext("Reflection")}</h1>
         <p class="text-sm text-zinc-500 mt-1 max-w-2xl">
           {gettext("Silent reflection: off-peak, each session's agent quietly consolidates its own memory and never messages anyone. System-managed, kept out of the Scheduled list on purpose.")}
         </p>
       </div>
 
-      <div class="rounded-lg border border-zinc-200 bg-white">
+      <div class="rounded-xl border border-zinc-200/80 bg-white shadow-sm">
         <div class="p-5 space-y-4">
           <div class="flex items-center gap-4">
             <div class="flex-1">
@@ -2847,9 +2847,9 @@ defmodule LongWeb.ManageLive do
         </div>
       </div>
 
-      <div class="rounded-lg border border-zinc-200 bg-white overflow-hidden">
+      <div class="rounded-xl border border-zinc-200/80 bg-white shadow-sm overflow-hidden">
         <table class="w-full text-sm">
-          <thead class="text-xs uppercase text-zinc-500 bg-zinc-50">
+          <thead class="text-[11px] uppercase tracking-wider text-zinc-400 bg-zinc-50/80">
             <tr>
               <th class="text-left px-4 py-2.5">{gettext("Session")}</th>
               <th class="text-left px-4 py-2.5">{gettext("At")}</th>
@@ -2914,7 +2914,7 @@ defmodule LongWeb.ManageLive do
     ~H"""
     <div class="p-6 space-y-4">
       <div class="flex items-center gap-3">
-        <h1 class="text-xl font-semibold flex-1">{gettext("Secrets")}</h1>
+        <h1 class="text-xl font-semibold tracking-tight flex-1">{gettext("Secrets")}</h1>
         <Button.button phx-click="new_secret" color="primary" icon="hero-plus" radius="md" size="sm">
           {gettext("New secret")}
         </Button.button>
@@ -2924,9 +2924,9 @@ defmodule LongWeb.ManageLive do
         {gettext("Flat key/value store for tokens the agent needs at tool-call time. Stored plaintext (LAN-only) but kept out of memory + chat history. The agent reads these via the graphql tool.")}
       </p>
 
-      <div class="rounded-lg border border-zinc-200 bg-white overflow-hidden">
+      <div class="rounded-xl border border-zinc-200/80 bg-white shadow-sm overflow-hidden">
         <table class="w-full text-sm">
-          <thead class="text-xs uppercase text-zinc-500 bg-zinc-50">
+          <thead class="text-[11px] uppercase tracking-wider text-zinc-400 bg-zinc-50/80">
             <tr>
               <th class="text-left px-4 py-2.5">{gettext("Name")}</th>
               <th class="text-left px-4 py-2.5">{gettext("Value")}</th>
