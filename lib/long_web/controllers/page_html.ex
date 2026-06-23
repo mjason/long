@@ -18,13 +18,7 @@ defmodule LongWeb.PageHTML do
   def nav_card(assigns) do
     ~H"""
     <.link navigate={@navigate} class="block group">
-      <.card
-        variant="bordered"
-        color="natural"
-        rounded="large"
-        padding="medium"
-        class="h-full bg-white border-zinc-200 transition group-hover:shadow-md group-hover:border-zinc-300"
-      >
+      <div class="h-full rounded-xl border border-zinc-200 bg-white p-5 transition group-hover:shadow-md group-hover:border-zinc-300">
         <div class="flex items-center gap-3">
           <span class={["inline-flex items-center justify-center size-10 rounded-full shrink-0", accent_class(@accent)]}>
             <.icon name={@icon} class="size-5" />
@@ -35,12 +29,12 @@ defmodule LongWeb.PageHTML do
           </div>
           <.icon name="hero-arrow-right" class="size-4 text-zinc-300 group-hover:text-zinc-500 transition shrink-0" />
         </div>
-      </.card>
+      </div>
     </.link>
     """
   end
 
-  defp accent_class("primary"), do: "bg-teal-50 text-teal-700"
+  defp accent_class("primary"), do: "bg-primary-50 text-primary-700"
   defp accent_class("info"), do: "bg-blue-50 text-blue-700"
   defp accent_class("success"), do: "bg-emerald-50 text-emerald-700"
   defp accent_class("warning"), do: "bg-amber-50 text-amber-700"

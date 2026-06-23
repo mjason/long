@@ -16,9 +16,8 @@ defmodule LongWeb.ManageLive do
 
   use LongWeb, :live_view
 
-  import LongWeb.Components.Alert, only: [flash_group: 1]
-
-  # Petal Components called qualified during the gradual migration off mishka.
+  # Petal Components called qualified (Badge/Button); the rest come from
+  # `use PetalComponents` in the web html helpers.
   alias PetalComponents.{Badge, Button}
 
   alias Long.Agent
@@ -1278,7 +1277,7 @@ defmodule LongWeb.ManageLive do
       </aside>
 
       <main class="flex-1 overflow-y-auto">
-        <.flash_group flash={@flash} />
+        <Layouts.flash_group flash={@flash} />
         <.section_view {assigns} />
         <.llm_modal
           :if={editing_kind(@editing) == :llm}
@@ -2484,9 +2483,9 @@ defmodule LongWeb.ManageLive do
                 <tr :for={r <- @editing.runs} class="border-t border-zinc-100 align-top">
                   <td class="px-3 py-1.5 whitespace-nowrap text-zinc-500">{format_dt(r.ran_at)}</td>
                   <td class="px-2 py-1.5">
-                    <.badge color={monitor_status_color(r.status)} size="extra_small" rounded="full">
+                    <Badge.badge color={monitor_status_color(r.status)} size="xs">
                       {r.status}
-                    </.badge>
+                    </Badge.badge>
                   </td>
                   <td class="px-2 py-1.5 text-zinc-600">{r.decision}</td>
                   <td class="px-3 py-1.5 text-zinc-700 break-all">{r.message || Text.preview(r.stdout_tail || "", 80)}</td>
@@ -2742,7 +2741,7 @@ defmodule LongWeb.ManageLive do
     <div class="p-6 space-y-4">
       <h1 class="text-xl font-semibold">{gettext("Phrases")}</h1>
       <p class="text-xs text-zinc-500 max-w-3xl leading-relaxed">
-        {gettext("Central catalog of bot / system copy, per locale. Each phrase has a built-in default; set an override here to customize the wording. %{name}-style placeholders are filled at runtime — keep them. Leave an override blank to fall back to the default.")}
+        {gettext("Central catalog of bot / system copy, per locale. Each phrase has a built-in default; set an override here to customize the wording. Placeholder tokens are filled at runtime — keep them. Leave an override blank to fall back to the default.")}
       </p>
 
       <div class="rounded-lg border border-zinc-200 bg-white overflow-hidden">
@@ -3105,21 +3104,9 @@ defmodule LongWeb.ManageLive do
           </label>
         </div>
 
-        <div class="flex justify-end gap-2 pt-2">
-          <.button
-            type="button"
-            phx-click="cancel_edit"
-            variant="base"
-            color="natural"
-            rounded="medium"
-            size="small"
-          >
-            Cancel
-          </.button>
-          <.button type="submit" color="primary" rounded="medium" size="small">
-            Save
-          </.button>
-        </div>
+        <.modal_footer>
+          <Button.button type="submit" color="primary" size="sm">{gettext("Save")}</Button.button>
+        </.modal_footer>
       </form>
     </.shell_modal>
     """
@@ -3182,21 +3169,9 @@ defmodule LongWeb.ManageLive do
             class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm"
           />
         </label>
-        <div class="flex justify-end gap-2 pt-2">
-          <.button
-            type="button"
-            phx-click="cancel_edit"
-            variant="base"
-            color="natural"
-            rounded="medium"
-            size="small"
-          >
-            Cancel
-          </.button>
-          <.button type="submit" color="primary" rounded="medium" size="small">
-            Save
-          </.button>
-        </div>
+        <.modal_footer>
+          <Button.button type="submit" color="primary" size="sm">{gettext("Save")}</Button.button>
+        </.modal_footer>
       </form>
     </.shell_modal>
     """
@@ -3247,21 +3222,9 @@ defmodule LongWeb.ManageLive do
             class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm leading-snug"
           >{@editing.value}</textarea>
         </label>
-        <div class="flex justify-end gap-2 pt-2">
-          <.button
-            type="button"
-            phx-click="cancel_edit"
-            variant="base"
-            color="natural"
-            rounded="medium"
-            size="small"
-          >
-            Cancel
-          </.button>
-          <.button type="submit" color="primary" rounded="medium" size="small">
-            Save
-          </.button>
-        </div>
+        <.modal_footer>
+          <Button.button type="submit" color="primary" size="sm">{gettext("Save")}</Button.button>
+        </.modal_footer>
       </form>
     </.shell_modal>
     """
@@ -3672,16 +3635,12 @@ defmodule LongWeb.ManageLive do
     <.shell_modal max_width="max-w-2xl" title={gettext("Skill · %{name}", name: @editing.name)}>
       <div class="space-y-4">
         <div class="flex flex-wrap items-center gap-1.5 text-xs">
-          <.badge
-            color={if @editing.scope == :global, do: "success", else: "info"}
-            size="extra_small"
-            rounded="full"
-          >
+          <Badge.badge color={if @editing.scope == :global, do: "success", else: "info"} size="xs">
             {@editing.scope}
-          </.badge>
-          <.badge :for={t <- @editing.tags || []} color="silver" size="extra_small" rounded="full">
+          </Badge.badge>
+          <Badge.badge :for={t <- @editing.tags || []} color="gray" size="xs">
             {t}
-          </.badge>
+          </Badge.badge>
         </div>
 
         <p :if={(@editing.description || "") != ""} class="text-sm text-zinc-600 leading-snug">
@@ -3701,8 +3660,6 @@ defmodule LongWeb.ManageLive do
     </.shell_modal>
     """
   end
-
-  attr :editing, :map, required: true
 
   # Custom overlay modal (replaces mishka `<.modal>`): visible as soon as it's
   # rendered (the editing :if controls it), click-away / Esc → cancel_edit.

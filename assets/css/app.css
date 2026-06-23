@@ -2,9 +2,7 @@
    https://tailwindcss.com/docs/configuration */
 
 @import "tailwindcss" source(none);
-@import "../vendor/mishka_chelekom.css";
-/* Petal Components v4 — design tokens + base styles (additive; coexists with
-   mishka/daisyUI during the gradual migration). */
+/* Petal Components v4 — design tokens + base styles. */
 @import "../../deps/petal_components/assets/default.css";
 @source "../css";
 @source "../js";

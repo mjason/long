@@ -84,8 +84,14 @@ defmodule LongWeb do
 
       # HTML escaping functionality
       import Phoenix.HTML
-      # Core UI components
-      use LongWeb.Components.MishkaComponents
+      # Core UI components — Petal Components (button, badge, card, modal, icon,
+      # alert, table, inputs, …). Flash is Phoenix-specific (Petal has none) so
+      # it comes from CoreComponents; icon comes from Petal.
+      use PetalComponents
+      # Flash + JS show/hide come from CoreComponents (Phoenix-specific; Petal
+      # has no flash). `flash_group` stays defined in Layouts (the full version
+      # with reconnect flashes); pages call it as `Layouts.flash_group`.
+      import LongWeb.CoreComponents, only: [flash: 1, show: 1, show: 2, hide: 1, hide: 2]
 
       # Common modules used in templates
       alias Phoenix.LiveView.JS

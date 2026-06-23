@@ -30,12 +30,12 @@ defmodule LongWeb.ManageLive.MemoriesTest do
       |> element("button[phx-click='edit_session_memory'][phx-value-id='#{mem.id}']")
       |> render_click()
 
-    assert opened =~ "session-memory-edit-modal"
+    assert opened =~ "save_session_memory"
     assert opened =~ String.trim_trailing(long_value)
 
     # Save an edited value (in Chinese) + bumped importance — persists in place.
     view
-    |> form("#session-memory-edit-modal form",
+    |> form("form[phx-submit='save_session_memory']",
       memory: %{
         session_id: sess.id,
         key: "writing_pref",
