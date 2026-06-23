@@ -1241,18 +1241,17 @@ defmodule LongWeb.ManageLive do
     ~H"""
     <div class="flex h-screen bg-zinc-50 text-zinc-900">
       <aside class="w-60 border-r border-zinc-200 bg-white flex flex-col shrink-0">
-        <div class="p-4 border-b border-zinc-100">
-          <div class="flex items-center gap-2 font-semibold text-zinc-900">
-            <span class="inline-flex h-6 w-6 items-center justify-center rounded-md bg-primary-600 text-xs font-bold text-white">
+        <div class="px-4 py-4">
+          <.link navigate={~p"/"} class="group flex items-center gap-2.5" title={gettext("Back to home")}>
+            <span class="inline-flex size-8 items-center justify-center rounded-lg bg-primary-600 text-sm font-bold text-white shadow-sm shadow-primary-600/30 transition-transform group-hover:scale-105">
               L
             </span>
-            Long
-          </div>
-          <.link
-            navigate={~p"/"}
-            class="mt-2 inline-flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-800"
-          >
-            <.icon name="hero-arrow-left" class="size-3.5" /> {gettext("Back to home")}
+            <span class="flex flex-col leading-none">
+              <span class="text-[15px] font-semibold tracking-tight text-zinc-900">Long</span>
+              <span class="mt-1 text-[10px] font-medium uppercase tracking-[0.14em] text-zinc-400">
+                {gettext("Console")}
+              </span>
+            </span>
           </.link>
         </div>
         <nav class="flex-1 overflow-y-auto p-3 space-y-0.5">

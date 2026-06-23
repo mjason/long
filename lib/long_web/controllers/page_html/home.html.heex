@@ -1,48 +1,75 @@
-<div class="min-h-screen bg-zinc-100 text-zinc-900">
-  <div class="max-w-5xl mx-auto px-6 py-16">
-    <header class="mb-12">
-      <h1 class="text-3xl font-semibold tracking-tight">Long</h1>
-      <p class="mt-2 text-zinc-500">
-        Phoenix / Ash port of the GenericAgent — chat, memory, skills, and bots in one runtime.
-      </p>
+<div class="relative min-h-screen overflow-hidden bg-zinc-50 text-zinc-900">
+  <%!-- a quiet indigo wash behind the hero --%>
+  <div class="pointer-events-none absolute inset-x-0 top-0 h-72 bg-gradient-to-b from-primary-50/70 to-transparent"></div>
+
+  <div class="relative mx-auto max-w-5xl px-6 py-16 sm:py-20">
+    <header class="mb-14">
+      <div class="flex items-center gap-3.5">
+        <span class="inline-flex size-12 items-center justify-center rounded-2xl bg-primary-600 text-xl font-bold text-white shadow-lg shadow-primary-600/25">
+          L
+        </span>
+        <div class="flex items-center gap-2.5">
+          <span class="text-xl font-semibold tracking-tight">Long</span>
+          <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
+            <span class="size-1.5 rounded-full bg-emerald-500"></span> {gettext("Online")}
+          </span>
+        </div>
+      </div>
+
+      <div class="mt-7 max-w-2xl">
+        <h1 class="text-3xl font-semibold tracking-tight text-zinc-900 sm:text-[2.5rem] sm:leading-[1.1]">
+          {gettext("Your own AI, running quietly on this machine.")}
+        </h1>
+        <p class="mt-4 text-[15px] leading-relaxed text-zinc-500">
+          {gettext("Chat, memory, skills, scheduled tasks, monitors, and WeChat / Telegram bots — one private runtime for you and your people.")}
+        </p>
+      </div>
     </header>
 
-    <section class="mb-12">
-      <h2 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-3">Workspaces</h2>
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    <section class="mb-14">
+      <h2 class="mb-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-400">
+        {gettext("Workspaces")}
+      </h2>
+      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <.nav_card
           navigate={~p"/chat"}
           icon="hero-chat-bubble-left-right"
-          title="Chat"
-          desc="Talk to the agent. ReAct loop, tools, memory, scheduled tasks."
+          title={gettext("Chat")}
+          desc={gettext("Talk to your agent — tools, memory, the full loop.")}
           accent="primary"
         />
         <.nav_card
           navigate={~p"/manage"}
-          icon="hero-cog-6-tooth"
-          title="Manage"
-          desc="LLMs, memories, skills, search providers, scheduled tasks."
+          icon="hero-squares-2x2"
+          title={gettext("Manage")}
+          desc={gettext("Models, memory, skills, schedules, monitors.")}
           accent="info"
         />
         <.nav_card
           navigate={~p"/manage/credentials"}
           icon="hero-signal"
-          title="Channels"
-          desc="Connect WeChat / Telegram bots in one place."
+          title={gettext("Channels")}
+          desc={gettext("Link WeChat & Telegram in one place.")}
           accent="success"
         />
       </div>
     </section>
 
     <section>
-      <h2 class="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-3">
-        Operator dashboards
+      <h2 class="mb-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-zinc-400">
+        {gettext("Operator dashboards")}
       </h2>
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <.dev_card href="/errors" icon="hero-exclamation-triangle" title="Errors" desc="ErrorTracker dashboard" />
-        <.dev_card href="/oban" icon="hero-queue-list" title="Jobs" desc="Oban Web" />
-        <.dev_card href="/dashboard" icon="hero-chart-bar" title="Metrics" desc="LiveDashboard" />
-        <.dev_card :if={@dev_routes?} href="/admin" icon="hero-shield-check" title="Admin" desc="Ash Admin (dev only)" />
+      <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <.dev_card href="/errors" icon="hero-exclamation-triangle" title={gettext("Errors")} desc={gettext("Captured exceptions")} />
+        <.dev_card href="/oban" icon="hero-queue-list" title={gettext("Jobs")} desc={gettext("Background queue")} />
+        <.dev_card href="/dashboard" icon="hero-chart-bar" title={gettext("Metrics")} desc={gettext("Live telemetry")} />
+        <.dev_card
+          :if={@dev_routes?}
+          href="/admin"
+          icon="hero-shield-check"
+          title={gettext("Admin")}
+          desc={gettext("Data admin (dev)")}
+        />
       </div>
     </section>
   </div>

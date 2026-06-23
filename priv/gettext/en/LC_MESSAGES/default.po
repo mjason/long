@@ -17,21 +17,21 @@ msgid "Account:"
 msgstr ""
 
 #: lib/long_web/components/core_components.ex:375
-#: lib/long_web/live/manage_live.ex:1383
-#: lib/long_web/live/manage_live.ex:1478
-#: lib/long_web/live/manage_live.ex:1526
-#: lib/long_web/live/manage_live.ex:1584
-#: lib/long_web/live/manage_live.ex:1684
-#: lib/long_web/live/manage_live.ex:1779
-#: lib/long_web/live/manage_live.ex:1850
-#: lib/long_web/live/manage_live.ex:1929
-#: lib/long_web/live/manage_live.ex:2034
-#: lib/long_web/live/manage_live.ex:2087
-#: lib/long_web/live/manage_live.ex:2193
-#: lib/long_web/live/manage_live.ex:2278
-#: lib/long_web/live/manage_live.ex:2637
-#: lib/long_web/live/manage_live.ex:2859
-#: lib/long_web/live/manage_live.ex:2936
+#: lib/long_web/live/manage_live.ex:1382
+#: lib/long_web/live/manage_live.ex:1477
+#: lib/long_web/live/manage_live.ex:1525
+#: lib/long_web/live/manage_live.ex:1583
+#: lib/long_web/live/manage_live.ex:1683
+#: lib/long_web/live/manage_live.ex:1778
+#: lib/long_web/live/manage_live.ex:1849
+#: lib/long_web/live/manage_live.ex:1928
+#: lib/long_web/live/manage_live.ex:2033
+#: lib/long_web/live/manage_live.ex:2086
+#: lib/long_web/live/manage_live.ex:2192
+#: lib/long_web/live/manage_live.ex:2277
+#: lib/long_web/live/manage_live.ex:2636
+#: lib/long_web/live/manage_live.ex:2858
+#: lib/long_web/live/manage_live.ex:2935
 #, elixir-autogen, elixir-format
 msgid "Actions"
 msgstr ""
@@ -82,7 +82,7 @@ msgstr ""
 msgid "QR code expired"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1981
+#: lib/long_web/live/manage_live.ex:1980
 #: lib/long_web/live/wechat_live/login.ex:195
 #, elixir-autogen, elixir-format
 msgid "Re-login"
@@ -153,75 +153,76 @@ msgstr ""
 msgid "regenerate"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1255
+#: lib/long_web/live/manage_live.ex:1245
 #, elixir-autogen, elixir-format
 msgid "Back to home"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1913
-#: lib/long_web/live/manage_live.ex:3243
+#: lib/long_web/controllers/page_html/home.html.heex:51
+#: lib/long_web/live/manage_live.ex:1912
+#: lib/long_web/live/manage_live.ex:3242
 #, elixir-autogen, elixir-format
 msgid "Channels"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2520
-#: lib/long_web/live/manage_live.ex:3238
+#: lib/long_web/live/manage_live.ex:2519
+#: lib/long_web/live/manage_live.ex:3237
 #, elixir-autogen, elixir-format
 msgid "Groups"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:3237
+#: lib/long_web/live/manage_live.ex:3236
 #, elixir-autogen, elixir-format
 msgid "LLMs"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:3239
+#: lib/long_web/live/manage_live.ex:3238
 #, elixir-autogen, elixir-format
 msgid "Memories"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2259
-#: lib/long_web/live/manage_live.ex:3245
+#: lib/long_web/live/manage_live.ex:2258
+#: lib/long_web/live/manage_live.ex:3244
 #, elixir-autogen, elixir-format
 msgid "Monitors"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2742
-#: lib/long_web/live/manage_live.ex:3248
+#: lib/long_web/live/manage_live.ex:2741
+#: lib/long_web/live/manage_live.ex:3247
 #, elixir-autogen, elixir-format
 msgid "Phrases"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2793
-#: lib/long_web/live/manage_live.ex:3246
+#: lib/long_web/live/manage_live.ex:2792
+#: lib/long_web/live/manage_live.ex:3245
 #, elixir-autogen, elixir-format
 msgid "Reflection"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:3244
+#: lib/long_web/live/manage_live.ex:3243
 #, elixir-autogen, elixir-format
 msgid "Scheduled"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:3242
+#: lib/long_web/live/manage_live.ex:3241
 #, elixir-autogen, elixir-format
 msgid "Search"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2918
-#: lib/long_web/live/manage_live.ex:3247
+#: lib/long_web/live/manage_live.ex:2917
+#: lib/long_web/live/manage_live.ex:3246
 #, elixir-autogen, elixir-format
 msgid "Secrets"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1769
-#: lib/long_web/live/manage_live.ex:3241
+#: lib/long_web/live/manage_live.ex:1768
+#: lib/long_web/live/manage_live.ex:3240
 #, elixir-autogen, elixir-format
 msgid "Sessions"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1634
-#: lib/long_web/live/manage_live.ex:3240
+#: lib/long_web/live/manage_live.ex:1633
+#: lib/long_web/live/manage_live.ex:3239
 #, elixir-autogen, elixir-format
 msgid "Skills"
 msgstr ""
@@ -248,7 +249,7 @@ msgid "Click to rename"
 msgstr ""
 
 #: lib/long_web/live/agent_live/chat.ex:603
-#: lib/long_web/live/manage_live.ex:1814
+#: lib/long_web/live/manage_live.ex:1813
 #, elixir-autogen, elixir-format
 msgid "Delete \"%{title}\" and all its messages?"
 msgstr ""
@@ -274,18 +275,19 @@ msgid "L1 · Working memory"
 msgstr ""
 
 #: lib/long_web/live/agent_live/chat.ex:1061
-#: lib/long_web/live/manage_live.ex:1515
+#: lib/long_web/live/manage_live.ex:1514
 #, elixir-autogen, elixir-format
 msgid "L2 · Global memory"
 msgstr ""
 
+#: lib/long_web/controllers/page_html/home.html.heex:44
 #: lib/long_web/live/agent_live/chat.ex:621
 #, elixir-autogen, elixir-format
 msgid "Manage"
 msgstr ""
 
 #: lib/long_web/live/agent_live/chat.ex:647
-#: lib/long_web/live/manage_live.ex:1381
+#: lib/long_web/live/manage_live.ex:1380
 #, elixir-autogen, elixir-format
 msgid "Model"
 msgstr ""
@@ -376,903 +378,904 @@ msgstr ""
 msgid "type not accepted"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1444
-#: lib/long_web/live/manage_live.ex:1555
-#: lib/long_web/live/manage_live.ex:1610
-#: lib/long_web/live/manage_live.ex:1815
-#: lib/long_web/live/manage_live.ex:1891
-#: lib/long_web/live/manage_live.ex:1989
-#: lib/long_web/live/manage_live.ex:2052
-#: lib/long_web/live/manage_live.ex:2153
-#: lib/long_web/live/manage_live.ex:2236
-#: lib/long_web/live/manage_live.ex:2334
-#: lib/long_web/live/manage_live.ex:2622
-#: lib/long_web/live/manage_live.ex:2677
-#: lib/long_web/live/manage_live.ex:2966
+#: lib/long_web/live/manage_live.ex:1443
+#: lib/long_web/live/manage_live.ex:1554
+#: lib/long_web/live/manage_live.ex:1609
+#: lib/long_web/live/manage_live.ex:1814
+#: lib/long_web/live/manage_live.ex:1890
+#: lib/long_web/live/manage_live.ex:1988
+#: lib/long_web/live/manage_live.ex:2051
+#: lib/long_web/live/manage_live.ex:2152
+#: lib/long_web/live/manage_live.ex:2235
+#: lib/long_web/live/manage_live.ex:2333
+#: lib/long_web/live/manage_live.ex:2621
+#: lib/long_web/live/manage_live.ex:2676
+#: lib/long_web/live/manage_live.ex:2965
 #, elixir-autogen, elixir-format, fuzzy
 msgid "Delete"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1443
-#: lib/long_web/live/manage_live.ex:1554
-#: lib/long_web/live/manage_live.ex:1609
-#: lib/long_web/live/manage_live.ex:1890
-#: lib/long_web/live/manage_live.ex:2235
-#: lib/long_web/live/manage_live.ex:2333
+#: lib/long_web/live/manage_live.ex:1442
+#: lib/long_web/live/manage_live.ex:1553
+#: lib/long_web/live/manage_live.ex:1608
+#: lib/long_web/live/manage_live.ex:1889
+#: lib/long_web/live/manage_live.ex:2234
+#: lib/long_web/live/manage_live.ex:2332
 #, elixir-autogen, elixir-format
 msgid "Delete \"%{name}\"?"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1425
-#: lib/long_web/live/manage_live.ex:1872
-#: lib/long_web/live/manage_live.ex:2134
-#: lib/long_web/live/manage_live.ex:2217
-#: lib/long_web/live/manage_live.ex:2315
-#: lib/long_web/live/manage_live.ex:2888
+#: lib/long_web/live/manage_live.ex:1424
+#: lib/long_web/live/manage_live.ex:1871
+#: lib/long_web/live/manage_live.ex:2133
+#: lib/long_web/live/manage_live.ex:2216
+#: lib/long_web/live/manage_live.ex:2314
+#: lib/long_web/live/manage_live.ex:2887
 #, elixir-autogen, elixir-format
 msgid "Disable"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1434
-#: lib/long_web/live/manage_live.ex:1545
-#: lib/long_web/live/manage_live.ex:1881
-#: lib/long_web/live/manage_live.ex:2143
-#: lib/long_web/live/manage_live.ex:2226
-#: lib/long_web/live/manage_live.ex:2324
-#: lib/long_web/live/manage_live.ex:2956
+#: lib/long_web/live/manage_live.ex:1433
+#: lib/long_web/live/manage_live.ex:1544
+#: lib/long_web/live/manage_live.ex:1880
+#: lib/long_web/live/manage_live.ex:2142
+#: lib/long_web/live/manage_live.ex:2225
+#: lib/long_web/live/manage_live.ex:2323
+#: lib/long_web/live/manage_live.ex:2955
 #, elixir-autogen, elixir-format
 msgid "Edit"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1425
-#: lib/long_web/live/manage_live.ex:1872
-#: lib/long_web/live/manage_live.ex:2134
-#: lib/long_web/live/manage_live.ex:2217
-#: lib/long_web/live/manage_live.ex:2315
-#: lib/long_web/live/manage_live.ex:2888
+#: lib/long_web/live/manage_live.ex:1424
+#: lib/long_web/live/manage_live.ex:1871
+#: lib/long_web/live/manage_live.ex:2133
+#: lib/long_web/live/manage_live.ex:2216
+#: lib/long_web/live/manage_live.ex:2314
+#: lib/long_web/live/manage_live.ex:2887
 #, elixir-autogen, elixir-format
 msgid "Enable"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2273
+#: lib/long_web/live/manage_live.ex:2272
 #, elixir-autogen, elixir-format
 msgid "Every"
-msgstr ""
-
-#: lib/long_web/live/manage_live.ex:2192
-#: lib/long_web/live/manage_live.ex:2277
-#, elixir-autogen, elixir-format
-msgid "Last run"
-msgstr ""
-
-#: lib/long_web/live/manage_live.ex:2275
-#, elixir-autogen, elixir-format
-msgid "Last status"
-msgstr ""
-
-#: lib/long_web/live/manage_live.ex:1678
-#: lib/long_web/live/manage_live.ex:2081
-#: lib/long_web/live/manage_live.ex:2187
-#: lib/long_web/live/manage_live.ex:2272
-#: lib/long_web/live/manage_live.ex:2695
-#: lib/long_web/live/manage_live.ex:2932
-#: lib/long_web/live/manage_live.ex:3712
-#, elixir-autogen, elixir-format
-msgid "Name"
-msgstr ""
-
-#: lib/long_web/live/manage_live.ex:2264
-#: lib/long_web/live/manage_live.ex:2367
-#, elixir-autogen, elixir-format
-msgid "New monitor"
 msgstr ""
 
 #: lib/long_web/live/manage_live.ex:2191
 #: lib/long_web/live/manage_live.ex:2276
 #, elixir-autogen, elixir-format
-msgid "Next run"
-msgstr ""
-
-#: lib/long_web/live/manage_live.ex:2343
-#, elixir-autogen, elixir-format
-msgid "No monitors yet. Click \"New monitor\", or let the agent create one."
+msgid "Last run"
 msgstr ""
 
 #: lib/long_web/live/manage_live.ex:2274
 #, elixir-autogen, elixir-format
+msgid "Last status"
+msgstr ""
+
+#: lib/long_web/live/manage_live.ex:1677
+#: lib/long_web/live/manage_live.ex:2080
+#: lib/long_web/live/manage_live.ex:2186
+#: lib/long_web/live/manage_live.ex:2271
+#: lib/long_web/live/manage_live.ex:2694
+#: lib/long_web/live/manage_live.ex:2931
+#: lib/long_web/live/manage_live.ex:3711
+#, elixir-autogen, elixir-format
+msgid "Name"
+msgstr ""
+
+#: lib/long_web/live/manage_live.ex:2263
+#: lib/long_web/live/manage_live.ex:2366
+#, elixir-autogen, elixir-format
+msgid "New monitor"
+msgstr ""
+
+#: lib/long_web/live/manage_live.ex:2190
+#: lib/long_web/live/manage_live.ex:2275
+#, elixir-autogen, elixir-format
+msgid "Next run"
+msgstr ""
+
+#: lib/long_web/live/manage_live.ex:2342
+#, elixir-autogen, elixir-format
+msgid "No monitors yet. Click \"New monitor\", or let the agent create one."
+msgstr ""
+
+#: lib/long_web/live/manage_live.ex:2273
+#, elixir-autogen, elixir-format
 msgid "On"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2306
-#: lib/long_web/live/manage_live.ex:2879
+#: lib/long_web/live/manage_live.ex:2305
+#: lib/long_web/live/manage_live.ex:2878
 #, elixir-autogen, elixir-format
 msgid "Run now"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2261
+#: lib/long_web/live/manage_live.ex:2260
 #, elixir-autogen, elixir-format
 msgid "Scripts that run on an interval and notify only when there's something. ⚡ runs one now."
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2205
-#: lib/long_web/live/manage_live.ex:2289
-#: lib/long_web/live/manage_live.ex:2811
+#: lib/long_web/live/manage_live.ex:2204
+#: lib/long_web/live/manage_live.ex:2288
+#: lib/long_web/live/manage_live.ex:2810
 #, elixir-autogen, elixir-format
 msgid "off"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2205
-#: lib/long_web/live/manage_live.ex:2289
-#: lib/long_web/live/manage_live.ex:2811
+#: lib/long_web/live/manage_live.ex:2204
+#: lib/long_web/live/manage_live.ex:2288
+#: lib/long_web/live/manage_live.ex:2810
 #, elixir-autogen, elixir-format
 msgid "on"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2179
+#: lib/long_web/live/manage_live.ex:2178
 #, elixir-autogen, elixir-format
 msgid "New task"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2245
+#: lib/long_web/live/manage_live.ex:2244
 #, elixir-autogen, elixir-format
 msgid "No scheduled tasks. Click \"New task\" to add one, or let the agent schedule them."
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2189
+#: lib/long_web/live/manage_live.ex:2188
 #, elixir-autogen, elixir-format
 msgid "Prompt"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2188
+#: lib/long_web/live/manage_live.ex:2187
 #, elixir-autogen, elixir-format
 msgid "Repeat"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2177
+#: lib/long_web/live/manage_live.ex:2176
 #, elixir-autogen, elixir-format, fuzzy
 msgid "Scheduled tasks"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1382
-#: lib/long_web/live/manage_live.ex:1775
-#: lib/long_web/live/manage_live.ex:1848
-#: lib/long_web/live/manage_live.ex:1926
-#: lib/long_web/live/manage_live.ex:2086
-#: lib/long_web/live/manage_live.ex:2190
-#: lib/long_web/live/manage_live.ex:2858
+#: lib/long_web/live/manage_live.ex:1381
+#: lib/long_web/live/manage_live.ex:1774
+#: lib/long_web/live/manage_live.ex:1847
+#: lib/long_web/live/manage_live.ex:1925
+#: lib/long_web/live/manage_live.ex:2085
+#: lib/long_web/live/manage_live.ex:2189
+#: lib/long_web/live/manage_live.ex:2857
 #, elixir-autogen, elixir-format, fuzzy
 msgid "Status"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1823
+#: lib/long_web/live/manage_live.ex:1822
 #, elixir-autogen, elixir-format, fuzzy
 msgid "(no sessions)"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1805
+#: lib/long_web/live/manage_live.ex:1804
 #, elixir-autogen, elixir-format
 msgid "Archive"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1778
+#: lib/long_web/live/manage_live.ex:1777
 #, elixir-autogen, elixir-format
 msgid "Created"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2965
+#: lib/long_web/live/manage_live.ex:2964
 #, elixir-autogen, elixir-format, fuzzy
 msgid "Delete secret \"%{name}\"?"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1680
-#: lib/long_web/live/manage_live.ex:2934
+#: lib/long_web/live/manage_live.ex:1679
+#: lib/long_web/live/manage_live.ex:2933
 #, elixir-autogen, elixir-format
 msgid "Description"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2925
+#: lib/long_web/live/manage_live.ex:2924
 #, elixir-autogen, elixir-format
 msgid "Flat key/value store for tokens the agent needs at tool-call time. Stored plaintext (LAN-only) but kept out of memory + chat history. The agent reads these via the graphql tool."
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1776
+#: lib/long_web/live/manage_live.ex:1775
 #, elixir-autogen, elixir-format, fuzzy
 msgid "LLM"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2920
-#: lib/long_web/live/manage_live.ex:3585
+#: lib/long_web/live/manage_live.ex:2919
+#: lib/long_web/live/manage_live.ex:3584
 #, elixir-autogen, elixir-format
 msgid "New secret"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2975
+#: lib/long_web/live/manage_live.ex:2974
 #, elixir-autogen, elixir-format
 msgid "No secrets yet. Click \"New secret\" to add a token."
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1774
+#: lib/long_web/live/manage_live.ex:1773
 #, elixir-autogen, elixir-format
 msgid "Title"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1777
+#: lib/long_web/live/manage_live.ex:1776
 #, elixir-autogen, elixir-format
 msgid "Tokens"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2935
+#: lib/long_web/live/manage_live.ex:2934
 #, elixir-autogen, elixir-format
 msgid "Updated"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1524
-#: lib/long_web/live/manage_live.ex:1583
-#: lib/long_web/live/manage_live.ex:2933
+#: lib/long_web/live/manage_live.ex:1523
+#: lib/long_web/live/manage_live.ex:1582
+#: lib/long_web/live/manage_live.ex:2932
 #, elixir-autogen, elixir-format
 msgid "Value"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2773
+#: lib/long_web/live/manage_live.ex:2772
 #, elixir-autogen, elixir-format
 msgid "(uses default)"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2753
+#: lib/long_web/live/manage_live.ex:2752
 #, elixir-autogen, elixir-format
 msgid "Built-in default"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1523
-#: lib/long_web/live/manage_live.ex:1582
-#: lib/long_web/live/manage_live.ex:2751
+#: lib/long_web/live/manage_live.ex:1522
+#: lib/long_web/live/manage_live.ex:1581
+#: lib/long_web/live/manage_live.ex:2750
 #, elixir-autogen, elixir-format
 msgid "Key"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2752
+#: lib/long_web/live/manage_live.ex:2751
 #, elixir-autogen, elixir-format
 msgid "Locale"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2754
+#: lib/long_web/live/manage_live.ex:2753
 #, elixir-autogen, elixir-format
 msgid "Override"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2509
-#: lib/long_web/live/manage_live.ex:2776
-#: lib/long_web/live/manage_live.ex:3108
-#: lib/long_web/live/manage_live.ex:3173
-#: lib/long_web/live/manage_live.ex:3226
-#: lib/long_web/live/manage_live.ex:3469
-#: lib/long_web/live/manage_live.ex:3572
-#: lib/long_web/live/manage_live.ex:3624
-#: lib/long_web/live/manage_live.ex:3758
+#: lib/long_web/live/manage_live.ex:2508
+#: lib/long_web/live/manage_live.ex:2775
+#: lib/long_web/live/manage_live.ex:3107
+#: lib/long_web/live/manage_live.ex:3172
+#: lib/long_web/live/manage_live.ex:3225
+#: lib/long_web/live/manage_live.ex:3468
+#: lib/long_web/live/manage_live.ex:3571
+#: lib/long_web/live/manage_live.ex:3623
+#: lib/long_web/live/manage_live.ex:3757
 #, elixir-autogen, elixir-format
 msgid "Save"
+msgstr ""
+
+#: lib/long_web/live/manage_live.ex:1377
+#: lib/long_web/live/manage_live.ex:1845
+#, elixir-autogen, elixir-format
+msgid "Alias"
+msgstr ""
+
+#: lib/long_web/live/manage_live.ex:1367
+#, elixir-autogen, elixir-format
+msgid "LLM configurations"
+msgstr ""
+
+#: lib/long_web/live/manage_live.ex:1394
+#, elixir-autogen, elixir-format
+msgid "Legacy row — set provider + wire_protocol via Edit."
+msgstr ""
+
+#: lib/long_web/live/manage_live.ex:1369
+#, elixir-autogen, elixir-format
+msgid "New LLM"
+msgstr ""
+
+#: lib/long_web/live/manage_live.ex:1837
+#, elixir-autogen, elixir-format
+msgid "New provider"
+msgstr ""
+
+#: lib/long_web/live/manage_live.ex:1452
+#, elixir-autogen, elixir-format
+msgid "No LLM configurations yet. Click \"New LLM\" above to add one."
+msgstr ""
+
+#: lib/long_web/live/manage_live.ex:1899
+#, elixir-autogen, elixir-format
+msgid "No search providers. Click \"New provider\" to add Tavily or Brave."
 msgstr ""
 
 #: lib/long_web/live/manage_live.ex:1378
 #: lib/long_web/live/manage_live.ex:1846
 #, elixir-autogen, elixir-format
-msgid "Alias"
-msgstr ""
-
-#: lib/long_web/live/manage_live.ex:1368
-#, elixir-autogen, elixir-format
-msgid "LLM configurations"
-msgstr ""
-
-#: lib/long_web/live/manage_live.ex:1395
-#, elixir-autogen, elixir-format
-msgid "Legacy row — set provider + wire_protocol via Edit."
-msgstr ""
-
-#: lib/long_web/live/manage_live.ex:1370
-#, elixir-autogen, elixir-format
-msgid "New LLM"
-msgstr ""
-
-#: lib/long_web/live/manage_live.ex:1838
-#, elixir-autogen, elixir-format
-msgid "New provider"
-msgstr ""
-
-#: lib/long_web/live/manage_live.ex:1453
-#, elixir-autogen, elixir-format
-msgid "No LLM configurations yet. Click \"New LLM\" above to add one."
-msgstr ""
-
-#: lib/long_web/live/manage_live.ex:1900
-#, elixir-autogen, elixir-format
-msgid "No search providers. Click \"New provider\" to add Tavily or Brave."
-msgstr ""
-
-#: lib/long_web/live/manage_live.ex:1379
-#: lib/long_web/live/manage_live.ex:1847
-#, elixir-autogen, elixir-format
 msgid "Provider"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1836
+#: lib/long_web/live/manage_live.ex:1835
 #, elixir-autogen, elixir-format
 msgid "Search providers"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1416
+#: lib/long_web/live/manage_live.ex:1415
 #, elixir-autogen, elixir-format
 msgid "Set as default"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1849
+#: lib/long_web/live/manage_live.ex:1848
 #, elixir-autogen, elixir-format
 msgid "Sort"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1380
+#: lib/long_web/live/manage_live.ex:1379
 #, elixir-autogen, elixir-format
 msgid "Wire"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1405
-#: lib/long_web/live/manage_live.ex:1861
-#: lib/long_web/live/manage_live.ex:2869
+#: lib/long_web/live/manage_live.ex:1404
+#: lib/long_web/live/manage_live.ex:1860
+#: lib/long_web/live/manage_live.ex:2868
 #, elixir-autogen, elixir-format, fuzzy
 msgid "disabled"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1405
-#: lib/long_web/live/manage_live.ex:1861
-#: lib/long_web/live/manage_live.ex:2124
-#: lib/long_web/live/manage_live.ex:2869
+#: lib/long_web/live/manage_live.ex:1404
+#: lib/long_web/live/manage_live.ex:1860
+#: lib/long_web/live/manage_live.ex:2123
+#: lib/long_web/live/manage_live.ex:2868
 #, elixir-autogen, elixir-format, fuzzy
 msgid "enabled"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1505
+#: lib/long_web/live/manage_live.ex:1504
 #, elixir-autogen, elixir-format
 msgid "(no checkpoints)"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1564
+#: lib/long_web/live/manage_live.ex:1563
 #, elixir-autogen, elixir-format
 msgid "(no global memory)"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1619
+#: lib/long_web/live/manage_live.ex:1618
 #, elixir-autogen, elixir-format, fuzzy
 msgid "(no session memory)"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1499
+#: lib/long_web/live/manage_live.ex:1498
 #, elixir-autogen, elixir-format
 msgid "Clear"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1497
+#: lib/long_web/live/manage_live.ex:1496
 #, elixir-autogen, elixir-format
 msgid "Clear this session's working checkpoint?"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1761
+#: lib/long_web/live/manage_live.ex:1760
 #, elixir-autogen, elixir-format
 msgid "Coming soon."
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1643
+#: lib/long_web/live/manage_live.ex:1642
 #, elixir-autogen, elixir-format
 msgid "Create a shared skill — visible to every member of every group (separate from members' personal skills)."
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1668
+#: lib/long_web/live/manage_live.ex:1667
 #, elixir-autogen, elixir-format
 msgid "Create shared skill"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1600
+#: lib/long_web/live/manage_live.ex:1599
 #, elixir-autogen, elixir-format
 msgid "Edit / view full"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1752
+#: lib/long_web/live/manage_live.ex:1751
 #, elixir-autogen, elixir-format
 msgid "Global"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1525
+#: lib/long_web/live/manage_live.ex:1524
 #, elixir-autogen, elixir-format
 msgid "Imp"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1522
-#: lib/long_web/live/manage_live.ex:1581
+#: lib/long_web/live/manage_live.ex:1521
+#: lib/long_web/live/manage_live.ex:1580
 #, elixir-autogen, elixir-format
 msgid "Kind"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1470
+#: lib/long_web/live/manage_live.ex:1469
 #, elixir-autogen, elixir-format, fuzzy
 msgid "L1 · Working checkpoints"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1574
+#: lib/long_web/live/manage_live.ex:1573
 #, elixir-autogen, elixir-format
 msgid "L2 · Session memory"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1466
+#: lib/long_web/live/manage_live.ex:1465
 #, elixir-autogen, elixir-format
 msgid "Memory editor"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1732
+#: lib/long_web/live/manage_live.ex:1731
 #, elixir-autogen, elixir-format
 msgid "No skills found. Drop a SKILL.md into the skills directory and hit Reindex."
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1682
+#: lib/long_web/live/manage_live.ex:1681
 #, elixir-autogen, elixir-format
 msgid "Path"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1749
+#: lib/long_web/live/manage_live.ex:1748
 #, elixir-autogen, elixir-format
 msgid "Personal"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1723
+#: lib/long_web/live/manage_live.ex:1722
 #, elixir-autogen, elixir-format
 msgid "Promote personal skill \"%{name}\" to global? Every member can use it; the directory moves to the global space."
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1725
+#: lib/long_web/live/manage_live.ex:1724
 #, elixir-autogen, elixir-format
 msgid "Promote to global"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1637
+#: lib/long_web/live/manage_live.ex:1636
 #, elixir-autogen, elixir-format
 msgid "Reindex"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1663
+#: lib/long_web/live/manage_live.ex:1662
 #, elixir-autogen, elixir-format
 msgid "SKILL.md instructions (markdown)…"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1521
-#: lib/long_web/live/manage_live.ex:1679
+#: lib/long_web/live/manage_live.ex:1520
+#: lib/long_web/live/manage_live.ex:1678
 #, elixir-autogen, elixir-format
 msgid "Scope"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1476
-#: lib/long_web/live/manage_live.ex:1580
-#: lib/long_web/live/manage_live.ex:2855
+#: lib/long_web/live/manage_live.ex:1475
+#: lib/long_web/live/manage_live.ex:1579
+#: lib/long_web/live/manage_live.ex:2854
 #, elixir-autogen, elixir-format, fuzzy
 msgid "Session"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1681
+#: lib/long_web/live/manage_live.ex:1680
 #, elixir-autogen, elixir-format
 msgid "Tags"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1683
+#: lib/long_web/live/manage_live.ex:1682
 #, elixir-autogen, elixir-format
 msgid "Used"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1713
+#: lib/long_web/live/manage_live.ex:1712
 #, elixir-autogen, elixir-format
 msgid "View"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1650
+#: lib/long_web/live/manage_live.ex:1649
 #, elixir-autogen, elixir-format
 msgid "name (e.g. daily-standup)"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1656
+#: lib/long_web/live/manage_live.ex:1655
 #, elixir-autogen, elixir-format
 msgid "one-line description"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1749
+#: lib/long_web/live/manage_live.ex:1748
 #, elixir-autogen, elixir-format, fuzzy
 msgid "unknown"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2856
+#: lib/long_web/live/manage_live.ex:2855
 #, elixir-autogen, elixir-format
 msgid "At"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2828
+#: lib/long_web/live/manage_live.ex:2827
 #, elixir-autogen, elixir-format
 msgid "Minute is spread per session to avoid a thundering herd."
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2857
+#: lib/long_web/live/manage_live.ex:2856
 #, elixir-autogen, elixir-format, fuzzy
 msgid "Next run (UTC)"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2897
+#: lib/long_web/live/manage_live.ex:2896
 #, elixir-autogen, elixir-format
 msgid "No reflection tasks yet — one is created automatically after a session's first real conversation (when reflection is on)."
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2807
+#: lib/long_web/live/manage_live.ex:2806
 #, elixir-autogen, elixir-format
 msgid "Off — no session reflects and none are auto-enrolled."
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2826
+#: lib/long_web/live/manage_live.ex:2825
 #, elixir-autogen, elixir-format
 msgid "Off-peak hour (UTC)"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2806
+#: lib/long_web/live/manage_live.ex:2805
 #, elixir-autogen, elixir-format
 msgid "On — sessions reflect daily; new ones are auto-enrolled after their first conversation."
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2803
+#: lib/long_web/live/manage_live.ex:2802
 #, elixir-autogen, elixir-format
 msgid "Silent reflection"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2795
+#: lib/long_web/live/manage_live.ex:2794
 #, elixir-autogen, elixir-format
 msgid "Silent reflection: off-peak, each session's agent quietly consolidates its own memory and never messages anyone. System-managed, kept out of the Scheduled list on purpose."
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2820
+#: lib/long_web/live/manage_live.ex:2819
 #, elixir-autogen, elixir-format
 msgid "Turn off"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2820
+#: lib/long_web/live/manage_live.ex:2819
 #, elixir-autogen, elixir-format
 msgid "Turn on"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2060
+#: lib/long_web/live/manage_live.ex:2059
 #, elixir-autogen, elixir-format
 msgid "(no bot users)"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1925
+#: lib/long_web/live/manage_live.ex:1924
 #, elixir-autogen, elixir-format, fuzzy
 msgid "Account"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2018
+#: lib/long_web/live/manage_live.ex:2017
 #, elixir-autogen, elixir-format
 msgid "Add & scan"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2025
+#: lib/long_web/live/manage_live.ex:2024
 #, elixir-autogen, elixir-format
 msgid "Bot users"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2033
+#: lib/long_web/controllers/page_html/home.html.heex:37
+#: lib/long_web/live/manage_live.ex:2032
 #, elixir-autogen, elixir-format
 msgid "Chat"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1918
+#: lib/long_web/live/manage_live.ex:1917
 #, elixir-autogen, elixir-format
 msgid "Connect one or more WeChat accounts. Assign each to a group member so every message arriving on that account runs as that role."
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2152
+#: lib/long_web/live/manage_live.ex:2151
 #, elixir-autogen, elixir-format
 msgid "Delete Telegram credential \"%{name}\"?"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1988
+#: lib/long_web/live/manage_live.ex:1987
 #, elixir-autogen, elixir-format
 msgid "Delete WeChat account \"%{name}\"? You'll need to scan again to reconnect."
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2051
+#: lib/long_web/live/manage_live.ex:2050
 #, elixir-autogen, elixir-format, fuzzy
 msgid "Delete bot user \"%{name}\"?"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2032
+#: lib/long_web/live/manage_live.ex:2031
 #, elixir-autogen, elixir-format
 msgid "Display"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2031
+#: lib/long_web/live/manage_live.ex:2030
 #, elixir-autogen, elixir-format
 msgid "External id"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1928
-#: lib/long_web/live/manage_live.ex:2084
-#: lib/long_web/live/manage_live.ex:2634
+#: lib/long_web/live/manage_live.ex:1927
+#: lib/long_web/live/manage_live.ex:2083
+#: lib/long_web/live/manage_live.ex:2633
 #, elixir-autogen, elixir-format
 msgid "Language"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1927
-#: lib/long_web/live/manage_live.ex:2083
+#: lib/long_web/live/manage_live.ex:1926
+#: lib/long_web/live/manage_live.ex:2082
 #, elixir-autogen, elixir-format
 msgid "Member (role)"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2074
-#: lib/long_web/live/manage_live.ex:3709
+#: lib/long_web/live/manage_live.ex:2073
+#: lib/long_web/live/manage_live.ex:3708
 #, elixir-autogen, elixir-format
 msgid "New Telegram bot"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2009
+#: lib/long_web/live/manage_live.ex:2008
 #, elixir-autogen, elixir-format
 msgid "New account name"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2162
+#: lib/long_web/live/manage_live.ex:2161
 #, elixir-autogen, elixir-format
 msgid "No Telegram credentials. Click \"New Telegram bot\" and paste a BotFather token."
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1998
+#: lib/long_web/live/manage_live.ex:1997
 #, elixir-autogen, elixir-format
 msgid "No WeChat accounts yet — add one below."
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2030
+#: lib/long_web/live/manage_live.ex:2029
 #, elixir-autogen, elixir-format
 msgid "Platform"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1981
+#: lib/long_web/live/manage_live.ex:1980
 #, elixir-autogen, elixir-format
 msgid "Scan"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2085
+#: lib/long_web/live/manage_live.ex:2084
 #, elixir-autogen, elixir-format, fuzzy
 msgid "Token"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2082
+#: lib/long_web/live/manage_live.ex:2081
 #, elixir-autogen, elixir-format
 msgid "Username"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1916
+#: lib/long_web/live/manage_live.ex:1915
 #, elixir-autogen, elixir-format
 msgid "WeChat accounts"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1938
+#: lib/long_web/live/manage_live.ex:1937
 #, elixir-autogen, elixir-format, fuzzy
 msgid "connected"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2013
+#: lib/long_web/live/manage_live.ex:2012
 #, elixir-autogen, elixir-format
 msgid "e.g. dad-phone"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1938
+#: lib/long_web/live/manage_live.ex:1937
 #, elixir-autogen, elixir-format
 msgid "no token"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2124
+#: lib/long_web/live/manage_live.ex:2123
 #, elixir-autogen, elixir-format
 msgid "paused"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1967
-#: lib/long_web/live/manage_live.ex:2116
-#: lib/long_web/live/manage_live.ex:2534
-#: lib/long_web/live/manage_live.ex:2612
-#: lib/long_web/live/manage_live.ex:2649
+#: lib/long_web/live/manage_live.ex:1966
+#: lib/long_web/live/manage_live.ex:2115
+#: lib/long_web/live/manage_live.ex:2533
+#: lib/long_web/live/manage_live.ex:2611
+#: lib/long_web/live/manage_live.ex:2648
 #, elixir-autogen, elixir-format
 msgid "— inherit —"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:1952
-#: lib/long_web/live/manage_live.ex:2101
+#: lib/long_web/live/manage_live.ex:1951
+#: lib/long_web/live/manage_live.ex:2100
 #, elixir-autogen, elixir-format
 msgid "— unassigned —"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2716
+#: lib/long_web/live/manage_live.ex:2715
 #, elixir-autogen, elixir-format
 msgid "Add member"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2635
+#: lib/long_web/live/manage_live.ex:2634
 #, elixir-autogen, elixir-format
 msgid "Bind command"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2636
+#: lib/long_web/live/manage_live.ex:2635
 #, elixir-autogen, elixir-format
 msgid "Bound accounts"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2599
+#: lib/long_web/live/manage_live.ex:2598
 #, elixir-autogen, elixir-format, fuzzy
 msgid "Create"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2608
+#: lib/long_web/live/manage_live.ex:2607
 #, elixir-autogen, elixir-format
 msgid "Default language"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2621
+#: lib/long_web/live/manage_live.ex:2620
 #, elixir-autogen, elixir-format
 msgid "Delete group \"%{name}\"? Its members and their bindings are removed too."
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2676
+#: lib/long_web/live/manage_live.ex:2675
 #, elixir-autogen, elixir-format, fuzzy
 msgid "Delete member \"%{name}\"?"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2546
+#: lib/long_web/live/manage_live.ex:2545
 #, elixir-autogen, elixir-format
 msgid "How the agent reads your local time when scheduling reminders (e.g. \"remind me at 8:30am\"). It also picks this up when you tell it where you are."
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2631
-#: lib/long_web/live/manage_live.ex:2731
+#: lib/long_web/live/manage_live.ex:2630
+#: lib/long_web/live/manage_live.ex:2730
 #, elixir-autogen, elixir-format, fuzzy
 msgid "Member"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2590
+#: lib/long_web/live/manage_live.ex:2589
 #, elixir-autogen, elixir-format
 msgid "New group"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2722
+#: lib/long_web/live/manage_live.ex:2721
 #, elixir-autogen, elixir-format
 msgid "No groups yet — create one above."
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2686
+#: lib/long_web/live/manage_live.ex:2685
 #, elixir-autogen, elixir-format
 msgid "No members yet — add one below."
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2737
+#: lib/long_web/live/manage_live.ex:2736
 #, elixir-autogen, elixir-format
 msgid "Not bound"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2662
+#: lib/long_web/live/manage_live.ex:2661
 #, elixir-autogen, elixir-format
 msgid "Regenerate bind code"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2632
-#: lib/long_web/live/manage_live.ex:2704
+#: lib/long_web/live/manage_live.ex:2631
+#: lib/long_web/live/manage_live.ex:2703
 #, elixir-autogen, elixir-format, fuzzy
 msgid "Relation"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2633
-#: lib/long_web/live/manage_live.ex:2710
+#: lib/long_web/live/manage_live.ex:2632
+#: lib/long_web/live/manage_live.ex:2709
 #, elixir-autogen, elixir-format
 msgid "Role"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2730
+#: lib/long_web/live/manage_live.ex:2729
 #, elixir-autogen, elixir-format
 msgid "Self"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2526
+#: lib/long_web/live/manage_live.ex:2525
 #, elixir-autogen, elixir-format
 msgid "System default language"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2544
+#: lib/long_web/live/manage_live.ex:2543
 #, elixir-autogen, elixir-format
 msgid "System timezone"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2528
+#: lib/long_web/live/manage_live.ex:2527
 #, elixir-autogen, elixir-format
 msgid "The fallback used when a channel, member, or group sets no language of its own."
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2699
+#: lib/long_web/live/manage_live.ex:2698
 #, elixir-autogen, elixir-format
 msgid "e.g. Alex"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2594
+#: lib/long_web/live/manage_live.ex:2593
 #, elixir-autogen, elixir-format
 msgid "e.g. My Home"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2557
+#: lib/long_web/live/manage_live.ex:2556
 #, elixir-autogen, elixir-format
 msgid "now: %{tz} — type to change"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:3728
+#: lib/long_web/live/manage_live.ex:3727
 #, elixir-autogen, elixir-format
 msgid "Bot token (from @BotFather)"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:3698
+#: lib/long_web/live/manage_live.ex:3697
 #, elixir-autogen, elixir-format, fuzzy
 msgid "Cancel"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2367
-#: lib/long_web/live/manage_live.ex:3013
-#: lib/long_web/live/manage_live.ex:3406
-#: lib/long_web/live/manage_live.ex:3485
-#: lib/long_web/live/manage_live.ex:3585
-#: lib/long_web/live/manage_live.ex:3709
+#: lib/long_web/live/manage_live.ex:2366
+#: lib/long_web/live/manage_live.ex:3012
+#: lib/long_web/live/manage_live.ex:3405
+#: lib/long_web/live/manage_live.ex:3484
+#: lib/long_web/live/manage_live.ex:3584
+#: lib/long_web/live/manage_live.ex:3708
 #, elixir-autogen, elixir-format
 msgid "Edit %{name}"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2505
+#: lib/long_web/live/manage_live.ex:2504
 #, elixir-autogen, elixir-format, fuzzy
 msgid "Enabled"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:3754
+#: lib/long_web/live/manage_live.ex:3753
 #, elixir-autogen, elixir-format
 msgid "Enabled (worker long-polls Telegram)"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:3722
+#: lib/long_web/live/manage_live.ex:3721
 #, elixir-autogen, elixir-format
 msgid "Single-bot deployments leave this as \"default\"."
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:3742
+#: lib/long_web/live/manage_live.ex:3741
 #, elixir-autogen, elixir-format
 msgid "Username (optional, e.g. @my_long_bot)"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:3121
-#: lib/long_web/live/manage_live.ex:3182
+#: lib/long_web/live/manage_live.ex:3120
+#: lib/long_web/live/manage_live.ex:3181
 #, elixir-autogen, elixir-format, fuzzy
 msgid "Edit \"%{name}\""
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:3013
+#: lib/long_web/live/manage_live.ex:3012
 #, elixir-autogen, elixir-format, fuzzy
 msgid "New LLM configuration"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:3485
+#: lib/long_web/live/manage_live.ex:3484
 #, elixir-autogen, elixir-format
 msgid "New scheduled task"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:3406
+#: lib/long_web/live/manage_live.ex:3405
 #, elixir-autogen, elixir-format
 msgid "New search provider"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:3635
+#: lib/long_web/live/manage_live.ex:3634
 #, elixir-autogen, elixir-format
 msgid "Skill · %{name}"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:3774
+#: lib/long_web/live/manage_live.ex:3773
 #, elixir-autogen, elixir-format
 msgid "WeChat login — %{name}"
 msgstr ""
@@ -1292,7 +1295,92 @@ msgstr ""
 msgid "thinking…"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:2744
+#: lib/long_web/live/manage_live.ex:2743
 #, elixir-autogen, elixir-format, fuzzy
 msgid "Central catalog of bot / system copy, per locale. Each phrase has a built-in default; set an override here to customize the wording. Placeholder tokens are filled at runtime — keep them. Leave an override blank to fall back to the default."
+msgstr ""
+
+#: lib/long_web/controllers/page_html/home.html.heex:70
+#, elixir-autogen, elixir-format
+msgid "Admin"
+msgstr ""
+
+#: lib/long_web/controllers/page_html/home.html.heex:64
+#, elixir-autogen, elixir-format
+msgid "Background queue"
+msgstr ""
+
+#: lib/long_web/controllers/page_html/home.html.heex:63
+#, elixir-autogen, elixir-format
+msgid "Captured exceptions"
+msgstr ""
+
+#: lib/long_web/controllers/page_html/home.html.heex:24
+#, elixir-autogen, elixir-format
+msgid "Chat, memory, skills, scheduled tasks, monitors, and WeChat / Telegram bots — one private runtime for you and your people."
+msgstr ""
+
+#: lib/long_web/live/manage_live.ex:1252
+#, elixir-autogen, elixir-format
+msgid "Console"
+msgstr ""
+
+#: lib/long_web/controllers/page_html/home.html.heex:71
+#, elixir-autogen, elixir-format
+msgid "Data admin (dev)"
+msgstr ""
+
+#: lib/long_web/controllers/page_html/home.html.heex:63
+#, elixir-autogen, elixir-format
+msgid "Errors"
+msgstr ""
+
+#: lib/long_web/controllers/page_html/home.html.heex:64
+#, elixir-autogen, elixir-format
+msgid "Jobs"
+msgstr ""
+
+#: lib/long_web/controllers/page_html/home.html.heex:52
+#, elixir-autogen, elixir-format
+msgid "Link WeChat & Telegram in one place."
+msgstr ""
+
+#: lib/long_web/controllers/page_html/home.html.heex:65
+#, elixir-autogen, elixir-format
+msgid "Live telemetry"
+msgstr ""
+
+#: lib/long_web/controllers/page_html/home.html.heex:65
+#, elixir-autogen, elixir-format
+msgid "Metrics"
+msgstr ""
+
+#: lib/long_web/controllers/page_html/home.html.heex:45
+#, elixir-autogen, elixir-format
+msgid "Models, memory, skills, schedules, monitors."
+msgstr ""
+
+#: lib/long_web/controllers/page_html/home.html.heex:14
+#, elixir-autogen, elixir-format
+msgid "Online"
+msgstr ""
+
+#: lib/long_web/controllers/page_html/home.html.heex:60
+#, elixir-autogen, elixir-format
+msgid "Operator dashboards"
+msgstr ""
+
+#: lib/long_web/controllers/page_html/home.html.heex:38
+#, elixir-autogen, elixir-format
+msgid "Talk to your agent — tools, memory, the full loop."
+msgstr ""
+
+#: lib/long_web/controllers/page_html/home.html.heex:31
+#, elixir-autogen, elixir-format
+msgid "Workspaces"
+msgstr ""
+
+#: lib/long_web/controllers/page_html/home.html.heex:21
+#, elixir-autogen, elixir-format
+msgid "Your own AI, running quietly on this machine."
 msgstr ""
