@@ -1002,9 +1002,9 @@ defmodule LongWeb.AgentLive.Chat do
           </div>
         </div>
 
-        <div class="flex items-end gap-2">
+        <div class="flex items-end gap-1.5 rounded-2xl border border-zinc-300 bg-white px-2 py-1.5 shadow-sm transition focus-within:border-primary-400 focus-within:ring-2 focus-within:ring-primary-100">
           <label
-            class="shrink-0 size-[50px] flex items-center justify-center rounded-2xl border border-zinc-300 text-zinc-500 hover:bg-zinc-50 cursor-pointer"
+            class="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-xl text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-600"
             title={gettext("Attach images or files")}
           >
             <.icon name="hero-paper-clip" class="size-5" />
@@ -1019,23 +1019,21 @@ defmodule LongWeb.AgentLive.Chat do
                 do: gettext("Working…"),
                 else: gettext("Send a message  (Enter to send · Shift+Enter for newline)")
             }
-            class="flex-1 resize-none border border-zinc-300 rounded-2xl px-4 py-3 leading-relaxed bg-white focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none max-h-60"
+            class="max-h-60 flex-1 resize-none bg-transparent px-1 py-2 text-[15px] leading-relaxed outline-none placeholder:text-zinc-400"
             autofocus
           ></textarea>
 
-          <Button.icon_button
+          <button
             type="submit"
             disabled={@loop_running?}
-            color={if @loop_running?, do: "gray", else: "primary"}
-            radius="full"
-            class="!h-[50px] !w-[50px] shrink-0"
+            class="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary-600 text-white shadow-sm transition hover:bg-primary-700 disabled:opacity-40"
             title={gettext("Send")}
           >
             <.icon
               name={if @loop_running?, do: "hero-arrow-path", else: "hero-paper-airplane"}
               class={["size-5", @loop_running? && "animate-spin"]}
             />
-          </Button.icon_button>
+          </button>
         </div>
       </div>
     </form>
@@ -1054,12 +1052,12 @@ defmodule LongWeb.AgentLive.Chat do
       !@open? && "w-0"
     ]}>
       <div class="p-4 space-y-4">
-        <div class="rounded-lg border border-zinc-200 bg-white p-3">
+        <div class="rounded-xl border border-zinc-200/80 bg-white p-3">
           <div class="text-[11px] font-medium uppercase text-zinc-500 mb-1">{gettext("L1 · Working memory")}</div>
           <pre class="text-xs whitespace-pre-wrap text-zinc-700 leading-snug min-h-[1.5em]">{(@checkpoint && @checkpoint.key_info) || gettext("(empty)")}</pre>
         </div>
 
-        <div class="rounded-lg border border-zinc-200 bg-white p-3">
+        <div class="rounded-xl border border-zinc-200/80 bg-white p-3">
           <div class="text-[11px] font-medium uppercase text-zinc-500 mb-1">{gettext("L2 · Global memory")}</div>
           <p :if={@global_memory == []} class="text-xs text-zinc-400">{gettext("(empty)")}</p>
           <ul :if={@global_memory != []} class="space-y-2 text-xs">

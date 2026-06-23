@@ -1647,20 +1647,20 @@ defmodule LongWeb.ManageLive do
               name="skill[name]"
               required
               placeholder={gettext("name (e.g. daily-standup)")}
-              class="flex-1 border border-zinc-300 rounded-md px-2 py-1.5 text-sm font-mono"
+              class="flex-1 rounded-lg border border-zinc-300 transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none px-2 py-1.5 text-sm font-mono"
             />
             <input
               name="skill[description]"
               required
               placeholder={gettext("one-line description")}
-              class="flex-[2] border border-zinc-300 rounded-md px-2 py-1.5 text-sm"
+              class="flex-[2] rounded-lg border border-zinc-300 transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none px-2 py-1.5 text-sm"
             />
           </div>
           <textarea
             name="skill[body]"
             rows="3"
             placeholder={gettext("SKILL.md instructions (markdown)…")}
-            class="w-full border border-zinc-300 rounded-md px-2 py-1.5 text-sm font-mono"
+            class="w-full rounded-lg border border-zinc-300 transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none px-2 py-1.5 text-sm font-mono"
           ></textarea>
           <div class="flex justify-end">
             <Button.button type="submit" color="primary" icon="hero-plus" radius="md" size="sm">
@@ -1946,7 +1946,7 @@ defmodule LongWeb.ManageLive do
                     <input type="hidden" name="credential_name" value={c.name} />
                     <select
                       name="member_id"
-                      class="border border-zinc-300 rounded-md px-2 py-1.5 text-sm"
+                      class="rounded-lg border border-zinc-300 transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none px-2 py-1.5 text-sm"
                     >
                       <option value="">{gettext("— unassigned —")}</option>
                       <option
@@ -1962,7 +1962,7 @@ defmodule LongWeb.ManageLive do
                 <td class="px-4 py-2">
                   <form id={"locsel-set_wechat_locale-#{c.name}"} phx-change="set_wechat_locale">
                     <input type="hidden" name="credential_name" value={c.name} />
-                    <select name="locale" class="border border-zinc-300 rounded-md px-2 py-1.5 text-sm">
+                    <select name="locale" class="rounded-lg border border-zinc-300 transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none px-2 py-1.5 text-sm">
                       <option value="">{gettext("— inherit —")}</option>
                       <option :for={{code, label} <- locale_options()} value={code} selected={code == c.locale}>{label}</option>
                     </select>
@@ -2010,7 +2010,7 @@ defmodule LongWeb.ManageLive do
                 name="name"
                 required
                 placeholder={gettext("e.g. dad-phone")}
-                class="mt-1 w-full border border-zinc-300 rounded-md px-2 py-1.5 text-sm"
+                class="mt-1 w-full rounded-lg border border-zinc-300 transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none px-2 py-1.5 text-sm"
               />
             </label>
             <Button.button type="submit" color="primary" icon="hero-plus" radius="md" size="sm">
@@ -2095,7 +2095,7 @@ defmodule LongWeb.ManageLive do
                     <input type="hidden" name="credential_name" value={c.name} />
                     <select
                       name="member_id"
-                      class="border border-zinc-300 rounded-md px-2 py-1.5 text-sm"
+                      class="rounded-lg border border-zinc-300 transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none px-2 py-1.5 text-sm"
                     >
                       <option value="">{gettext("— unassigned —")}</option>
                       <option
@@ -2111,7 +2111,7 @@ defmodule LongWeb.ManageLive do
                 <td class="px-4 py-2">
                   <form id={"locsel-set_telegram_locale-#{c.name}"} phx-change="set_telegram_locale">
                     <input type="hidden" name="credential_name" value={c.name} />
-                    <select name="locale" class="border border-zinc-300 rounded-md px-2 py-1.5 text-sm">
+                    <select name="locale" class="rounded-lg border border-zinc-300 transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none px-2 py-1.5 text-sm">
                       <option value="">{gettext("— inherit —")}</option>
                       <option :for={{code, label} <- locale_options()} value={code} selected={code == c.locale}>{label}</option>
                     </select>
@@ -2374,7 +2374,7 @@ defmodule LongWeb.ManageLive do
               value={@editing.name}
               required
               readonly={!@is_new?}
-              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm font-mono"
+              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none font-mono"
               placeholder="e.g. xiaomi_stock_watch"
             />
           </label>
@@ -2382,7 +2382,7 @@ defmodule LongWeb.ManageLive do
             <span class="text-xs font-medium text-zinc-600">Repeat</span>
             <select
               name="monitor[repeat]"
-              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm"
+              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none"
             >
               <option :for={r <- @repeats} value={r} selected={@editing.repeat == r}>{r}</option>
             </select>
@@ -2398,7 +2398,7 @@ defmodule LongWeb.ManageLive do
             name="monitor[script]"
             rows="12"
             required
-            class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-xs font-mono leading-snug"
+            class="mt-1 w-full rounded-lg border border-zinc-300 transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none px-3 py-2 text-xs font-mono leading-snug"
           >{@editing.script}</textarea>
         </label>
 
@@ -2410,7 +2410,7 @@ defmodule LongWeb.ManageLive do
               min="1"
               name="monitor[every_n]"
               value={@editing.every_n}
-              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm"
+              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none"
             />
           </label>
           <label class="block">
@@ -2418,7 +2418,7 @@ defmodule LongWeb.ManageLive do
             <input
               name="monitor[schedule_time]"
               value={@editing.schedule_time}
-              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm font-mono"
+              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none font-mono"
               placeholder="08:00"
             />
           </label>
@@ -2429,7 +2429,7 @@ defmodule LongWeb.ManageLive do
               min="0"
               name="monitor[cooldown_minutes]"
               value={@editing.cooldown_minutes}
-              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm"
+              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none"
             />
           </label>
           <label class="block">
@@ -2439,7 +2439,7 @@ defmodule LongWeb.ManageLive do
               min="0"
               name="monitor[max_delay_hours]"
               value={@editing.max_delay_hours}
-              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm"
+              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none"
             />
           </label>
         </div>
@@ -2450,7 +2450,7 @@ defmodule LongWeb.ManageLive do
             <input
               name="monitor[secret_name]"
               value={@editing.secret_name}
-              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm font-mono"
+              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none font-mono"
             />
           </label>
           <label :if={@is_new?} class="block">
@@ -2458,7 +2458,7 @@ defmodule LongWeb.ManageLive do
             <input
               name="monitor[session_id]"
               value={@editing.session_id}
-              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm font-mono"
+              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none font-mono"
               placeholder="UUID"
             />
           </label>
@@ -2529,7 +2529,7 @@ defmodule LongWeb.ManageLive do
           </div>
           <form id="locsel-set_default_locale-system" phx-change="set_default_locale">
             <input type="hidden" name="scope" value="system" />
-            <select name="locale" class="border border-zinc-300 rounded-md px-2 py-1.5 text-sm">
+            <select name="locale" class="rounded-lg border border-zinc-300 transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none px-2 py-1.5 text-sm">
               <option value="">{gettext("— inherit —")}</option>
               <option :for={{code, label} <- locale_options()} value={code} selected={code == Long.Copy.default_locale_setting()}>{label}</option>
             </select>
@@ -2554,7 +2554,7 @@ defmodule LongWeb.ManageLive do
               autocomplete="off"
               phx-debounce="300"
               placeholder={gettext("now: %{tz} — type to change", tz: current_tz)}
-              class="border border-zinc-300 rounded-md px-2 py-1.5 text-sm w-72"
+              class="rounded-lg border border-zinc-300 transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none px-2 py-1.5 text-sm w-72"
             />
             <datalist id="tz-datalist">
               <option :for={tz <- timezone_options()} value={tz}></option>
@@ -2591,7 +2591,7 @@ defmodule LongWeb.ManageLive do
               name="group[name]"
               required
               placeholder={gettext("e.g. My Home")}
-              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm"
+              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none"
             />
           </label>
           <Button.button type="submit" color="primary" icon="hero-plus" radius="md" size="sm">
@@ -2607,7 +2607,7 @@ defmodule LongWeb.ManageLive do
           <span class="text-xs text-zinc-500">{gettext("Default language")}</span>
           <form id={"locsel-set_group_locale-#{hh.id}"} phx-change="set_group_locale">
             <input type="hidden" name="group_id" value={hh.id} />
-            <select name="locale" class="border border-zinc-300 rounded-md px-2 py-1.5 text-sm">
+            <select name="locale" class="rounded-lg border border-zinc-300 transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none px-2 py-1.5 text-sm">
               <option value="">{gettext("— inherit —")}</option>
               <option :for={{code, label} <- locale_options()} value={code} selected={code == hh.locale}>{label}</option>
             </select>
@@ -2644,7 +2644,7 @@ defmodule LongWeb.ManageLive do
               <td class="px-4 py-2">
                 <form id={"locsel-set_member_locale-#{m.id}"} phx-change="set_member_locale">
                   <input type="hidden" name="member_id" value={m.id} />
-                  <select name="locale" class="border border-zinc-300 rounded-md px-2 py-1.5 text-sm">
+                  <select name="locale" class="rounded-lg border border-zinc-300 transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none px-2 py-1.5 text-sm">
                     <option value="">{gettext("— inherit —")}</option>
                     <option :for={{code, label} <- locale_options()} value={code} selected={code == m.locale}>{label}</option>
                   </select>
@@ -2696,18 +2696,18 @@ defmodule LongWeb.ManageLive do
               name="member[display_name]"
               required
               placeholder={gettext("e.g. Alex")}
-              class="mt-1 w-full border border-zinc-300 rounded-md px-2 py-1.5 text-sm"
+              class="mt-1 w-full rounded-lg border border-zinc-300 transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none px-2 py-1.5 text-sm"
             />
           </label>
           <label class="block">
             <span class="text-xs font-medium text-zinc-600">{gettext("Relation")}</span>
-            <select name="member[relation]" class="mt-1 border border-zinc-300 rounded-md px-2 py-1.5 text-sm">
+            <select name="member[relation]" class="mt-1 rounded-lg border border-zinc-300 transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none px-2 py-1.5 text-sm">
               <option :for={r <- member_relations()} value={r}>{relation_label(r)}</option>
             </select>
           </label>
           <label class="block">
             <span class="text-xs font-medium text-zinc-600">{gettext("Role")}</span>
-            <select name="member[role]" class="mt-1 border border-zinc-300 rounded-md px-2 py-1.5 text-sm">
+            <select name="member[role]" class="mt-1 rounded-lg border border-zinc-300 transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none px-2 py-1.5 text-sm">
               <option :for={r <- member_roles()} value={r}>{r}</option>
             </select>
           </label>
@@ -2770,7 +2770,7 @@ defmodule LongWeb.ManageLive do
                     name="text"
                     rows="1"
                     placeholder={gettext("(uses default)")}
-                    class="w-64 border border-zinc-300 rounded-md px-2 py-1 text-xs font-mono"
+                    class="w-64 rounded-lg border border-zinc-300 transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none px-2 py-1 text-xs font-mono"
                   >{r.override}</textarea>
                   <Button.icon_button type="submit" color="primary" size="xs" title={gettext("Save")}>
                     <.icon name="hero-check" class="size-4" />
@@ -3020,7 +3020,7 @@ defmodule LongWeb.ManageLive do
               value={@editing.alias}
               required
               readonly={!@is_new?}
-              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm font-mono"
+              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none font-mono"
               placeholder="e.g. claude_main"
             />
           </label>
@@ -3030,7 +3030,7 @@ defmodule LongWeb.ManageLive do
               name="llm[model]"
               value={@editing.model}
               required
-              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm font-mono"
+              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none font-mono"
               placeholder="e.g. claude-sonnet-4"
             />
           </label>
@@ -3041,7 +3041,7 @@ defmodule LongWeb.ManageLive do
             <span class="text-xs font-medium text-zinc-600">Provider</span>
             <select
               name="llm[provider]"
-              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm"
+              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none"
             >
               <option :for={p <- @providers} value={p} selected={@editing.provider == p}>{p}</option>
             </select>
@@ -3050,7 +3050,7 @@ defmodule LongWeb.ManageLive do
             <span class="text-xs font-medium text-zinc-600">Wire protocol</span>
             <select
               name="llm[wire_protocol]"
-              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm"
+              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none"
             >
               <option value="">(provider default)</option>
               <option :for={w <- @wire_protocols} value={w} selected={@editing.wire_protocol == w}>
@@ -3065,7 +3065,7 @@ defmodule LongWeb.ManageLive do
           <input
             name="llm[api_base]"
             value={@editing.api_base}
-            class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm font-mono"
+            class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none font-mono"
             placeholder="https://api.anthropic.com"
           />
         </label>
@@ -3077,7 +3077,7 @@ defmodule LongWeb.ManageLive do
               type="password"
               name="llm[api_key]"
               value={@editing.api_key}
-              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm font-mono"
+              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none font-mono"
               placeholder="sk-…"
             />
           </label>
@@ -3086,7 +3086,7 @@ defmodule LongWeb.ManageLive do
             <input
               name="llm[api_key_env_var]"
               value={@editing.api_key_env_var}
-              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm font-mono"
+              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none font-mono"
               placeholder="ANTHROPIC_API_KEY"
             />
           </label>
@@ -3124,7 +3124,7 @@ defmodule LongWeb.ManageLive do
             <span class="text-xs font-medium text-zinc-600">Scope</span>
             <select
               name="memory[scope]"
-              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm"
+              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none"
             >
               <option :for={s <- @scopes} value={s} selected={@editing.scope == s}>{s}</option>
             </select>
@@ -3133,7 +3133,7 @@ defmodule LongWeb.ManageLive do
             <span class="text-xs font-medium text-zinc-600">Kind</span>
             <select
               name="memory[kind]"
-              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm"
+              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none"
             >
               <option :for={k <- @kinds} value={k} selected={@editing.kind == k}>{k}</option>
             </select>
@@ -3146,7 +3146,7 @@ defmodule LongWeb.ManageLive do
             value={@editing.key}
             required
             readonly
-            class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm font-mono bg-zinc-50"
+            class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none font-mono bg-zinc-50"
           />
         </label>
         <label class="block">
@@ -3154,7 +3154,7 @@ defmodule LongWeb.ManageLive do
           <textarea
             name="memory[value]"
             rows="5"
-            class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm leading-snug"
+            class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none leading-snug"
           >{@editing.value}</textarea>
         </label>
         <label class="block w-40">
@@ -3165,7 +3165,7 @@ defmodule LongWeb.ManageLive do
             value={@editing.importance}
             min="1"
             max="5"
-            class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm"
+            class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none"
           />
         </label>
         <.modal_footer>
@@ -3186,7 +3186,7 @@ defmodule LongWeb.ManageLive do
             <span class="text-xs font-medium text-zinc-600">Kind</span>
             <select
               name="memory[kind]"
-              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm"
+              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none"
             >
               <option :for={k <- @kinds} value={k} selected={@editing.kind == k}>{k}</option>
             </select>
@@ -3199,7 +3199,7 @@ defmodule LongWeb.ManageLive do
               value={@editing.importance}
               min="1"
               max="5"
-              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm"
+              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none"
             />
           </label>
         </div>
@@ -3210,7 +3210,7 @@ defmodule LongWeb.ManageLive do
             value={@editing.key}
             required
             readonly
-            class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm font-mono bg-zinc-50"
+            class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none font-mono bg-zinc-50"
           />
         </label>
         <label class="block">
@@ -3218,7 +3218,7 @@ defmodule LongWeb.ManageLive do
           <textarea
             name="memory[value]"
             rows="6"
-            class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm leading-snug"
+            class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none leading-snug"
           >{@editing.value}</textarea>
         </label>
         <.modal_footer>
@@ -3412,7 +3412,7 @@ defmodule LongWeb.ManageLive do
               value={@editing.alias}
               required
               readonly={!@is_new?}
-              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm font-mono"
+              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none font-mono"
               placeholder="e.g. tavily_main"
             />
           </label>
@@ -3420,7 +3420,7 @@ defmodule LongWeb.ManageLive do
             <span class="text-xs font-medium text-zinc-600">Provider</span>
             <select
               name="search[provider]"
-              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm"
+              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none"
             >
               <option :for={p <- @providers} value={p} selected={@editing.provider == p}>{p}</option>
             </select>
@@ -3434,7 +3434,7 @@ defmodule LongWeb.ManageLive do
               type="password"
               name="search[api_key]"
               value={@editing.api_key}
-              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm font-mono"
+              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none font-mono"
             />
           </label>
           <label class="block">
@@ -3442,7 +3442,7 @@ defmodule LongWeb.ManageLive do
             <input
               name="search[api_key_env_var]"
               value={@editing.api_key_env_var}
-              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm font-mono"
+              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none font-mono"
               placeholder="TAVILY_API_KEY"
             />
           </label>
@@ -3459,7 +3459,7 @@ defmodule LongWeb.ManageLive do
               type="number"
               name="search[sort_order]"
               value={@editing.sort_order}
-              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm"
+              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none"
             />
           </label>
         </div>
@@ -3492,7 +3492,7 @@ defmodule LongWeb.ManageLive do
               value={@editing.name}
               required
               readonly={!@is_new?}
-              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm font-mono"
+              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none font-mono"
               placeholder="e.g. morning_hn_digest"
             />
           </label>
@@ -3500,7 +3500,7 @@ defmodule LongWeb.ManageLive do
             <span class="text-xs font-medium text-zinc-600">Repeat</span>
             <select
               name="scheduled[repeat]"
-              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm"
+              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none"
             >
               <option :for={r <- @repeats} value={r} selected={@editing.repeat == r}>{r}</option>
             </select>
@@ -3513,7 +3513,7 @@ defmodule LongWeb.ManageLive do
             name="scheduled[prompt]"
             rows="4"
             required
-            class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm leading-snug"
+            class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none leading-snug"
             placeholder="What should the agent do when this fires?"
           >{@editing.prompt}</textarea>
         </label>
@@ -3524,7 +3524,7 @@ defmodule LongWeb.ManageLive do
             <input
               name="scheduled[schedule_time]"
               value={@editing.schedule_time}
-              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm font-mono"
+              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none font-mono"
               placeholder="08:00"
             />
           </label>
@@ -3535,7 +3535,7 @@ defmodule LongWeb.ManageLive do
               min="1"
               name="scheduled[every_n]"
               value={@editing.every_n}
-              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm"
+              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none"
             />
           </label>
           <label class="block">
@@ -3545,7 +3545,7 @@ defmodule LongWeb.ManageLive do
               min="0"
               name="scheduled[max_delay_hours]"
               value={@editing.max_delay_hours}
-              class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm"
+              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none"
             />
           </label>
         </div>
@@ -3557,7 +3557,7 @@ defmodule LongWeb.ManageLive do
           <input
             name="scheduled[session_id]"
             value={@editing.session_id}
-            class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm font-mono"
+            class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none font-mono"
             placeholder="UUID"
           />
         </label>
@@ -3590,7 +3590,7 @@ defmodule LongWeb.ManageLive do
             value={@editing.name}
             required
             readonly={!@is_new?}
-            class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm font-mono"
+            class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none font-mono"
             placeholder="e.g. github_personal"
           />
           <span class="text-[11px] text-zinc-500">
@@ -3604,7 +3604,7 @@ defmodule LongWeb.ManageLive do
             name="secret[value]"
             rows="3"
             required
-            class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm font-mono"
+            class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none font-mono"
             placeholder="Paste the token / key / cookie here"
           >{@editing.value}</textarea>
         </label>
@@ -3614,7 +3614,7 @@ defmodule LongWeb.ManageLive do
           <input
             name="secret[description]"
             value={@editing.description}
-            class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm"
+            class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none"
             placeholder="What is this for? Helps the agent pick the right one."
           />
         </label>
@@ -3714,7 +3714,7 @@ defmodule LongWeb.ManageLive do
             value={@editing.name}
             required
             readonly={!@is_new?}
-            class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm font-mono"
+            class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none font-mono"
             placeholder="default"
           />
           <span class="text-[11px] text-zinc-500">
@@ -3731,7 +3731,7 @@ defmodule LongWeb.ManageLive do
             name="telegram[bot_token]"
             value={@editing.bot_token}
             required
-            class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm font-mono"
+            class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none font-mono"
             placeholder="123456789:ABC-DEF..."
           />
         </label>
@@ -3743,7 +3743,7 @@ defmodule LongWeb.ManageLive do
           <input
             name="telegram[username]"
             value={@editing.username}
-            class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm font-mono"
+            class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none font-mono"
             placeholder="my_long_bot"
           />
         </label>
