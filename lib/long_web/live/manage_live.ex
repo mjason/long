@@ -3009,12 +3009,9 @@ defmodule LongWeb.ManageLive do
     assigns = assign(assigns, :is_new?, assigns.editing.__action__ == :create)
 
     ~H"""
-    <.modal
-      id="llm-edit-modal"
-      show
-      title={if @is_new?, do: "New LLM configuration", else: "Edit #{@editing.alias}"}
-      on_cancel={JS.push("cancel_edit")}
-      size="large"
+    <.shell_modal
+      max_width="max-w-2xl"
+      title={if @is_new?, do: gettext("New LLM configuration"), else: gettext("Edit %{name}", name: @editing.alias)}
     >
       <form phx-submit="save_llm" class="space-y-3">
         <div class="grid grid-cols-2 gap-3">
@@ -3124,7 +3121,7 @@ defmodule LongWeb.ManageLive do
           </.button>
         </div>
       </form>
-    </.modal>
+    </.shell_modal>
     """
   end
 
@@ -3134,13 +3131,7 @@ defmodule LongWeb.ManageLive do
 
   defp memory_modal(assigns) do
     ~H"""
-    <.modal
-      id="memory-edit-modal"
-      show
-      title={"Edit \"#{@editing.key}\""}
-      on_cancel={JS.push("cancel_edit")}
-      size="medium"
-    >
+    <.shell_modal title={gettext("Edit \"%{name}\"", name: @editing.key)}>
       <form phx-submit="save_global_memory" class="space-y-3">
         <div class="grid grid-cols-2 gap-3">
           <label class="block">
@@ -3207,19 +3198,13 @@ defmodule LongWeb.ManageLive do
           </.button>
         </div>
       </form>
-    </.modal>
+    </.shell_modal>
     """
   end
 
   defp session_memory_modal(assigns) do
     ~H"""
-    <.modal
-      id="session-memory-edit-modal"
-      show
-      title={"Edit \"#{@editing.key}\""}
-      on_cancel={JS.push("cancel_edit")}
-      size="medium"
-    >
+    <.shell_modal title={gettext("Edit \"%{name}\"", name: @editing.key)}>
       <form phx-submit="save_session_memory" class="space-y-3">
         <input type="hidden" name="memory[session_id]" value={@editing.session_id} />
         <div class="grid grid-cols-2 gap-3">
@@ -3278,7 +3263,7 @@ defmodule LongWeb.ManageLive do
           </.button>
         </div>
       </form>
-    </.modal>
+    </.shell_modal>
     """
   end
 
@@ -3455,13 +3440,7 @@ defmodule LongWeb.ManageLive do
     assigns = assign(assigns, :is_new?, assigns.editing.__action__ == :create_search)
 
     ~H"""
-    <.modal
-      id="search-edit-modal"
-      show
-      title={if @is_new?, do: "New search provider", else: "Edit #{@editing.alias}"}
-      on_cancel={JS.push("cancel_edit")}
-      size="medium"
-    >
+    <.shell_modal title={if @is_new?, do: gettext("New search provider"), else: gettext("Edit %{name}", name: @editing.alias)}>
       <form phx-submit="save_search" class="space-y-3">
         <div class="grid grid-cols-2 gap-3">
           <label class="block">
@@ -3523,21 +3502,11 @@ defmodule LongWeb.ManageLive do
           </label>
         </div>
 
-        <div class="flex justify-end gap-2 pt-2">
-          <.button
-            type="button"
-            phx-click="cancel_edit"
-            variant="base"
-            color="natural"
-            rounded="medium"
-            size="small"
-          >
-            Cancel
-          </.button>
-          <.button type="submit" color="primary" rounded="medium" size="small">Save</.button>
-        </div>
+        <.modal_footer>
+          <Button.button type="submit" color="primary" size="sm">{gettext("Save")}</Button.button>
+        </.modal_footer>
       </form>
-    </.modal>
+    </.shell_modal>
     """
   end
 
@@ -3548,12 +3517,9 @@ defmodule LongWeb.ManageLive do
     assigns = assign(assigns, :is_new?, assigns.editing.__action__ == :create_scheduled)
 
     ~H"""
-    <.modal
-      id="scheduled-edit-modal"
-      show
-      title={if @is_new?, do: "New scheduled task", else: "Edit #{@editing.name}"}
-      on_cancel={JS.push("cancel_edit")}
-      size="large"
+    <.shell_modal
+      max_width="max-w-2xl"
+      title={if @is_new?, do: gettext("New scheduled task"), else: gettext("Edit %{name}", name: @editing.name)}
     >
       <form phx-submit="save_scheduled" class="space-y-3">
         <div class="grid grid-cols-2 gap-3">
@@ -3639,21 +3605,11 @@ defmodule LongWeb.ManageLive do
           Enabled
         </label>
 
-        <div class="flex justify-end gap-2 pt-2">
-          <.button
-            type="button"
-            phx-click="cancel_edit"
-            variant="base"
-            color="natural"
-            rounded="medium"
-            size="small"
-          >
-            Cancel
-          </.button>
-          <.button type="submit" color="primary" rounded="medium" size="small">Save</.button>
-        </div>
+        <.modal_footer>
+          <Button.button type="submit" color="primary" size="sm">{gettext("Save")}</Button.button>
+        </.modal_footer>
       </form>
-    </.modal>
+    </.shell_modal>
     """
   end
 
@@ -3663,13 +3619,7 @@ defmodule LongWeb.ManageLive do
     assigns = assign(assigns, :is_new?, assigns.editing.__action__ == :create_secret)
 
     ~H"""
-    <.modal
-      id="secret-edit-modal"
-      show
-      title={if @is_new?, do: "New secret", else: "Edit #{@editing.name}"}
-      on_cancel={JS.push("cancel_edit")}
-      size="medium"
-    >
+    <.shell_modal title={if @is_new?, do: gettext("New secret"), else: gettext("Edit %{name}", name: @editing.name)}>
       <form phx-submit="save_secret" class="space-y-3">
         <label class="block">
           <span class="text-xs font-medium text-zinc-600">Name</span>
@@ -3707,21 +3657,11 @@ defmodule LongWeb.ManageLive do
           />
         </label>
 
-        <div class="flex justify-end gap-2 pt-2">
-          <.button
-            type="button"
-            phx-click="cancel_edit"
-            variant="base"
-            color="natural"
-            rounded="medium"
-            size="small"
-          >
-            Cancel
-          </.button>
-          <.button type="submit" color="primary" rounded="medium" size="small">Save</.button>
-        </div>
+        <.modal_footer>
+          <Button.button type="submit" color="primary" size="sm">{gettext("Save")}</Button.button>
+        </.modal_footer>
       </form>
-    </.modal>
+    </.shell_modal>
     """
   end
 
@@ -3729,13 +3669,7 @@ defmodule LongWeb.ManageLive do
 
   defp skill_modal(assigns) do
     ~H"""
-    <.modal
-      id="skill-view-modal"
-      show
-      title={"Skill · #{@editing.name}"}
-      on_cancel={JS.push("cancel_edit")}
-      size="large"
-    >
+    <.shell_modal max_width="max-w-2xl" title={gettext("Skill · %{name}", name: @editing.name)}>
       <div class="space-y-4">
         <div class="flex flex-wrap items-center gap-1.5 text-xs">
           <.badge
@@ -3764,7 +3698,7 @@ defmodule LongWeb.ManageLive do
           <pre class="max-h-[60vh] overflow-auto rounded-md border border-zinc-200 bg-zinc-50 p-3 text-xs whitespace-pre-wrap break-words">{if (@editing.body || "") == "", do: "(no SKILL.md body)", else: @editing.body}</pre>
         </div>
       </div>
-    </.modal>
+    </.shell_modal>
     """
   end
 
@@ -3774,6 +3708,7 @@ defmodule LongWeb.ManageLive do
   # rendered (the editing :if controls it), click-away / Esc → cancel_edit.
   attr :title, :string, required: true
   attr :max_width, :string, default: "max-w-lg"
+  attr :on_cancel, :string, default: "cancel_edit"
   slot :inner_block, required: true
 
   defp shell_modal(assigns) do
@@ -3781,13 +3716,13 @@ defmodule LongWeb.ManageLive do
     <div class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-4">
       <div
         class={["w-full rounded-xl bg-white shadow-xl max-h-[90vh] overflow-y-auto", @max_width]}
-        phx-click-away="cancel_edit"
-        phx-window-keydown="cancel_edit"
+        phx-click-away={@on_cancel}
+        phx-window-keydown={@on_cancel}
         phx-key="escape"
       >
         <div class="flex items-center justify-between border-b border-zinc-100 px-5 py-3">
           <h3 class="font-semibold text-zinc-900">{@title}</h3>
-          <button type="button" phx-click="cancel_edit" class="text-zinc-400 hover:text-zinc-700">
+          <button type="button" phx-click={@on_cancel} class="text-zinc-400 hover:text-zinc-700">
             <.icon name="hero-x-mark" class="size-5" />
           </button>
         </div>
@@ -3879,18 +3814,12 @@ defmodule LongWeb.ManageLive do
   # success, which `handle_info/2` above turns into a section refresh.
   defp wechat_login_modal(assigns) do
     ~H"""
-    <.modal
-      id="wechat-login-modal"
-      show
-      title={"WeChat login — #{@login_name}"}
-      on_cancel={JS.push("close_wechat_login")}
-      size="medium"
-    >
+    <.shell_modal on_cancel="close_wechat_login" title={gettext("WeChat login — %{name}", name: @login_name)}>
       {live_render(@socket, LongWeb.WechatLive.Login,
         id: "wechat-login-embed-#{@login_name}",
         session: %{"embedded" => true, "name" => @login_name}
       )}
-    </.modal>
+    </.shell_modal>
     """
   end
 end
