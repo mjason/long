@@ -1911,24 +1911,23 @@ defmodule LongWeb.ManageLive do
   defp credentials_section(assigns) do
     ~H"""
     <div class="p-6 space-y-6">
-      <h1 class="text-xl font-semibold">Channels</h1>
+      <h1 class="text-xl font-semibold">{gettext("Channels")}</h1>
 
       <section class="space-y-2">
-        <h2 class="text-sm font-semibold text-zinc-700 uppercase tracking-wide">WeChat accounts</h2>
+        <h2 class="text-sm font-semibold text-zinc-700 uppercase tracking-wide">{gettext("WeChat accounts")}</h2>
         <p class="text-xs text-zinc-500 max-w-2xl">
-          Connect one or more WeChat accounts. Assign each to a group member so every
-          message arriving on that account runs as that role.
+          {gettext("Connect one or more WeChat accounts. Assign each to a group member so every message arriving on that account runs as that role.")}
         </p>
 
-        <.card variant="bordered" color="natural" rounded="large" padding="none">
+        <div class="rounded-lg border border-zinc-200 bg-white overflow-hidden">
           <table class="w-full text-sm">
             <thead class="text-xs uppercase text-zinc-500 bg-zinc-50">
               <tr>
-                <th class="text-left px-4 py-2">Account</th>
-                <th class="text-left px-4 py-2">Status</th>
-                <th class="text-left px-4 py-2">Member (role)</th>
-                <th class="text-left px-4 py-2">Language</th>
-                <th class="text-right px-4 py-2">Actions</th>
+                <th class="text-left px-4 py-2">{gettext("Account")}</th>
+                <th class="text-left px-4 py-2">{gettext("Status")}</th>
+                <th class="text-left px-4 py-2">{gettext("Member (role)")}</th>
+                <th class="text-left px-4 py-2">{gettext("Language")}</th>
+                <th class="text-right px-4 py-2">{gettext("Actions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -1936,13 +1935,9 @@ defmodule LongWeb.ManageLive do
                 <td class="px-4 py-2 font-mono text-zinc-800">{c.name}</td>
                 <td class="px-4 py-2">
                   <div class="flex items-center gap-2">
-                    <.badge
-                      color={if wechat_connected?(c), do: "success", else: "silver"}
-                      size="extra_small"
-                      rounded="full"
-                    >
-                      {if wechat_connected?(c), do: "connected", else: "no token"}
-                    </.badge>
+                    <Badge.badge color={if wechat_connected?(c), do: "success", else: "gray"} size="xs">
+                      {if wechat_connected?(c), do: gettext("connected"), else: gettext("no token")}
+                    </Badge.badge>
                     <span :if={c.ilink_bot_id} class="text-xs font-mono text-zinc-400">
                       {c.ilink_bot_id}
                     </span>
@@ -1955,7 +1950,7 @@ defmodule LongWeb.ManageLive do
                       name="member_id"
                       class="border border-zinc-300 rounded-md px-2 py-1.5 text-sm"
                     >
-                      <option value="">— unassigned —</option>
+                      <option value="">{gettext("— unassigned —")}</option>
                       <option
                         :for={{id, label} <- @member_options}
                         value={id}
@@ -1970,40 +1965,38 @@ defmodule LongWeb.ManageLive do
                   <form id={"locsel-set_wechat_locale-#{c.name}"} phx-change="set_wechat_locale">
                     <input type="hidden" name="credential_name" value={c.name} />
                     <select name="locale" class="border border-zinc-300 rounded-md px-2 py-1.5 text-sm">
-                      <option value="">— inherit —</option>
+                      <option value="">{gettext("— inherit —")}</option>
                       <option :for={{code, label} <- locale_options()} value={code} selected={code == c.locale}>{label}</option>
                     </select>
                   </form>
                 </td>
                 <td class="px-4 py-2">
                   <div class="flex justify-end gap-1.5">
-                    <.button
+                    <Button.button
                       phx-click="open_wechat_login"
                       phx-value-name={c.name}
-                      variant="base"
                       color="primary"
-                      size="extra_small"
+                      size="xs"
                       icon="hero-qr-code"
-                      rounded="medium"
                     >
-                      {if wechat_connected?(c), do: "Re-login", else: "Scan"}
-                    </.button>
-                    <.button
+                      {if wechat_connected?(c), do: gettext("Re-login"), else: gettext("Scan")}
+                    </Button.button>
+                    <Button.icon_button
                       phx-click="destroy_wechat_credential"
                       phx-value-name={c.name}
-                      variant="base"
                       color="danger"
-                      size="extra_small"
-                      icon="hero-trash"
-                      rounded="medium"
-                      data-confirm={"Delete WeChat account \"#{c.name}\"? You'll need to scan again to reconnect."}
-                    />
+                      size="xs"
+                      data-confirm={gettext("Delete WeChat account \"%{name}\"? You'll need to scan again to reconnect.", name: c.name)}
+                      title={gettext("Delete")}
+                    >
+                      <.icon name="hero-trash" class="size-4" />
+                    </Button.icon_button>
                   </div>
                 </td>
               </tr>
               <tr :if={@wechat_credentials == []}>
                 <td colspan="5" class="px-4 py-6 text-center text-zinc-400 text-sm">
-                  No WeChat accounts yet — add one below.
+                  {gettext("No WeChat accounts yet — add one below.")}
                 </td>
               </tr>
             </tbody>
@@ -2014,63 +2007,63 @@ defmodule LongWeb.ManageLive do
             class="flex items-end gap-2 px-4 py-3 border-t border-zinc-200 bg-zinc-50"
           >
             <label class="flex-1 block">
-              <span class="text-xs font-medium text-zinc-600">New account name</span>
+              <span class="text-xs font-medium text-zinc-600">{gettext("New account name")}</span>
               <input
                 name="name"
                 required
-                placeholder="e.g. dad-phone"
+                placeholder={gettext("e.g. dad-phone")}
                 class="mt-1 w-full border border-zinc-300 rounded-md px-2 py-1.5 text-sm"
               />
             </label>
-            <.button type="submit" color="primary" icon="hero-plus" rounded="medium" size="small">
-              Add &amp; scan
-            </.button>
+            <Button.button type="submit" color="primary" icon="hero-plus" radius="md" size="sm">
+              {gettext("Add & scan")}
+            </Button.button>
           </form>
-        </.card>
+        </div>
       </section>
 
       <section class="space-y-2">
-        <h2 class="text-sm font-semibold text-zinc-700 uppercase tracking-wide">Bot users</h2>
-        <.card variant="bordered" color="natural" rounded="large" padding="none">
+        <h2 class="text-sm font-semibold text-zinc-700 uppercase tracking-wide">{gettext("Bot users")}</h2>
+        <div class="rounded-lg border border-zinc-200 bg-white overflow-hidden">
           <table class="w-full text-sm">
             <thead class="text-xs uppercase text-zinc-500 bg-zinc-50">
               <tr>
-                <th class="text-left px-4 py-2.5">Platform</th>
-                <th class="text-left px-4 py-2.5">External id</th>
-                <th class="text-left px-4 py-2.5">Display</th>
-                <th class="text-left px-4 py-2.5">Chat</th>
-                <th class="text-right px-4 py-2.5">Actions</th>
+                <th class="text-left px-4 py-2.5">{gettext("Platform")}</th>
+                <th class="text-left px-4 py-2.5">{gettext("External id")}</th>
+                <th class="text-left px-4 py-2.5">{gettext("Display")}</th>
+                <th class="text-left px-4 py-2.5">{gettext("Chat")}</th>
+                <th class="text-right px-4 py-2.5">{gettext("Actions")}</th>
               </tr>
             </thead>
             <tbody>
               <tr :for={u <- @bot_users} class="border-t border-zinc-100">
                 <td class="px-4 py-2">
-                  <.badge color="info" size="extra_small" rounded="full">{u.platform}</.badge>
+                  <Badge.badge color="info" size="xs">{u.platform}</Badge.badge>
                 </td>
                 <td class="px-4 py-2 text-xs font-mono text-zinc-700">{u.external_id}</td>
                 <td class="px-4 py-2 text-zinc-700">{u.display_name || "—"}</td>
                 <td class="px-4 py-2 text-xs font-mono text-zinc-500">{u.chat_id || "—"}</td>
                 <td class="px-4 py-2 text-right">
-                  <.button
+                  <Button.icon_button
                     phx-click="destroy_bot_user"
                     phx-value-id={u.id}
-                    variant="base"
                     color="danger"
-                    size="extra_small"
-                    icon="hero-trash"
-                    rounded="medium"
-                    data-confirm={"Delete bot user \"#{u.external_id}\"?"}
-                  />
+                    size="xs"
+                    data-confirm={gettext("Delete bot user \"%{name}\"?", name: u.external_id)}
+                    title={gettext("Delete")}
+                  >
+                    <.icon name="hero-trash" class="size-4" />
+                  </Button.icon_button>
                 </td>
               </tr>
               <tr :if={@bot_users == []}>
                 <td colspan="5" class="px-4 py-8 text-center text-zinc-400 text-sm">
-                  (no bot users)
+                  {gettext("(no bot users)")}
                 </td>
               </tr>
             </tbody>
           </table>
-        </.card>
+        </div>
       </section>
 
       <section class="space-y-2">
@@ -2078,27 +2071,21 @@ defmodule LongWeb.ManageLive do
           <h2 class="text-sm font-semibold text-zinc-700 uppercase tracking-wide flex-1">
             Telegram
           </h2>
-          <.button
-            phx-click="new_telegram_credential"
-            color="primary"
-            icon="hero-plus"
-            rounded="medium"
-            size="extra_small"
-          >
-            New Telegram bot
-          </.button>
+          <Button.button phx-click="new_telegram_credential" color="primary" icon="hero-plus" radius="md" size="xs">
+            {gettext("New Telegram bot")}
+          </Button.button>
         </div>
-        <.card variant="bordered" color="natural" rounded="large" padding="none">
+        <div class="rounded-lg border border-zinc-200 bg-white overflow-hidden">
           <table class="w-full text-sm">
             <thead class="text-xs uppercase text-zinc-500 bg-zinc-50">
               <tr>
-                <th class="text-left px-4 py-2.5">Name</th>
-                <th class="text-left px-4 py-2.5">Username</th>
-                <th class="text-left px-4 py-2.5">Member (role)</th>
-                <th class="text-left px-4 py-2.5">Language</th>
-                <th class="text-left px-4 py-2.5">Token</th>
-                <th class="text-left px-4 py-2.5">Status</th>
-                <th class="text-right px-4 py-2.5">Actions</th>
+                <th class="text-left px-4 py-2.5">{gettext("Name")}</th>
+                <th class="text-left px-4 py-2.5">{gettext("Username")}</th>
+                <th class="text-left px-4 py-2.5">{gettext("Member (role)")}</th>
+                <th class="text-left px-4 py-2.5">{gettext("Language")}</th>
+                <th class="text-left px-4 py-2.5">{gettext("Token")}</th>
+                <th class="text-left px-4 py-2.5">{gettext("Status")}</th>
+                <th class="text-right px-4 py-2.5">{gettext("Actions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -2112,7 +2099,7 @@ defmodule LongWeb.ManageLive do
                       name="member_id"
                       class="border border-zinc-300 rounded-md px-2 py-1.5 text-sm"
                     >
-                      <option value="">— unassigned —</option>
+                      <option value="">{gettext("— unassigned —")}</option>
                       <option
                         :for={{id, label} <- @member_options}
                         value={id}
@@ -2127,63 +2114,58 @@ defmodule LongWeb.ManageLive do
                   <form id={"locsel-set_telegram_locale-#{c.name}"} phx-change="set_telegram_locale">
                     <input type="hidden" name="credential_name" value={c.name} />
                     <select name="locale" class="border border-zinc-300 rounded-md px-2 py-1.5 text-sm">
-                      <option value="">— inherit —</option>
+                      <option value="">{gettext("— inherit —")}</option>
                       <option :for={{code, label} <- locale_options()} value={code} selected={code == c.locale}>{label}</option>
                     </select>
                   </form>
                 </td>
                 <td class="px-4 py-2 text-xs font-mono text-zinc-500">{mask_secret(c.bot_token)}</td>
                 <td class="px-4 py-2">
-                  <.badge
-                    color={if c.enabled, do: "success", else: "silver"}
-                    size="extra_small"
-                    rounded="full"
-                  >
-                    {if c.enabled, do: "enabled", else: "paused"}
-                  </.badge>
+                  <Badge.badge color={if c.enabled, do: "success", else: "gray"} size="xs">
+                    {if c.enabled, do: gettext("enabled"), else: gettext("paused")}
+                  </Badge.badge>
                 </td>
                 <td class="px-4 py-2">
-                  <div class="flex justify-end gap-1.5">
-                    <.button
+                  <div class="flex justify-end gap-1">
+                    <Button.icon_button
                       phx-click="toggle_telegram_enabled"
                       phx-value-name={c.name}
-                      variant="base"
-                      color="natural"
-                      size="extra_small"
-                      icon={if c.enabled, do: "hero-pause", else: "hero-play"}
-                      rounded="medium"
-                    />
-                    <.button
+                      color="gray"
+                      size="xs"
+                      title={if c.enabled, do: gettext("Disable"), else: gettext("Enable")}
+                    >
+                      <.icon name={if c.enabled, do: "hero-pause", else: "hero-play"} class="size-4" />
+                    </Button.icon_button>
+                    <Button.icon_button
                       phx-click="edit_telegram_credential"
                       phx-value-name={c.name}
-                      variant="base"
-                      color="natural"
-                      size="extra_small"
-                      icon="hero-pencil-square"
-                      rounded="medium"
-                    />
-                    <.button
+                      color="gray"
+                      size="xs"
+                      title={gettext("Edit")}
+                    >
+                      <.icon name="hero-pencil-square" class="size-4" />
+                    </Button.icon_button>
+                    <Button.icon_button
                       phx-click="destroy_telegram_credential"
                       phx-value-name={c.name}
-                      variant="base"
                       color="danger"
-                      size="extra_small"
-                      icon="hero-trash"
-                      rounded="medium"
-                      data-confirm={"Delete Telegram credential \"#{c.name}\"?"}
-                    />
+                      size="xs"
+                      data-confirm={gettext("Delete Telegram credential \"%{name}\"?", name: c.name)}
+                      title={gettext("Delete")}
+                    >
+                      <.icon name="hero-trash" class="size-4" />
+                    </Button.icon_button>
                   </div>
                 </td>
               </tr>
               <tr :if={@telegram_credentials == []}>
                 <td colspan="7" class="px-4 py-8 text-center text-zinc-400 text-sm">
-                  No Telegram credentials. Click <strong>New Telegram bot</strong>
-                  and paste a BotFather token.
+                  {gettext("No Telegram credentials. Click \"New Telegram bot\" and paste a BotFather token.")}
                 </td>
               </tr>
             </tbody>
           </table>
-        </.card>
+        </div>
       </section>
     </div>
     """
