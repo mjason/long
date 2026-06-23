@@ -60,6 +60,7 @@ defmodule LongWeb.ManageLive do
 
     {:ok,
      socket
+     |> assign_new(:locale, fn -> "en" end)
      |> assign(:sections, @sections)
      |> assign(:editing, nil)
      |> assign(:wechat_modal_open?, false)
@@ -1237,36 +1238,40 @@ defmodule LongWeb.ManageLive do
   def render(assigns) do
     ~H"""
     <div class="flex h-screen bg-zinc-50 text-zinc-900">
-      <aside class="w-56 border-r border-zinc-200 bg-white flex flex-col shrink-0">
-        <div class="p-4 border-b border-zinc-200">
-          <div class="font-semibold text-zinc-900">Long · Manage</div>
-          <.button_link
+      <aside class="w-60 border-r border-zinc-200 bg-white flex flex-col shrink-0">
+        <div class="p-4 border-b border-zinc-100">
+          <div class="flex items-center gap-2 font-semibold text-zinc-900">
+            <span class="inline-flex h-6 w-6 items-center justify-center rounded-md bg-primary-600 text-xs font-bold text-white">
+              L
+            </span>
+            Long
+          </div>
+          <.link
             navigate={~p"/"}
-            variant="base"
-            color="natural"
-            size="extra_small"
-            icon="hero-arrow-left"
-            rounded="medium"
-            class="!mt-2"
+            class="mt-2 inline-flex items-center gap-1 text-xs text-zinc-500 hover:text-zinc-800"
           >
-            Back to home
-          </.button_link>
+            <.icon name="hero-arrow-left" class="size-3.5" /> {gettext("Back to home")}
+          </.link>
         </div>
-        <nav class="flex-1 overflow-y-auto p-2 space-y-0.5">
-          <.button_link
-            :for={{key, label, icon} <- @sections}
+        <nav class="flex-1 overflow-y-auto p-3 space-y-0.5">
+          <.link
+            :for={{key, _label, icon} <- @sections}
             navigate={section_path(key)}
-            variant={if @section == key, do: "default", else: "base"}
-            color={if @section == key, do: "primary", else: "natural"}
-            size="small"
-            rounded="medium"
-            icon={icon}
-            full_width
-            class="!justify-start"
+            class={[
+              "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+              if(@section == key,
+                do: "bg-primary-50 text-primary-700",
+                else: "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
+              )
+            ]}
           >
-            {label}
-          </.button_link>
+            <.icon name={icon} class="size-4 shrink-0" />
+            {nav_label(key)}
+          </.link>
         </nav>
+        <div class="border-t border-zinc-100 p-3">
+          <.language_switcher locale={@locale} />
+        </div>
       </aside>
 
       <main class="flex-1 overflow-y-auto">
@@ -3402,6 +3407,44 @@ defmodule LongWeb.ManageLive do
   end
 
   # ── Helpers ──────────────────────────────────────────────────────────
+
+  # i18n nav labels — literal gettext so they extract. (The @sections English
+  # label is the fallback for anything not listed.)
+  defp nav_label(:llms), do: gettext("LLMs")
+  defp nav_label(:groups), do: gettext("Groups")
+  defp nav_label(:memories), do: gettext("Memories")
+  defp nav_label(:skills), do: gettext("Skills")
+  defp nav_label(:sessions), do: gettext("Sessions")
+  defp nav_label(:search), do: gettext("Search")
+  defp nav_label(:credentials), do: gettext("Channels")
+  defp nav_label(:scheduled), do: gettext("Scheduled")
+  defp nav_label(:monitors), do: gettext("Monitors")
+  defp nav_label(:reflection), do: gettext("Reflection")
+  defp nav_label(:secrets), do: gettext("Secrets")
+  defp nav_label(:phrases), do: gettext("Phrases")
+  defp nav_label(key), do: to_string(key)
+
+  attr :locale, :string, required: true
+
+  defp language_switcher(assigns) do
+    ~H"""
+    <div class="flex items-center gap-1 text-xs">
+      <.icon name="hero-language" class="size-4 text-zinc-400" />
+      <.link
+        href={~p"/locale/en"}
+        class={["rounded px-1.5 py-0.5", if(@locale == "en", do: "bg-zinc-100 font-semibold text-zinc-900", else: "text-zinc-400 hover:text-zinc-700")]}
+      >
+        EN
+      </.link>
+      <.link
+        href={~p"/locale/zh"}
+        class={["rounded px-1.5 py-0.5", if(@locale == "zh", do: "bg-zinc-100 font-semibold text-zinc-900", else: "text-zinc-400 hover:text-zinc-700")]}
+      >
+        中文
+      </.link>
+    </div>
+    """
+  end
 
   defp section_path(:llms), do: ~p"/manage/llms"
   defp section_path(:groups), do: ~p"/manage/groups"

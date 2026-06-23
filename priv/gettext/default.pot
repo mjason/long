@@ -312,3 +312,68 @@ msgstr ""
 #, elixir-autogen, elixir-format
 msgid "regenerate"
 msgstr ""
+
+#: lib/long_web/live/manage_live.ex:1253
+#, elixir-autogen, elixir-format
+msgid "Back to home"
+msgstr ""
+
+#: lib/long_web/live/manage_live.ex:3419
+#, elixir-autogen, elixir-format
+msgid "Channels"
+msgstr ""
+
+#: lib/long_web/live/manage_live.ex:3414
+#, elixir-autogen, elixir-format
+msgid "Groups"
+msgstr ""
+
+#: lib/long_web/live/manage_live.ex:3413
+#, elixir-autogen, elixir-format
+msgid "LLMs"
+msgstr ""
+
+#: lib/long_web/live/manage_live.ex:3415
+#, elixir-autogen, elixir-format
+msgid "Memories"
+msgstr ""
+
+#: lib/long_web/live/manage_live.ex:3421
+#, elixir-autogen, elixir-format
+msgid "Monitors"
+msgstr ""
+
+#: lib/long_web/live/manage_live.ex:3424
+#, elixir-autogen, elixir-format
+msgid "Phrases"
+msgstr ""
+
+#: lib/long_web/live/manage_live.ex:3422
+#, elixir-autogen, elixir-format
+msgid "Reflection"
+msgstr ""
+
+#: lib/long_web/live/manage_live.ex:3420
+#, elixir-autogen, elixir-format
+msgid "Scheduled"
+msgstr ""
+
+#: lib/long_web/live/manage_live.ex:3418
+#, elixir-autogen, elixir-format
+msgid "Search"
+msgstr ""
+
+#: lib/long_web/live/manage_live.ex:3423
+#, elixir-autogen, elixir-format
+msgid "Secrets"
+msgstr ""
+
+#: lib/long_web/live/manage_live.ex:3417
+#, elixir-autogen, elixir-format
+msgid "Sessions"
+msgstr ""
+
+#: lib/long_web/live/manage_live.ex:3416
+#, elixir-autogen, elixir-format
+msgid "Skills"
+msgstr ""
