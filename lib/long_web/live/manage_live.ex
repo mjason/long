@@ -2831,83 +2831,73 @@ defmodule LongWeb.ManageLive do
     ~H"""
     <div class="p-6 space-y-4">
       <div>
-        <h1 class="text-xl font-semibold">Reflection</h1>
+        <h1 class="text-xl font-semibold">{gettext("Reflection")}</h1>
         <p class="text-sm text-zinc-500 mt-1 max-w-2xl">
-          Silent reflection: off-peak, each session's agent quietly consolidates its own
-          memory and never messages anyone. These tasks are system-managed and are kept out
-          of the Scheduled list on purpose.
+          {gettext("Silent reflection: off-peak, each session's agent quietly consolidates its own memory and never messages anyone. System-managed, kept out of the Scheduled list on purpose.")}
         </p>
       </div>
 
-      <.card variant="bordered" color="natural" rounded="large" padding="none">
+      <div class="rounded-lg border border-zinc-200 bg-white">
         <div class="p-5 space-y-4">
           <div class="flex items-center gap-4">
             <div class="flex-1">
-              <div class="font-medium">Silent reflection</div>
+              <div class="font-medium">{gettext("Silent reflection")}</div>
               <div class="text-sm text-zinc-500">
                 {if @reflection_enabled,
-                  do:
-                    "On — sessions reflect daily; new ones are auto-enrolled after their first conversation.",
-                  else: "Off — no session reflects and none are auto-enrolled."}
+                  do: gettext("On — sessions reflect daily; new ones are auto-enrolled after their first conversation."),
+                  else: gettext("Off — no session reflects and none are auto-enrolled.")}
               </div>
             </div>
-            <.badge
-              color={if @reflection_enabled, do: "success", else: "silver"}
-              size="extra_small"
-              rounded="full"
-            >
-              {if @reflection_enabled, do: "on", else: "off"}
-            </.badge>
-            <.button
+            <Badge.badge color={if @reflection_enabled, do: "success", else: "gray"} size="xs">
+              {if @reflection_enabled, do: gettext("on"), else: gettext("off")}
+            </Badge.badge>
+            <Button.button
               phx-click="toggle_reflection"
-              variant="base"
-              color={if @reflection_enabled, do: "natural", else: "primary"}
+              variant="outline"
+              color={if @reflection_enabled, do: "gray", else: "primary"}
               icon={if @reflection_enabled, do: "hero-pause", else: "hero-play"}
-              size="small"
-              rounded="medium"
+              size="sm"
             >
-              {if @reflection_enabled, do: "Turn off", else: "Turn on"}
-            </.button>
+              {if @reflection_enabled, do: gettext("Turn off"), else: gettext("Turn on")}
+            </Button.button>
           </div>
 
           <div class="flex items-center gap-3">
             <div class="flex-1">
-              <div class="text-sm font-medium text-zinc-800">Off-peak hour (UTC)</div>
+              <div class="text-sm font-medium text-zinc-800">{gettext("Off-peak hour (UTC)")}</div>
               <div class="text-xs text-zinc-500">
-                Minute is spread per session to avoid a thundering herd.
+                {gettext("Minute is spread per session to avoid a thundering herd.")}
               </div>
             </div>
             <form phx-change="set_reflection_hour">
-              <.native_select
+              <select
                 id="reflection-hour"
                 name="hour"
-                color="natural"
-                rounded="small"
-                size="small"
                 disabled={!@reflection_enabled}
+                class="rounded-md border border-zinc-300 bg-white px-2 py-1 text-sm focus:border-primary-500 focus:ring-1 focus:ring-primary-500 disabled:opacity-50"
               >
-                <:option
+                <option
                   :for={h <- 0..23}
                   value={Integer.to_string(h)}
                   selected={h == @reflection_hour}
                 >
                   {String.pad_leading(Integer.to_string(h), 2, "0")}:xx UTC
-                </:option>
-              </.native_select>
+                </option>
+              </select>
             </form>
           </div>
         </div>
-      </.card>
+      </div>
 
-      <.card variant="bordered" color="natural" rounded="large" padding="none">
+      <div class="rounded-lg border border-zinc-200 bg-white overflow-hidden">
         <table class="w-full text-sm">
           <thead class="text-xs uppercase text-zinc-500 bg-zinc-50">
             <tr>
-              <th class="text-left px-4 py-2.5">Session</th>
-              <th class="text-left px-4 py-2.5">At</th>
-              <th class="text-left px-4 py-2.5">Next run (UTC)</th>
-              <th class="text-left px-4 py-2.5">Status</th>
-              <th class="text-right px-4 py-2.5">Actions</th>
+              <th class="text-left px-4 py-2.5">{gettext("Session")}</th>
+              <th class="text-left px-4 py-2.5">{gettext("At")}</th>
+              <th class="text-left px-4 py-2.5">{gettext("Next run (UTC)")}</th>
+              <th class="text-left px-4 py-2.5">{gettext("Status")}</th>
+              <th class="text-right px-4 py-2.5">{gettext("Actions")}</th>
             </tr>
           </thead>
           <tbody>
@@ -2916,48 +2906,41 @@ defmodule LongWeb.ManageLive do
               <td class="px-4 py-2">{t.schedule_time} UTC</td>
               <td class="px-4 py-2 text-xs text-zinc-500">{reflection_dt(t.next_run_at)}</td>
               <td class="px-4 py-2">
-                <.badge
-                  color={if t.enabled, do: "success", else: "silver"}
-                  size="extra_small"
-                  rounded="full"
-                >
-                  {if t.enabled, do: "enabled", else: "disabled"}
-                </.badge>
+                <Badge.badge color={if t.enabled, do: "success", else: "gray"} size="xs">
+                  {if t.enabled, do: gettext("enabled"), else: gettext("disabled")}
+                </Badge.badge>
               </td>
               <td class="px-4 py-2">
-                <div class="flex justify-end gap-1.5">
-                  <.button
+                <div class="flex justify-end gap-1">
+                  <Button.icon_button
                     phx-click="run_reflection_now"
                     phx-value-id={t.id}
-                    variant="base"
-                    color="natural"
-                    size="extra_small"
-                    icon="hero-bolt"
-                    rounded="medium"
-                    title="Run now"
-                  />
-                  <.button
+                    color="gray"
+                    size="xs"
+                    title={gettext("Run now")}
+                  >
+                    <.icon name="hero-bolt" class="size-4" />
+                  </Button.icon_button>
+                  <Button.icon_button
                     phx-click="toggle_reflection_task"
                     phx-value-id={t.id}
-                    variant="base"
-                    color="natural"
-                    size="extra_small"
-                    icon={if t.enabled, do: "hero-pause", else: "hero-play"}
-                    rounded="medium"
-                    title={if t.enabled, do: "Disable", else: "Enable"}
-                  />
+                    color="gray"
+                    size="xs"
+                    title={if t.enabled, do: gettext("Disable"), else: gettext("Enable")}
+                  >
+                    <.icon name={if t.enabled, do: "hero-pause", else: "hero-play"} class="size-4" />
+                  </Button.icon_button>
                 </div>
               </td>
             </tr>
             <tr :if={@reflection_tasks == []}>
               <td colspan="5" class="px-4 py-8 text-center text-zinc-400 text-sm">
-                No reflection tasks yet — one is created automatically after a session's first
-                real conversation (when reflection is on).
+                {gettext("No reflection tasks yet — one is created automatically after a session's first real conversation (when reflection is on).")}
               </td>
             </tr>
           </tbody>
         </table>
-      </.card>
+      </div>
     </div>
     """
   end
