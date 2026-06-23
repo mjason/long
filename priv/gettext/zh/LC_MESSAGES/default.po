@@ -19,11 +19,15 @@ msgstr "账号:"
 #: lib/long_web/components/core_components.ex:375
 #: lib/long_web/components/table.ex:188
 #: lib/long_web/live/manage_live.ex:1384
-#: lib/long_web/live/manage_live.ex:1794
-#: lib/long_web/live/manage_live.ex:1865
-#: lib/long_web/live/manage_live.ex:2226
-#: lib/long_web/live/manage_live.ex:2311
-#: lib/long_web/live/manage_live.ex:3008
+#: lib/long_web/live/manage_live.ex:1479
+#: lib/long_web/live/manage_live.ex:1527
+#: lib/long_web/live/manage_live.ex:1585
+#: lib/long_web/live/manage_live.ex:1685
+#: lib/long_web/live/manage_live.ex:1780
+#: lib/long_web/live/manage_live.ex:1851
+#: lib/long_web/live/manage_live.ex:2212
+#: lib/long_web/live/manage_live.ex:2297
+#: lib/long_web/live/manage_live.ex:2994
 #, elixir-autogen, elixir-format
 msgid "Actions"
 msgstr "操作"
@@ -324,66 +328,67 @@ msgstr "重新生成"
 msgid "Back to home"
 msgstr "返回首页"
 
-#: lib/long_web/live/manage_live.ex:3366
+#: lib/long_web/live/manage_live.ex:3352
 #, elixir-autogen, elixir-format
 msgid "Channels"
 msgstr "渠道"
 
-#: lib/long_web/live/manage_live.ex:3361
+#: lib/long_web/live/manage_live.ex:3347
 #, elixir-autogen, elixir-format
 msgid "Groups"
 msgstr "群组"
 
-#: lib/long_web/live/manage_live.ex:3360
+#: lib/long_web/live/manage_live.ex:3346
 #, elixir-autogen, elixir-format
 msgid "LLMs"
 msgstr "模型"
 
-#: lib/long_web/live/manage_live.ex:3362
+#: lib/long_web/live/manage_live.ex:3348
 #, elixir-autogen, elixir-format
 msgid "Memories"
 msgstr "记忆"
 
-#: lib/long_web/live/manage_live.ex:2292
-#: lib/long_web/live/manage_live.ex:3368
+#: lib/long_web/live/manage_live.ex:2278
+#: lib/long_web/live/manage_live.ex:3354
 #, elixir-autogen, elixir-format
 msgid "Monitors"
 msgstr "监控"
 
-#: lib/long_web/live/manage_live.ex:2797
-#: lib/long_web/live/manage_live.ex:3371
+#: lib/long_web/live/manage_live.ex:2783
+#: lib/long_web/live/manage_live.ex:3357
 #, elixir-autogen, elixir-format
 msgid "Phrases"
 msgstr "措辞"
 
-#: lib/long_web/live/manage_live.ex:3369
+#: lib/long_web/live/manage_live.ex:3355
 #, elixir-autogen, elixir-format
 msgid "Reflection"
 msgstr "反思"
 
-#: lib/long_web/live/manage_live.ex:3367
+#: lib/long_web/live/manage_live.ex:3353
 #, elixir-autogen, elixir-format
 msgid "Scheduled"
 msgstr "定时任务"
 
-#: lib/long_web/live/manage_live.ex:3365
+#: lib/long_web/live/manage_live.ex:3351
 #, elixir-autogen, elixir-format
 msgid "Search"
 msgstr "搜索"
 
-#: lib/long_web/live/manage_live.ex:2990
-#: lib/long_web/live/manage_live.ex:3370
+#: lib/long_web/live/manage_live.ex:2976
+#: lib/long_web/live/manage_live.ex:3356
 #, elixir-autogen, elixir-format
 msgid "Secrets"
 msgstr "密钥"
 
-#: lib/long_web/live/manage_live.ex:1784
-#: lib/long_web/live/manage_live.ex:3364
+#: lib/long_web/live/manage_live.ex:1770
+#: lib/long_web/live/manage_live.ex:3350
 #, elixir-autogen, elixir-format
 msgid "Sessions"
 msgstr "会话"
 
-#: lib/long_web/live/manage_live.ex:3363
+#: lib/long_web/live/manage_live.ex:1635
+#: lib/long_web/live/manage_live.ex:3349
 #, elixir-autogen, elixir-format
 msgid "Skills"
 msgstr "技能"
@@ -410,7 +415,7 @@ msgid "Click to rename"
 msgstr "点击重命名"
 
 #: lib/long_web/live/agent_live/chat.ex:603
-#: lib/long_web/live/manage_live.ex:1829
+#: lib/long_web/live/manage_live.ex:1815
 #, elixir-autogen, elixir-format
 msgid "Delete \"%{title}\" and all its messages?"
 msgstr "删除「%{title}」及其所有消息?"
@@ -436,6 +441,7 @@ msgid "L1 · Working memory"
 msgstr "L1 · 工作记忆"
 
 #: lib/long_web/live/agent_live/chat.ex:1085
+#: lib/long_web/live/manage_live.ex:1516
 #, elixir-autogen, elixir-format
 msgid "L2 · Global memory"
 msgstr "L2 · 全局记忆"
@@ -538,249 +544,260 @@ msgid "type not accepted"
 msgstr "不支持的文件类型"
 
 #: lib/long_web/live/manage_live.ex:1445
-#: lib/long_web/live/manage_live.ex:1830
-#: lib/long_web/live/manage_live.ex:1906
-#: lib/long_web/live/manage_live.ex:2269
-#: lib/long_web/live/manage_live.ex:2367
-#: lib/long_web/live/manage_live.ex:3038
+#: lib/long_web/live/manage_live.ex:1556
+#: lib/long_web/live/manage_live.ex:1611
+#: lib/long_web/live/manage_live.ex:1816
+#: lib/long_web/live/manage_live.ex:1892
+#: lib/long_web/live/manage_live.ex:2255
+#: lib/long_web/live/manage_live.ex:2353
+#: lib/long_web/live/manage_live.ex:3024
 #, elixir-autogen, elixir-format, fuzzy
 msgid "Delete"
 msgstr "删除"
 
 #: lib/long_web/live/manage_live.ex:1444
-#: lib/long_web/live/manage_live.ex:1905
-#: lib/long_web/live/manage_live.ex:2268
-#: lib/long_web/live/manage_live.ex:2366
+#: lib/long_web/live/manage_live.ex:1555
+#: lib/long_web/live/manage_live.ex:1610
+#: lib/long_web/live/manage_live.ex:1891
+#: lib/long_web/live/manage_live.ex:2254
+#: lib/long_web/live/manage_live.ex:2352
 #, elixir-autogen, elixir-format
 msgid "Delete \"%{name}\"?"
 msgstr "删除「%{name}」?"
 
 #: lib/long_web/live/manage_live.ex:1426
-#: lib/long_web/live/manage_live.ex:1887
-#: lib/long_web/live/manage_live.ex:2250
-#: lib/long_web/live/manage_live.ex:2348
+#: lib/long_web/live/manage_live.ex:1873
+#: lib/long_web/live/manage_live.ex:2236
+#: lib/long_web/live/manage_live.ex:2334
 #, elixir-autogen, elixir-format
 msgid "Disable"
 msgstr "停用"
 
 #: lib/long_web/live/manage_live.ex:1435
-#: lib/long_web/live/manage_live.ex:1896
-#: lib/long_web/live/manage_live.ex:2259
-#: lib/long_web/live/manage_live.ex:2357
-#: lib/long_web/live/manage_live.ex:3028
+#: lib/long_web/live/manage_live.ex:1546
+#: lib/long_web/live/manage_live.ex:1882
+#: lib/long_web/live/manage_live.ex:2245
+#: lib/long_web/live/manage_live.ex:2343
+#: lib/long_web/live/manage_live.ex:3014
 #, elixir-autogen, elixir-format
 msgid "Edit"
 msgstr "编辑"
 
 #: lib/long_web/live/manage_live.ex:1426
-#: lib/long_web/live/manage_live.ex:1887
-#: lib/long_web/live/manage_live.ex:2250
-#: lib/long_web/live/manage_live.ex:2348
+#: lib/long_web/live/manage_live.ex:1873
+#: lib/long_web/live/manage_live.ex:2236
+#: lib/long_web/live/manage_live.ex:2334
 #, elixir-autogen, elixir-format
 msgid "Enable"
 msgstr "启用"
 
-#: lib/long_web/live/manage_live.ex:2306
+#: lib/long_web/live/manage_live.ex:2292
 #, elixir-autogen, elixir-format
 msgid "Every"
 msgstr "频率"
 
-#: lib/long_web/live/manage_live.ex:2225
-#: lib/long_web/live/manage_live.ex:2310
+#: lib/long_web/live/manage_live.ex:2211
+#: lib/long_web/live/manage_live.ex:2296
 #, elixir-autogen, elixir-format
 msgid "Last run"
 msgstr "上次运行"
 
-#: lib/long_web/live/manage_live.ex:2308
+#: lib/long_web/live/manage_live.ex:2294
 #, elixir-autogen, elixir-format
 msgid "Last status"
 msgstr "最近状态"
 
-#: lib/long_web/live/manage_live.ex:2220
-#: lib/long_web/live/manage_live.ex:2305
-#: lib/long_web/live/manage_live.ex:3004
+#: lib/long_web/live/manage_live.ex:1679
+#: lib/long_web/live/manage_live.ex:2206
+#: lib/long_web/live/manage_live.ex:2291
+#: lib/long_web/live/manage_live.ex:2990
 #, elixir-autogen, elixir-format
 msgid "Name"
 msgstr "名称"
 
-#: lib/long_web/live/manage_live.ex:2297
+#: lib/long_web/live/manage_live.ex:2283
 #, elixir-autogen, elixir-format
 msgid "New monitor"
 msgstr "新建监控"
 
-#: lib/long_web/live/manage_live.ex:2224
-#: lib/long_web/live/manage_live.ex:2309
+#: lib/long_web/live/manage_live.ex:2210
+#: lib/long_web/live/manage_live.ex:2295
 #, elixir-autogen, elixir-format
 msgid "Next run"
 msgstr "下次运行"
 
-#: lib/long_web/live/manage_live.ex:2376
+#: lib/long_web/live/manage_live.ex:2362
 #, elixir-autogen, elixir-format
 msgid "No monitors yet. Click \"New monitor\", or let the agent create one."
 msgstr "还没有监控。点「新建监控」,或让 agent 帮你建一个。"
 
-#: lib/long_web/live/manage_live.ex:2307
+#: lib/long_web/live/manage_live.ex:2293
 #, elixir-autogen, elixir-format
 msgid "On"
 msgstr "启用"
 
-#: lib/long_web/live/manage_live.ex:2339
+#: lib/long_web/live/manage_live.ex:2325
 #, elixir-autogen, elixir-format
 msgid "Run now"
 msgstr "立即运行"
 
-#: lib/long_web/live/manage_live.ex:2294
+#: lib/long_web/live/manage_live.ex:2280
 #, elixir-autogen, elixir-format
 msgid "Scripts that run on an interval and notify only when there's something. ⚡ runs one now."
 msgstr "按间隔运行的脚本,只在有情况时才提醒。⚡ 立即运行一次。"
 
-#: lib/long_web/live/manage_live.ex:2238
-#: lib/long_web/live/manage_live.ex:2322
+#: lib/long_web/live/manage_live.ex:2224
+#: lib/long_web/live/manage_live.ex:2308
 #, elixir-autogen, elixir-format
 msgid "off"
 msgstr "关"
 
-#: lib/long_web/live/manage_live.ex:2238
-#: lib/long_web/live/manage_live.ex:2322
+#: lib/long_web/live/manage_live.ex:2224
+#: lib/long_web/live/manage_live.ex:2308
 #, elixir-autogen, elixir-format
 msgid "on"
 msgstr "开"
 
-#: lib/long_web/live/manage_live.ex:2212
+#: lib/long_web/live/manage_live.ex:2198
 #, elixir-autogen, elixir-format
 msgid "New task"
 msgstr "新建任务"
 
-#: lib/long_web/live/manage_live.ex:2278
+#: lib/long_web/live/manage_live.ex:2264
 #, elixir-autogen, elixir-format
 msgid "No scheduled tasks. Click \"New task\" to add one, or let the agent schedule them."
 msgstr "还没有定时任务。点「新建任务」,或让 agent 帮你安排。"
 
-#: lib/long_web/live/manage_live.ex:2222
+#: lib/long_web/live/manage_live.ex:2208
 #, elixir-autogen, elixir-format
 msgid "Prompt"
 msgstr "提示词"
 
-#: lib/long_web/live/manage_live.ex:2221
+#: lib/long_web/live/manage_live.ex:2207
 #, elixir-autogen, elixir-format
 msgid "Repeat"
 msgstr "重复"
 
-#: lib/long_web/live/manage_live.ex:2210
+#: lib/long_web/live/manage_live.ex:2196
 #, elixir-autogen, elixir-format, fuzzy
 msgid "Scheduled tasks"
 msgstr "定时任务"
 
 #: lib/long_web/live/manage_live.ex:1383
-#: lib/long_web/live/manage_live.ex:1790
-#: lib/long_web/live/manage_live.ex:1863
-#: lib/long_web/live/manage_live.ex:2223
+#: lib/long_web/live/manage_live.ex:1776
+#: lib/long_web/live/manage_live.ex:1849
+#: lib/long_web/live/manage_live.ex:2209
 #, elixir-autogen, elixir-format, fuzzy
 msgid "Status"
 msgstr "状态"
 
-#: lib/long_web/live/manage_live.ex:1838
+#: lib/long_web/live/manage_live.ex:1824
 #, elixir-autogen, elixir-format, fuzzy
 msgid "(no sessions)"
 msgstr "(无会话)"
 
-#: lib/long_web/live/manage_live.ex:1820
+#: lib/long_web/live/manage_live.ex:1806
 #, elixir-autogen, elixir-format
 msgid "Archive"
 msgstr "归档"
 
-#: lib/long_web/live/manage_live.ex:1793
+#: lib/long_web/live/manage_live.ex:1779
 #, elixir-autogen, elixir-format
 msgid "Created"
 msgstr "创建时间"
 
-#: lib/long_web/live/manage_live.ex:3037
+#: lib/long_web/live/manage_live.ex:3023
 #, elixir-autogen, elixir-format, fuzzy
 msgid "Delete secret \"%{name}\"?"
 msgstr "删除密钥「%{name}」?"
 
-#: lib/long_web/live/manage_live.ex:3006
+#: lib/long_web/live/manage_live.ex:1681
+#: lib/long_web/live/manage_live.ex:2992
 #, elixir-autogen, elixir-format
 msgid "Description"
 msgstr "描述"
 
-#: lib/long_web/live/manage_live.ex:2997
+#: lib/long_web/live/manage_live.ex:2983
 #, elixir-autogen, elixir-format
 msgid "Flat key/value store for tokens the agent needs at tool-call time. Stored plaintext (LAN-only) but kept out of memory + chat history. The agent reads these via the graphql tool."
 msgstr "agent 在调用工具时需要的 token 的扁平键值存储。明文存储(仅局域网),但不进记忆和聊天记录。agent 通过 graphql 工具读取。"
 
-#: lib/long_web/live/manage_live.ex:1791
+#: lib/long_web/live/manage_live.ex:1777
 #, elixir-autogen, elixir-format, fuzzy
 msgid "LLM"
 msgstr "LLM"
 
-#: lib/long_web/live/manage_live.ex:2992
+#: lib/long_web/live/manage_live.ex:2978
 #, elixir-autogen, elixir-format
 msgid "New secret"
 msgstr "新建密钥"
 
-#: lib/long_web/live/manage_live.ex:3047
+#: lib/long_web/live/manage_live.ex:3033
 #, elixir-autogen, elixir-format
 msgid "No secrets yet. Click \"New secret\" to add a token."
 msgstr "还没有密钥。点「新建密钥」添加一个 token。"
 
-#: lib/long_web/live/manage_live.ex:1789
+#: lib/long_web/live/manage_live.ex:1775
 #, elixir-autogen, elixir-format
 msgid "Title"
 msgstr "标题"
 
-#: lib/long_web/live/manage_live.ex:1792
+#: lib/long_web/live/manage_live.ex:1778
 #, elixir-autogen, elixir-format
 msgid "Tokens"
 msgstr "令牌数"
 
-#: lib/long_web/live/manage_live.ex:3007
+#: lib/long_web/live/manage_live.ex:2993
 #, elixir-autogen, elixir-format
 msgid "Updated"
 msgstr "更新时间"
 
-#: lib/long_web/live/manage_live.ex:3005
+#: lib/long_web/live/manage_live.ex:1525
+#: lib/long_web/live/manage_live.ex:1584
+#: lib/long_web/live/manage_live.ex:2991
 #, elixir-autogen, elixir-format
 msgid "Value"
 msgstr "值"
 
-#: lib/long_web/live/manage_live.ex:2828
+#: lib/long_web/live/manage_live.ex:2814
 #, elixir-autogen, elixir-format
 msgid "(uses default)"
 msgstr "(使用默认)"
 
-#: lib/long_web/live/manage_live.ex:2808
+#: lib/long_web/live/manage_live.ex:2794
 #, elixir-autogen, elixir-format
 msgid "Built-in default"
 msgstr "内置默认"
 
-#: lib/long_web/live/manage_live.ex:2799
+#: lib/long_web/live/manage_live.ex:2785
 #, elixir-autogen, elixir-format
 msgid "Central catalog of bot / system copy, per locale. Each phrase has a built-in default; set an override here to customize the wording. %{name}-style placeholders are filled at runtime — keep them. Leave an override blank to fall back to the default."
 msgstr "按语言集中管理 bot/系统文案。每条都有内置默认;在此设置覆盖来自定义措辞。%{name} 形式的占位符会在运行时填充,请保留。留空覆盖则回退到默认。"
 
-#: lib/long_web/live/manage_live.ex:2806
+#: lib/long_web/live/manage_live.ex:1524
+#: lib/long_web/live/manage_live.ex:1583
+#: lib/long_web/live/manage_live.ex:2792
 #, elixir-autogen, elixir-format
 msgid "Key"
 msgstr "键"
 
-#: lib/long_web/live/manage_live.ex:2807
+#: lib/long_web/live/manage_live.ex:2793
 #, elixir-autogen, elixir-format
 msgid "Locale"
 msgstr "语言"
 
-#: lib/long_web/live/manage_live.ex:2809
+#: lib/long_web/live/manage_live.ex:2795
 #, elixir-autogen, elixir-format
 msgid "Override"
 msgstr "覆盖"
 
-#: lib/long_web/live/manage_live.ex:2831
+#: lib/long_web/live/manage_live.ex:2817
 #, elixir-autogen, elixir-format
 msgid "Save"
 msgstr "保存"
 
 #: lib/long_web/live/manage_live.ex:1379
-#: lib/long_web/live/manage_live.ex:1861
+#: lib/long_web/live/manage_live.ex:1847
 #, elixir-autogen, elixir-format
 msgid "Alias"
 msgstr "别名"
@@ -800,7 +817,7 @@ msgstr "旧数据行 —— 通过编辑设置 provider + wire_protocol。"
 msgid "New LLM"
 msgstr "新建 LLM"
 
-#: lib/long_web/live/manage_live.ex:1853
+#: lib/long_web/live/manage_live.ex:1839
 #, elixir-autogen, elixir-format
 msgid "New provider"
 msgstr "新建服务"
@@ -810,18 +827,18 @@ msgstr "新建服务"
 msgid "No LLM configurations yet. Click \"New LLM\" above to add one."
 msgstr "还没有 LLM 配置。点上方「新建 LLM」添加一个。"
 
-#: lib/long_web/live/manage_live.ex:1915
+#: lib/long_web/live/manage_live.ex:1901
 #, elixir-autogen, elixir-format
 msgid "No search providers. Click \"New provider\" to add Tavily or Brave."
 msgstr "还没有搜索服务。点「新建服务」添加 Tavily 或 Brave。"
 
 #: lib/long_web/live/manage_live.ex:1380
-#: lib/long_web/live/manage_live.ex:1862
+#: lib/long_web/live/manage_live.ex:1848
 #, elixir-autogen, elixir-format
 msgid "Provider"
 msgstr "服务商"
 
-#: lib/long_web/live/manage_live.ex:1851
+#: lib/long_web/live/manage_live.ex:1837
 #, elixir-autogen, elixir-format
 msgid "Search providers"
 msgstr "搜索服务"
@@ -831,7 +848,7 @@ msgstr "搜索服务"
 msgid "Set as default"
 msgstr "设为默认"
 
-#: lib/long_web/live/manage_live.ex:1864
+#: lib/long_web/live/manage_live.ex:1850
 #, elixir-autogen, elixir-format
 msgid "Sort"
 msgstr "排序"
@@ -842,13 +859,166 @@ msgid "Wire"
 msgstr "协议"
 
 #: lib/long_web/live/manage_live.ex:1406
-#: lib/long_web/live/manage_live.ex:1876
+#: lib/long_web/live/manage_live.ex:1862
 #, elixir-autogen, elixir-format, fuzzy
 msgid "disabled"
 msgstr "已停用"
 
 #: lib/long_web/live/manage_live.ex:1406
-#: lib/long_web/live/manage_live.ex:1876
+#: lib/long_web/live/manage_live.ex:1862
 #, elixir-autogen, elixir-format, fuzzy
 msgid "enabled"
 msgstr "已启用"
+
+#: lib/long_web/live/manage_live.ex:1506
+#, elixir-autogen, elixir-format
+msgid "(no checkpoints)"
+msgstr "(无检查点)"
+
+#: lib/long_web/live/manage_live.ex:1565
+#, elixir-autogen, elixir-format
+msgid "(no global memory)"
+msgstr "(无全局记忆)"
+
+#: lib/long_web/live/manage_live.ex:1620
+#, elixir-autogen, elixir-format, fuzzy
+msgid "(no session memory)"
+msgstr "(无会话记忆)"
+
+#: lib/long_web/live/manage_live.ex:1500
+#, elixir-autogen, elixir-format
+msgid "Clear"
+msgstr "清除"
+
+#: lib/long_web/live/manage_live.ex:1498
+#, elixir-autogen, elixir-format
+msgid "Clear this session's working checkpoint?"
+msgstr "清除这个会话的工作检查点?"
+
+#: lib/long_web/live/manage_live.ex:1762
+#, elixir-autogen, elixir-format
+msgid "Coming soon."
+msgstr "敬请期待。"
+
+#: lib/long_web/live/manage_live.ex:1644
+#, elixir-autogen, elixir-format
+msgid "Create a shared skill — visible to every member of every group (separate from members' personal skills)."
+msgstr "创建一个共享技能 —— 所有群组的所有成员可见(独立于成员的个人技能)。"
+
+#: lib/long_web/live/manage_live.ex:1669
+#, elixir-autogen, elixir-format
+msgid "Create shared skill"
+msgstr "创建共享技能"
+
+#: lib/long_web/live/manage_live.ex:1601
+#, elixir-autogen, elixir-format
+msgid "Edit / view full"
+msgstr "编辑/查看完整"
+
+#: lib/long_web/live/manage_live.ex:1753
+#, elixir-autogen, elixir-format
+msgid "Global"
+msgstr "全局"
+
+#: lib/long_web/live/manage_live.ex:1526
+#, elixir-autogen, elixir-format
+msgid "Imp"
+msgstr "重要度"
+
+#: lib/long_web/live/manage_live.ex:1523
+#: lib/long_web/live/manage_live.ex:1582
+#, elixir-autogen, elixir-format
+msgid "Kind"
+msgstr "类型"
+
+#: lib/long_web/live/manage_live.ex:1471
+#, elixir-autogen, elixir-format, fuzzy
+msgid "L1 · Working checkpoints"
+msgstr "L1 · 工作检查点"
+
+#: lib/long_web/live/manage_live.ex:1575
+#, elixir-autogen, elixir-format
+msgid "L2 · Session memory"
+msgstr "L2 · 会话记忆"
+
+#: lib/long_web/live/manage_live.ex:1467
+#, elixir-autogen, elixir-format
+msgid "Memory editor"
+msgstr "记忆编辑器"
+
+#: lib/long_web/live/manage_live.ex:1733
+#, elixir-autogen, elixir-format
+msgid "No skills found. Drop a SKILL.md into the skills directory and hit Reindex."
+msgstr "没有技能。把 SKILL.md 放进技能目录,然后点「重新索引」。"
+
+#: lib/long_web/live/manage_live.ex:1683
+#, elixir-autogen, elixir-format
+msgid "Path"
+msgstr "路径"
+
+#: lib/long_web/live/manage_live.ex:1750
+#, elixir-autogen, elixir-format
+msgid "Personal"
+msgstr "个人"
+
+#: lib/long_web/live/manage_live.ex:1724
+#, elixir-autogen, elixir-format
+msgid "Promote personal skill \"%{name}\" to global? Every member can use it; the directory moves to the global space."
+msgstr "把个人技能「%{name}」提升为全局?所有成员都能用,目录会移动到全局区。"
+
+#: lib/long_web/live/manage_live.ex:1726
+#, elixir-autogen, elixir-format
+msgid "Promote to global"
+msgstr "提升为全局"
+
+#: lib/long_web/live/manage_live.ex:1638
+#, elixir-autogen, elixir-format
+msgid "Reindex"
+msgstr "重新索引"
+
+#: lib/long_web/live/manage_live.ex:1664
+#, elixir-autogen, elixir-format
+msgid "SKILL.md instructions (markdown)…"
+msgstr "SKILL.md 指令(markdown)…"
+
+#: lib/long_web/live/manage_live.ex:1522
+#: lib/long_web/live/manage_live.ex:1680
+#, elixir-autogen, elixir-format
+msgid "Scope"
+msgstr "范围"
+
+#: lib/long_web/live/manage_live.ex:1477
+#: lib/long_web/live/manage_live.ex:1581
+#, elixir-autogen, elixir-format, fuzzy
+msgid "Session"
+msgstr "会话"
+
+#: lib/long_web/live/manage_live.ex:1682
+#, elixir-autogen, elixir-format
+msgid "Tags"
+msgstr "标签"
+
+#: lib/long_web/live/manage_live.ex:1684
+#, elixir-autogen, elixir-format
+msgid "Used"
+msgstr "使用次数"
+
+#: lib/long_web/live/manage_live.ex:1714
+#, elixir-autogen, elixir-format
+msgid "View"
+msgstr "查看"
+
+#: lib/long_web/live/manage_live.ex:1651
+#, elixir-autogen, elixir-format
+msgid "name (e.g. daily-standup)"
+msgstr "名称(如 daily-standup)"
+
+#: lib/long_web/live/manage_live.ex:1657
+#, elixir-autogen, elixir-format
+msgid "one-line description"
+msgstr "一句话描述"
+
+#: lib/long_web/live/manage_live.ex:1750
+#, elixir-autogen, elixir-format, fuzzy
+msgid "unknown"
+msgstr "未知"

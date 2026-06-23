@@ -1464,19 +1464,19 @@ defmodule LongWeb.ManageLive do
   defp memory_section(assigns) do
     ~H"""
     <div class="p-6 space-y-6">
-      <h1 class="text-xl font-semibold">Memory editor</h1>
+      <h1 class="text-xl font-semibold">{gettext("Memory editor")}</h1>
 
       <section class="space-y-2">
         <h2 class="text-sm font-semibold text-zinc-700 uppercase tracking-wide">
-          L1 · Working checkpoints
+          {gettext("L1 · Working checkpoints")}
         </h2>
-        <.card variant="bordered" color="natural" rounded="large" padding="none">
+        <div class="rounded-lg border border-zinc-200 bg-white overflow-hidden">
           <table class="w-full text-sm">
             <thead class="text-xs uppercase text-zinc-500 bg-zinc-50">
               <tr>
-                <th class="text-left px-4 py-2.5">Session</th>
+                <th class="text-left px-4 py-2.5">{gettext("Session")}</th>
                 <th class="text-left px-4 py-2.5">key_info</th>
-                <th class="text-right px-4 py-2.5">Actions</th>
+                <th class="text-right px-4 py-2.5">{gettext("Actions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -1488,102 +1488,101 @@ defmodule LongWeb.ManageLive do
                   {row.checkpoint.key_info}
                 </td>
                 <td class="px-4 py-2 text-right">
-                  <.button
+                  <Button.button
                     phx-click="clear_checkpoint"
                     phx-value-session_id={row.session.id}
-                    variant="base"
+                    variant="light"
                     color="danger"
-                    size="extra_small"
+                    size="xs"
                     icon="hero-x-mark"
-                    rounded="medium"
-                    data-confirm="Clear this session's working checkpoint?"
+                    data-confirm={gettext("Clear this session's working checkpoint?")}
                   >
-                    Clear
-                  </.button>
+                    {gettext("Clear")}
+                  </Button.button>
                 </td>
               </tr>
               <tr :if={@checkpoints == []}>
                 <td colspan="3" class="px-4 py-6 text-center text-zinc-400 text-sm">
-                  (no checkpoints)
+                  {gettext("(no checkpoints)")}
                 </td>
               </tr>
             </tbody>
           </table>
-        </.card>
+        </div>
       </section>
 
       <section class="space-y-2">
         <h2 class="text-sm font-semibold text-zinc-700 uppercase tracking-wide">
-          L2 · Global memory
+          {gettext("L2 · Global memory")}
         </h2>
-        <.card variant="bordered" color="natural" rounded="large" padding="none">
+        <div class="rounded-lg border border-zinc-200 bg-white overflow-hidden">
           <table class="w-full text-sm">
             <thead class="text-xs uppercase text-zinc-500 bg-zinc-50">
               <tr>
-                <th class="text-left px-4 py-2.5">Scope</th>
-                <th class="text-left px-4 py-2.5">Kind</th>
-                <th class="text-left px-4 py-2.5">Key</th>
-                <th class="text-left px-4 py-2.5">Value</th>
-                <th class="text-left px-4 py-2.5">Imp</th>
-                <th class="text-right px-4 py-2.5">Actions</th>
+                <th class="text-left px-4 py-2.5">{gettext("Scope")}</th>
+                <th class="text-left px-4 py-2.5">{gettext("Kind")}</th>
+                <th class="text-left px-4 py-2.5">{gettext("Key")}</th>
+                <th class="text-left px-4 py-2.5">{gettext("Value")}</th>
+                <th class="text-left px-4 py-2.5">{gettext("Imp")}</th>
+                <th class="text-right px-4 py-2.5">{gettext("Actions")}</th>
               </tr>
             </thead>
             <tbody>
               <tr :for={row <- @globals} class="border-t border-zinc-100">
                 <td class="px-4 py-2">
-                  <.badge color="info" size="extra_small" rounded="full">{row.scope}</.badge>
+                  <Badge.badge color="info" size="xs">{row.scope}</Badge.badge>
                 </td>
                 <td class="px-4 py-2 text-xs text-zinc-500">{row.kind}</td>
                 <td class="px-4 py-2 font-medium text-zinc-800">{row.key}</td>
                 <td class="px-4 py-2 text-zinc-600 leading-snug">{Text.preview(row.value, 140)}</td>
                 <td class="px-4 py-2 text-xs">{row.importance || 3}</td>
                 <td class="px-4 py-2 text-right">
-                  <div class="flex justify-end gap-1.5">
-                    <.button
+                  <div class="flex justify-end gap-1">
+                    <Button.icon_button
                       phx-click="edit_global_memory"
                       phx-value-id={row.id}
-                      variant="base"
-                      color="natural"
-                      size="extra_small"
-                      icon="hero-pencil-square"
-                      rounded="medium"
-                    />
-                    <.button
+                      color="gray"
+                      size="xs"
+                      title={gettext("Edit")}
+                    >
+                      <.icon name="hero-pencil-square" class="size-4" />
+                    </Button.icon_button>
+                    <Button.icon_button
                       phx-click="destroy_global_memory"
                       phx-value-id={row.id}
-                      variant="base"
                       color="danger"
-                      size="extra_small"
-                      icon="hero-trash"
-                      rounded="medium"
-                      data-confirm={"Delete \"#{row.key}\"?"}
-                    />
+                      size="xs"
+                      data-confirm={gettext("Delete \"%{name}\"?", name: row.key)}
+                      title={gettext("Delete")}
+                    >
+                      <.icon name="hero-trash" class="size-4" />
+                    </Button.icon_button>
                   </div>
                 </td>
               </tr>
               <tr :if={@globals == []}>
                 <td colspan="6" class="px-4 py-6 text-center text-zinc-400 text-sm">
-                  (no global memory)
+                  {gettext("(no global memory)")}
                 </td>
               </tr>
             </tbody>
           </table>
-        </.card>
+        </div>
       </section>
 
       <section class="space-y-2">
         <h2 class="text-sm font-semibold text-zinc-700 uppercase tracking-wide">
-          L2 · Session memory
+          {gettext("L2 · Session memory")}
         </h2>
-        <.card variant="bordered" color="natural" rounded="large" padding="none">
+        <div class="rounded-lg border border-zinc-200 bg-white overflow-hidden">
           <table class="w-full text-sm">
             <thead class="text-xs uppercase text-zinc-500 bg-zinc-50">
               <tr>
-                <th class="text-left px-4 py-2.5">Session</th>
-                <th class="text-left px-4 py-2.5">Kind</th>
-                <th class="text-left px-4 py-2.5">Key</th>
-                <th class="text-left px-4 py-2.5">Value</th>
-                <th class="text-right px-4 py-2.5">Actions</th>
+                <th class="text-left px-4 py-2.5">{gettext("Session")}</th>
+                <th class="text-left px-4 py-2.5">{gettext("Kind")}</th>
+                <th class="text-left px-4 py-2.5">{gettext("Key")}</th>
+                <th class="text-left px-4 py-2.5">{gettext("Value")}</th>
+                <th class="text-right px-4 py-2.5">{gettext("Actions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -1593,38 +1592,37 @@ defmodule LongWeb.ManageLive do
                 <td class="px-4 py-2 font-medium text-zinc-800">{row.key}</td>
                 <td class="px-4 py-2 text-zinc-600 leading-snug">{Text.preview(row.value, 140)}</td>
                 <td class="px-4 py-2 text-right">
-                  <div class="flex justify-end gap-1.5">
-                    <.button
+                  <div class="flex justify-end gap-1">
+                    <Button.icon_button
                       phx-click="edit_session_memory"
                       phx-value-id={row.id}
-                      variant="base"
-                      color="natural"
-                      size="extra_small"
-                      icon="hero-pencil-square"
-                      rounded="medium"
-                      title="Edit / view full"
-                    />
-                    <.button
+                      color="gray"
+                      size="xs"
+                      title={gettext("Edit / view full")}
+                    >
+                      <.icon name="hero-pencil-square" class="size-4" />
+                    </Button.icon_button>
+                    <Button.icon_button
                       phx-click="destroy_session_memory"
                       phx-value-id={row.id}
-                      variant="base"
                       color="danger"
-                      size="extra_small"
-                      icon="hero-trash"
-                      rounded="medium"
-                      data-confirm={"Delete \"#{row.key}\"?"}
-                    />
+                      size="xs"
+                      data-confirm={gettext("Delete \"%{name}\"?", name: row.key)}
+                      title={gettext("Delete")}
+                    >
+                      <.icon name="hero-trash" class="size-4" />
+                    </Button.icon_button>
                   </div>
                 </td>
               </tr>
               <tr :if={@session_memories == []}>
                 <td colspan="5" class="px-4 py-6 text-center text-zinc-400 text-sm">
-                  (no session memory)
+                  {gettext("(no session memory)")}
                 </td>
               </tr>
             </tbody>
           </table>
-        </.card>
+        </div>
       </section>
     </div>
     """
@@ -1634,65 +1632,57 @@ defmodule LongWeb.ManageLive do
     ~H"""
     <div class="p-6 space-y-4">
       <div class="flex items-center gap-3">
-        <h1 class="text-xl font-semibold flex-1">Skills</h1>
+        <h1 class="text-xl font-semibold flex-1">{gettext("Skills")}</h1>
         <span class="text-xs text-zinc-400 font-mono">{SkillStore.root()}</span>
-        <.button
-          phx-click="skill_reindex"
-          color="primary"
-          variant="outline"
-          icon="hero-arrow-path"
-          rounded="medium"
-          size="small"
-        >
-          Reindex
-        </.button>
+        <Button.button phx-click="skill_reindex" color="primary" variant="outline" icon="hero-arrow-path" radius="md" size="sm">
+          {gettext("Reindex")}
+        </Button.button>
       </div>
 
-      <.card variant="bordered" color="natural" rounded="large" padding="medium">
+      <div class="rounded-lg border border-zinc-200 bg-white p-4">
         <p class="text-xs text-zinc-500 mb-2">
-          Create a <strong>shared skill</strong> — visible to every member of every group
-          (the independent shared space, separate from members' personal skills).
+          {gettext("Create a shared skill — visible to every member of every group (separate from members' personal skills).")}
         </p>
         <form phx-submit="new_shared_skill" class="space-y-2">
           <div class="flex gap-2">
             <input
               name="skill[name]"
               required
-              placeholder="name (e.g. daily-standup)"
+              placeholder={gettext("name (e.g. daily-standup)")}
               class="flex-1 border border-zinc-300 rounded-md px-2 py-1.5 text-sm font-mono"
             />
             <input
               name="skill[description]"
               required
-              placeholder="one-line description"
+              placeholder={gettext("one-line description")}
               class="flex-[2] border border-zinc-300 rounded-md px-2 py-1.5 text-sm"
             />
           </div>
           <textarea
             name="skill[body]"
             rows="3"
-            placeholder="SKILL.md instructions (markdown)…"
+            placeholder={gettext("SKILL.md instructions (markdown)…")}
             class="w-full border border-zinc-300 rounded-md px-2 py-1.5 text-sm font-mono"
           ></textarea>
           <div class="flex justify-end">
-            <.button type="submit" color="primary" icon="hero-plus" rounded="medium" size="small">
-              Create shared skill
-            </.button>
+            <Button.button type="submit" color="primary" icon="hero-plus" radius="md" size="sm">
+              {gettext("Create shared skill")}
+            </Button.button>
           </div>
         </form>
-      </.card>
+      </div>
 
-      <.card variant="bordered" color="natural" rounded="large" padding="none">
+      <div class="rounded-lg border border-zinc-200 bg-white overflow-hidden">
         <table class="w-full text-sm">
           <thead class="text-xs uppercase text-zinc-500 bg-zinc-50">
             <tr>
-              <th class="text-left px-4 py-2.5">Name</th>
-              <th class="text-left px-4 py-2.5">Scope</th>
-              <th class="text-left px-4 py-2.5">Description</th>
-              <th class="text-left px-4 py-2.5">Tags</th>
-              <th class="text-left px-4 py-2.5">Path</th>
-              <th class="text-right px-4 py-2.5">Used</th>
-              <th class="text-right px-4 py-2.5">Actions</th>
+              <th class="text-left px-4 py-2.5">{gettext("Name")}</th>
+              <th class="text-left px-4 py-2.5">{gettext("Scope")}</th>
+              <th class="text-left px-4 py-2.5">{gettext("Description")}</th>
+              <th class="text-left px-4 py-2.5">{gettext("Tags")}</th>
+              <th class="text-left px-4 py-2.5">{gettext("Path")}</th>
+              <th class="text-right px-4 py-2.5">{gettext("Used")}</th>
+              <th class="text-right px-4 py-2.5">{gettext("Actions")}</th>
             </tr>
           </thead>
           <tbody>
@@ -1704,52 +1694,48 @@ defmodule LongWeb.ManageLive do
               </td>
               <td class="px-4 py-2">
                 <span class="inline-flex gap-1">
-                  <.badge :for={t <- s.tags || []} color="silver" size="extra_small" rounded="full">
+                  <Badge.badge :for={t <- s.tags || []} color="gray" size="xs">
                     {t}
-                  </.badge>
+                  </Badge.badge>
                 </span>
               </td>
               <td class="px-4 py-2 text-xs font-mono text-zinc-500">{s.relative_path}</td>
               <td class="px-4 py-2 text-right text-zinc-600">{s.use_count}</td>
               <td class="px-4 py-2">
                 <div class="flex justify-end gap-1.5">
-                  <.button
+                  <Button.button
                     phx-click="view_skill"
                     phx-value-name={s.name}
                     variant="outline"
-                    color="natural"
-                    size="extra_small"
+                    color="gray"
+                    size="xs"
                     icon="hero-eye"
-                    rounded="medium"
                   >
-                    View
-                  </.button>
-                  <.button
+                    {gettext("View")}
+                  </Button.button>
+                  <Button.button
                     :if={s[:scope] == :personal}
                     phx-click="promote_skill"
                     phx-value-name={s.name}
                     variant="outline"
                     color="primary"
-                    size="extra_small"
+                    size="xs"
                     icon="hero-arrow-up-on-square"
-                    rounded="medium"
-                    data-confirm={"把个人技能「#{s.name}」提升为全局?所有成员都能用,目录会移动到全局区。"}
+                    data-confirm={gettext("Promote personal skill \"%{name}\" to global? Every member can use it; the directory moves to the global space.", name: s.name)}
                   >
-                    提升为全局
-                  </.button>
+                    {gettext("Promote to global")}
+                  </Button.button>
                 </div>
               </td>
             </tr>
             <tr :if={@skills == []}>
               <td colspan="7" class="px-4 py-8 text-center text-zinc-400 text-sm">
-                No skills under <code class="text-xs">{SkillStore.root()}</code>. Drop a
-                <code class="text-xs">SKILL.md</code>
-                in there and hit <strong>Reindex</strong>.
+                {gettext("No skills found. Drop a SKILL.md into the skills directory and hit Reindex.")}
               </td>
             </tr>
           </tbody>
         </table>
-      </.card>
+      </div>
     </div>
     """
   end
@@ -1760,11 +1746,11 @@ defmodule LongWeb.ManageLive do
   defp skill_scope_badge(assigns) do
     ~H"""
     <%= if @skill[:scope] == :personal do %>
-      <.badge color="warning" size="extra_small" rounded="full">
-        Personal · {@owners[@skill.owner_member_id] || "unknown"}
-      </.badge>
+      <Badge.badge color="warning" size="xs">
+        {gettext("Personal")} · {@owners[@skill.owner_member_id] || gettext("unknown")}
+      </Badge.badge>
     <% else %>
-      <.badge color="success" size="extra_small" rounded="full">Global</.badge>
+      <Badge.badge color="success" size="xs">{gettext("Global")}</Badge.badge>
     <% end %>
     """
   end
@@ -1773,7 +1759,7 @@ defmodule LongWeb.ManageLive do
     ~H"""
     <div class="p-8">
       <h1 class="text-xl font-semibold mb-2">{@title}</h1>
-      <p class="text-sm text-zinc-500">Coming soon.</p>
+      <p class="text-sm text-zinc-500">{gettext("Coming soon.")}</p>
     </div>
     """
   end
