@@ -2228,91 +2228,80 @@ defmodule LongWeb.ManageLive do
     ~H"""
     <div class="p-6 space-y-4">
       <div class="flex items-center gap-3">
-        <h1 class="text-xl font-semibold flex-1">Scheduled tasks</h1>
-        <.button
-          phx-click="new_scheduled"
-          color="primary"
-          icon="hero-plus"
-          rounded="medium"
-          size="small"
-        >
-          New task
-        </.button>
+        <h1 class="text-xl font-semibold flex-1">{gettext("Scheduled tasks")}</h1>
+        <Button.button phx-click="new_scheduled" color="primary" icon="hero-plus" radius="md" size="sm">
+          {gettext("New task")}
+        </Button.button>
       </div>
 
-      <.card variant="bordered" color="natural" rounded="large" padding="none">
+      <div class="rounded-lg border border-zinc-200 bg-white overflow-hidden">
         <table class="w-full text-sm">
           <thead class="text-xs uppercase text-zinc-500 bg-zinc-50">
             <tr>
-              <th class="text-left px-4 py-2.5">Name</th>
-              <th class="text-left px-4 py-2.5">Repeat</th>
-              <th class="text-left px-4 py-2.5">Prompt</th>
-              <th class="text-left px-4 py-2.5">Status</th>
-              <th class="text-left px-4 py-2.5">Next run</th>
-              <th class="text-left px-4 py-2.5">Last run</th>
-              <th class="text-right px-4 py-2.5">Actions</th>
+              <th class="text-left px-4 py-2.5">{gettext("Name")}</th>
+              <th class="text-left px-4 py-2.5">{gettext("Repeat")}</th>
+              <th class="text-left px-4 py-2.5">{gettext("Prompt")}</th>
+              <th class="text-left px-4 py-2.5">{gettext("Status")}</th>
+              <th class="text-left px-4 py-2.5">{gettext("Next run")}</th>
+              <th class="text-left px-4 py-2.5">{gettext("Last run")}</th>
+              <th class="text-right px-4 py-2.5">{gettext("Actions")}</th>
             </tr>
           </thead>
           <tbody>
             <tr :for={t <- @scheduled_tasks} class="border-t border-zinc-100">
               <td class="px-4 py-2 font-medium">{t.name}</td>
               <td class="px-4 py-2">
-                <.badge color="info" size="extra_small" rounded="full">{repeat_label(t)}</.badge>
+                <Badge.badge color="info" size="xs">{repeat_label(t)}</Badge.badge>
               </td>
               <td class="px-4 py-2 text-zinc-600 max-w-md">{Text.preview(t.prompt || "", 80)}</td>
               <td class="px-4 py-2">
-                <.badge
-                  color={if t.enabled, do: "success", else: "silver"}
-                  size="extra_small"
-                  rounded="full"
-                >
-                  {if t.enabled, do: "on", else: "off"}
-                </.badge>
+                <Badge.badge color={if t.enabled, do: "success", else: "gray"} size="xs">
+                  {if t.enabled, do: gettext("on"), else: gettext("off")}
+                </Badge.badge>
               </td>
               <td class="px-4 py-2 text-xs text-zinc-500">{format_dt(t.next_run_at)}</td>
               <td class="px-4 py-2 text-xs text-zinc-500">{format_dt(t.last_run_at)}</td>
               <td class="px-4 py-2">
-                <div class="flex justify-end gap-1.5">
-                  <.button
+                <div class="flex justify-end gap-1">
+                  <Button.icon_button
                     phx-click="toggle_scheduled_enabled"
                     phx-value-id={t.id}
-                    variant="base"
-                    color="natural"
-                    size="extra_small"
-                    icon={if t.enabled, do: "hero-pause", else: "hero-play"}
-                    rounded="medium"
-                  />
-                  <.button
+                    color="gray"
+                    size="xs"
+                    title={if t.enabled, do: gettext("Disable"), else: gettext("Enable")}
+                  >
+                    <.icon name={if t.enabled, do: "hero-pause", else: "hero-play"} class="size-4" />
+                  </Button.icon_button>
+                  <Button.icon_button
                     phx-click="edit_scheduled"
                     phx-value-id={t.id}
-                    variant="base"
-                    color="natural"
-                    size="extra_small"
-                    icon="hero-pencil-square"
-                    rounded="medium"
-                  />
-                  <.button
+                    color="gray"
+                    size="xs"
+                    title={gettext("Edit")}
+                  >
+                    <.icon name="hero-pencil-square" class="size-4" />
+                  </Button.icon_button>
+                  <Button.icon_button
                     phx-click="destroy_scheduled"
                     phx-value-id={t.id}
-                    variant="base"
                     color="danger"
-                    size="extra_small"
-                    icon="hero-trash"
-                    rounded="medium"
-                    data-confirm={"Delete \"#{t.name}\"?"}
-                  />
+                    size="xs"
+                    data-confirm={gettext("Delete \"%{name}\"?", name: t.name)}
+                    title={gettext("Delete")}
+                  >
+                    <.icon name="hero-trash" class="size-4" />
+                  </Button.icon_button>
                 </div>
               </td>
             </tr>
             <tr :if={@scheduled_tasks == []}>
               <td colspan="7" class="px-4 py-8 text-center text-zinc-400 text-sm">
-                No scheduled tasks. Click <strong>New task</strong>
-                to add one (or let the agent schedule them via GraphQL <code>createScheduledTask</code>).
+                {gettext("No scheduled tasks. Click \"New task\" to add one, or let the agent schedule them.")}
               </td>
             </tr>
           </tbody>
         </table>
-      </.card>
+      </div>
     </div>
     """
   end
