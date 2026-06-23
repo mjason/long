@@ -2814,24 +2814,19 @@ defmodule LongWeb.ManageLive do
   defp phrases_section(assigns) do
     ~H"""
     <div class="p-6 space-y-4">
-      <h1 class="text-xl font-semibold">Phrases</h1>
+      <h1 class="text-xl font-semibold">{gettext("Phrases")}</h1>
       <p class="text-xs text-zinc-500 max-w-3xl leading-relaxed">
-        Central catalog of bot / system copy, per locale. Each phrase has a built-in default;
-        set an <strong>override</strong> here to customize the wording.
-        <code>%&#123;name&#125;</code>
-        placeholders are filled at runtime — keep them. Leave an override blank to fall back to
-        the built-in default. (The agent's own replies are written by the LLM in the user's
-        language; this controls only the fixed system messages.)
+        {gettext("Central catalog of bot / system copy, per locale. Each phrase has a built-in default; set an override here to customize the wording. %{name}-style placeholders are filled at runtime — keep them. Leave an override blank to fall back to the default.")}
       </p>
 
-      <.card variant="bordered" color="natural" rounded="large" padding="none">
+      <div class="rounded-lg border border-zinc-200 bg-white overflow-hidden">
         <table class="w-full text-sm">
           <thead class="text-xs uppercase text-zinc-500 bg-zinc-50">
             <tr>
-              <th class="text-left px-4 py-2">Key</th>
-              <th class="text-left px-4 py-2">Locale</th>
-              <th class="text-left px-4 py-2">Built-in default</th>
-              <th class="text-left px-4 py-2">Override</th>
+              <th class="text-left px-4 py-2">{gettext("Key")}</th>
+              <th class="text-left px-4 py-2">{gettext("Locale")}</th>
+              <th class="text-left px-4 py-2">{gettext("Built-in default")}</th>
+              <th class="text-left px-4 py-2">{gettext("Override")}</th>
             </tr>
           </thead>
           <tbody>
@@ -2850,22 +2845,18 @@ defmodule LongWeb.ManageLive do
                   <textarea
                     name="text"
                     rows="1"
-                    placeholder="(uses default)"
+                    placeholder={gettext("(uses default)")}
                     class="w-64 border border-zinc-300 rounded-md px-2 py-1 text-xs font-mono"
                   >{r.override}</textarea>
-                  <.button
-                    type="submit"
-                    color="primary"
-                    size="extra_small"
-                    icon="hero-check"
-                    rounded="medium"
-                  />
+                  <Button.icon_button type="submit" color="primary" size="xs" title={gettext("Save")}>
+                    <.icon name="hero-check" class="size-4" />
+                  </Button.icon_button>
                 </form>
               </td>
             </tr>
           </tbody>
         </table>
-      </.card>
+      </div>
     </div>
     """
   end

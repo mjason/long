@@ -21,7 +21,7 @@ msgstr ""
 #: lib/long_web/live/manage_live.ex:1810
 #: lib/long_web/live/manage_live.ex:2246
 #: lib/long_web/live/manage_live.ex:2331
-#: lib/long_web/live/manage_live.ex:3037
+#: lib/long_web/live/manage_live.ex:3028
 #, elixir-autogen, elixir-format
 msgid "Actions"
 msgstr ""
@@ -322,65 +322,66 @@ msgstr ""
 msgid "Back to home"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:3395
+#: lib/long_web/live/manage_live.ex:3386
 #, elixir-autogen, elixir-format
 msgid "Channels"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:3390
+#: lib/long_web/live/manage_live.ex:3381
 #, elixir-autogen, elixir-format
 msgid "Groups"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:3389
+#: lib/long_web/live/manage_live.ex:3380
 #, elixir-autogen, elixir-format
 msgid "LLMs"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:3391
+#: lib/long_web/live/manage_live.ex:3382
 #, elixir-autogen, elixir-format
 msgid "Memories"
 msgstr ""
 
 #: lib/long_web/live/manage_live.ex:2312
-#: lib/long_web/live/manage_live.ex:3397
+#: lib/long_web/live/manage_live.ex:3388
 #, elixir-autogen, elixir-format
 msgid "Monitors"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:3400
+#: lib/long_web/live/manage_live.ex:2817
+#: lib/long_web/live/manage_live.ex:3391
 #, elixir-autogen, elixir-format
 msgid "Phrases"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:3398
+#: lib/long_web/live/manage_live.ex:3389
 #, elixir-autogen, elixir-format
 msgid "Reflection"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:3396
+#: lib/long_web/live/manage_live.ex:3387
 #, elixir-autogen, elixir-format
 msgid "Scheduled"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:3394
+#: lib/long_web/live/manage_live.ex:3385
 #, elixir-autogen, elixir-format
 msgid "Search"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:3019
-#: lib/long_web/live/manage_live.ex:3399
+#: lib/long_web/live/manage_live.ex:3010
+#: lib/long_web/live/manage_live.ex:3390
 #, elixir-autogen, elixir-format
 msgid "Secrets"
 msgstr ""
 
 #: lib/long_web/live/manage_live.ex:1800
-#: lib/long_web/live/manage_live.ex:3393
+#: lib/long_web/live/manage_live.ex:3384
 #, elixir-autogen, elixir-format
 msgid "Sessions"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:3392
+#: lib/long_web/live/manage_live.ex:3383
 #, elixir-autogen, elixir-format
 msgid "Skills"
 msgstr ""
@@ -536,7 +537,7 @@ msgstr ""
 #: lib/long_web/live/manage_live.ex:1846
 #: lib/long_web/live/manage_live.ex:2289
 #: lib/long_web/live/manage_live.ex:2387
-#: lib/long_web/live/manage_live.ex:3067
+#: lib/long_web/live/manage_live.ex:3058
 #, elixir-autogen, elixir-format
 msgid "Delete"
 msgstr ""
@@ -555,7 +556,7 @@ msgstr ""
 
 #: lib/long_web/live/manage_live.ex:2279
 #: lib/long_web/live/manage_live.ex:2377
-#: lib/long_web/live/manage_live.ex:3057
+#: lib/long_web/live/manage_live.ex:3048
 #, elixir-autogen, elixir-format
 msgid "Edit"
 msgstr ""
@@ -584,7 +585,7 @@ msgstr ""
 
 #: lib/long_web/live/manage_live.ex:2240
 #: lib/long_web/live/manage_live.ex:2325
-#: lib/long_web/live/manage_live.ex:3033
+#: lib/long_web/live/manage_live.ex:3024
 #, elixir-autogen, elixir-format
 msgid "Name"
 msgstr ""
@@ -678,17 +679,17 @@ msgstr ""
 msgid "Created"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:3066
+#: lib/long_web/live/manage_live.ex:3057
 #, elixir-autogen, elixir-format
 msgid "Delete secret \"%{name}\"?"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:3035
+#: lib/long_web/live/manage_live.ex:3026
 #, elixir-autogen, elixir-format
 msgid "Description"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:3026
+#: lib/long_web/live/manage_live.ex:3017
 #, elixir-autogen, elixir-format
 msgid "Flat key/value store for tokens the agent needs at tool-call time. Stored plaintext (LAN-only) but kept out of memory + chat history. The agent reads these via the graphql tool."
 msgstr ""
@@ -698,12 +699,12 @@ msgstr ""
 msgid "LLM"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:3021
+#: lib/long_web/live/manage_live.ex:3012
 #, elixir-autogen, elixir-format
 msgid "New secret"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:3076
+#: lib/long_web/live/manage_live.ex:3067
 #, elixir-autogen, elixir-format
 msgid "No secrets yet. Click \"New secret\" to add a token."
 msgstr ""
@@ -718,12 +719,47 @@ msgstr ""
 msgid "Tokens"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:3036
+#: lib/long_web/live/manage_live.ex:3027
 #, elixir-autogen, elixir-format
 msgid "Updated"
 msgstr ""
 
-#: lib/long_web/live/manage_live.ex:3034
+#: lib/long_web/live/manage_live.ex:3025
 #, elixir-autogen, elixir-format
 msgid "Value"
+msgstr ""
+
+#: lib/long_web/live/manage_live.ex:2848
+#, elixir-autogen, elixir-format
+msgid "(uses default)"
+msgstr ""
+
+#: lib/long_web/live/manage_live.ex:2828
+#, elixir-autogen, elixir-format
+msgid "Built-in default"
+msgstr ""
+
+#: lib/long_web/live/manage_live.ex:2819
+#, elixir-autogen, elixir-format
+msgid "Central catalog of bot / system copy, per locale. Each phrase has a built-in default; set an override here to customize the wording. %{name}-style placeholders are filled at runtime — keep them. Leave an override blank to fall back to the default."
+msgstr ""
+
+#: lib/long_web/live/manage_live.ex:2826
+#, elixir-autogen, elixir-format
+msgid "Key"
+msgstr ""
+
+#: lib/long_web/live/manage_live.ex:2827
+#, elixir-autogen, elixir-format
+msgid "Locale"
+msgstr ""
+
+#: lib/long_web/live/manage_live.ex:2829
+#, elixir-autogen, elixir-format
+msgid "Override"
+msgstr ""
+
+#: lib/long_web/live/manage_live.ex:2851
+#, elixir-autogen, elixir-format
+msgid "Save"
 msgstr ""
