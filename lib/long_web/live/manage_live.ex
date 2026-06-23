@@ -1797,17 +1797,17 @@ defmodule LongWeb.ManageLive do
   defp sessions_section(assigns) do
     ~H"""
     <div class="p-6 space-y-4">
-      <h1 class="text-xl font-semibold">Sessions</h1>
-      <.card variant="bordered" color="natural" rounded="large" padding="none">
+      <h1 class="text-xl font-semibold">{gettext("Sessions")}</h1>
+      <div class="rounded-lg border border-zinc-200 bg-white overflow-hidden">
         <table class="w-full text-sm">
           <thead class="text-xs uppercase text-zinc-500 bg-zinc-50">
             <tr>
-              <th class="text-left px-4 py-2.5">Title</th>
-              <th class="text-left px-4 py-2.5">Status</th>
-              <th class="text-left px-4 py-2.5">LLM</th>
-              <th class="text-right px-4 py-2.5">Tokens</th>
-              <th class="text-left px-4 py-2.5">Created</th>
-              <th class="text-right px-4 py-2.5">Actions</th>
+              <th class="text-left px-4 py-2.5">{gettext("Title")}</th>
+              <th class="text-left px-4 py-2.5">{gettext("Status")}</th>
+              <th class="text-left px-4 py-2.5">{gettext("LLM")}</th>
+              <th class="text-right px-4 py-2.5">{gettext("Tokens")}</th>
+              <th class="text-left px-4 py-2.5">{gettext("Created")}</th>
+              <th class="text-right px-4 py-2.5">{gettext("Actions")}</th>
             </tr>
           </thead>
           <tbody>
@@ -1818,45 +1818,44 @@ defmodule LongWeb.ManageLive do
                 </.link>
               </td>
               <td class="px-4 py-2">
-                <.badge color={session_status_color(s.status)} size="extra_small" rounded="full">
+                <Badge.badge color={session_status_color(s.status)} size="xs">
                   {s.status}
-                </.badge>
+                </Badge.badge>
               </td>
               <td class="px-4 py-2 text-xs font-mono text-zinc-500">{s.llm_alias || "—"}</td>
               <td class="px-4 py-2 text-right text-zinc-600">{s.token_usage || 0}</td>
               <td class="px-4 py-2 text-xs text-zinc-500">{format_dt(s.inserted_at)}</td>
               <td class="px-4 py-2">
-                <div class="flex justify-end gap-1.5">
-                  <.button
+                <div class="flex justify-end gap-1">
+                  <Button.icon_button
                     :if={s.status != :archived}
                     phx-click="archive_session"
                     phx-value-id={s.id}
-                    variant="base"
-                    color="natural"
-                    size="extra_small"
-                    icon="hero-archive-box-arrow-down"
-                    rounded="medium"
-                    title="Archive"
-                  />
-                  <.button
+                    color="gray"
+                    size="xs"
+                    title={gettext("Archive")}
+                  >
+                    <.icon name="hero-archive-box-arrow-down" class="size-4" />
+                  </Button.icon_button>
+                  <Button.icon_button
                     phx-click="destroy_session"
                     phx-value-id={s.id}
-                    variant="base"
                     color="danger"
-                    size="extra_small"
-                    icon="hero-trash"
-                    rounded="medium"
-                    data-confirm={"Delete \"#{s.title || s.id}\" and all its messages?"}
-                  />
+                    size="xs"
+                    data-confirm={gettext("Delete \"%{title}\" and all its messages?", title: s.title || s.id)}
+                    title={gettext("Delete")}
+                  >
+                    <.icon name="hero-trash" class="size-4" />
+                  </Button.icon_button>
                 </div>
               </td>
             </tr>
             <tr :if={@sessions_rows == []}>
-              <td colspan="6" class="px-4 py-8 text-center text-zinc-400 text-sm">(no sessions)</td>
+              <td colspan="6" class="px-4 py-8 text-center text-zinc-400 text-sm">{gettext("(no sessions)")}</td>
             </tr>
           </tbody>
         </table>
-      </.card>
+      </div>
     </div>
     """
   end
@@ -3017,28 +3016,25 @@ defmodule LongWeb.ManageLive do
     ~H"""
     <div class="p-6 space-y-4">
       <div class="flex items-center gap-3">
-        <h1 class="text-xl font-semibold flex-1">Secrets</h1>
-        <.button phx-click="new_secret" color="primary" icon="hero-plus" rounded="medium" size="small">
-          New secret
-        </.button>
+        <h1 class="text-xl font-semibold flex-1">{gettext("Secrets")}</h1>
+        <Button.button phx-click="new_secret" color="primary" icon="hero-plus" radius="md" size="sm">
+          {gettext("New secret")}
+        </Button.button>
       </div>
 
       <p class="text-xs text-zinc-500 max-w-2xl leading-relaxed">
-        Flat key/value store for tokens the agent needs at tool-call time.
-        Stored plaintext (LAN-only) but kept out of memory + chat history.
-        The agent reads these via the <code>graphql</code> tool — ask it to
-        fetch a secret by name when it needs to authenticate against an API.
+        {gettext("Flat key/value store for tokens the agent needs at tool-call time. Stored plaintext (LAN-only) but kept out of memory + chat history. The agent reads these via the graphql tool.")}
       </p>
 
-      <.card variant="bordered" color="natural" rounded="large" padding="none">
+      <div class="rounded-lg border border-zinc-200 bg-white overflow-hidden">
         <table class="w-full text-sm">
           <thead class="text-xs uppercase text-zinc-500 bg-zinc-50">
             <tr>
-              <th class="text-left px-4 py-2.5">Name</th>
-              <th class="text-left px-4 py-2.5">Value</th>
-              <th class="text-left px-4 py-2.5">Description</th>
-              <th class="text-left px-4 py-2.5">Updated</th>
-              <th class="text-right px-4 py-2.5">Actions</th>
+              <th class="text-left px-4 py-2.5">{gettext("Name")}</th>
+              <th class="text-left px-4 py-2.5">{gettext("Value")}</th>
+              <th class="text-left px-4 py-2.5">{gettext("Description")}</th>
+              <th class="text-left px-4 py-2.5">{gettext("Updated")}</th>
+              <th class="text-right px-4 py-2.5">{gettext("Actions")}</th>
             </tr>
           </thead>
           <tbody>
@@ -3052,37 +3048,37 @@ defmodule LongWeb.ManageLive do
               </td>
               <td class="px-4 py-2 text-xs text-zinc-500">{format_dt(s.updated_at)}</td>
               <td class="px-4 py-2">
-                <div class="flex justify-end gap-1.5">
-                  <.button
+                <div class="flex justify-end gap-1">
+                  <Button.icon_button
                     phx-click="edit_secret"
                     phx-value-name={s.name}
-                    variant="base"
-                    color="natural"
-                    size="extra_small"
-                    icon="hero-pencil-square"
-                    rounded="medium"
-                  />
-                  <.button
+                    color="gray"
+                    size="xs"
+                    title={gettext("Edit")}
+                  >
+                    <.icon name="hero-pencil-square" class="size-4" />
+                  </Button.icon_button>
+                  <Button.icon_button
                     phx-click="destroy_secret"
                     phx-value-name={s.name}
-                    variant="base"
                     color="danger"
-                    size="extra_small"
-                    icon="hero-trash"
-                    rounded="medium"
-                    data-confirm={"Delete secret \"#{s.name}\"?"}
-                  />
+                    size="xs"
+                    data-confirm={gettext("Delete secret \"%{name}\"?", name: s.name)}
+                    title={gettext("Delete")}
+                  >
+                    <.icon name="hero-trash" class="size-4" />
+                  </Button.icon_button>
                 </div>
               </td>
             </tr>
             <tr :if={@secrets == []}>
               <td colspan="5" class="px-4 py-8 text-center text-zinc-400 text-sm">
-                No secrets yet. Click <strong>New secret</strong> to add a token.
+                {gettext("No secrets yet. Click \"New secret\" to add a token.")}
               </td>
             </tr>
           </tbody>
         </table>
-      </.card>
+      </div>
     </div>
     """
   end
@@ -3545,7 +3541,7 @@ defmodule LongWeb.ManageLive do
   end
 
   defp session_status_color(:active), do: "success"
-  defp session_status_color(:archived), do: "silver"
+  defp session_status_color(:archived), do: "gray"
   defp session_status_color(_), do: "info"
 
   defp repeat_label(%{repeat: :every_n_hours, every_n: n}), do: "every #{n}h"
