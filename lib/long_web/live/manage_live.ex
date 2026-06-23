@@ -2531,35 +2531,33 @@ defmodule LongWeb.ManageLive do
     ~H"""
     <div class="p-6 space-y-6">
       <div class="flex items-center gap-3">
-        <h1 class="text-xl font-semibold flex-1">Groups</h1>
+        <h1 class="text-xl font-semibold flex-1">{gettext("Groups")}</h1>
       </div>
 
-      <.card variant="bordered" color="natural" rounded="large" padding="none">
+      <div class="rounded-lg border border-zinc-200 bg-white">
         <div class="flex items-center gap-3 p-4">
           <div class="flex-1">
-            <div class="text-sm font-medium text-zinc-800">System default language</div>
+            <div class="text-sm font-medium text-zinc-800">{gettext("System default language")}</div>
             <div class="text-xs text-zinc-500">
-              The fallback used when a channel, member, or group sets no language of its own.
+              {gettext("The fallback used when a channel, member, or group sets no language of its own.")}
             </div>
           </div>
           <form id="locsel-set_default_locale-system" phx-change="set_default_locale">
             <input type="hidden" name="scope" value="system" />
             <select name="locale" class="border border-zinc-300 rounded-md px-2 py-1.5 text-sm">
-              <option value="">— inherit —</option>
+              <option value="">{gettext("— inherit —")}</option>
               <option :for={{code, label} <- locale_options()} value={code} selected={code == Long.Copy.default_locale_setting()}>{label}</option>
             </select>
           </form>
         </div>
-      </.card>
+      </div>
 
-      <.card variant="bordered" color="natural" rounded="large" padding="none">
+      <div class="rounded-lg border border-zinc-200 bg-white">
         <div class="flex items-center gap-3 p-4">
           <div class="flex-1">
-            <div class="text-sm font-medium text-zinc-800">System timezone</div>
+            <div class="text-sm font-medium text-zinc-800">{gettext("System timezone")}</div>
             <div class="text-xs text-zinc-500">
-              How the agent reads your local time when scheduling reminders
-              (e.g. "remind me at 8:30am"). The agent also picks this up when
-              you tell it where you are.
+              {gettext("How the agent reads your local time when scheduling reminders (e.g. \"remind me at 8:30am\"). It also picks this up when you tell it where you are.")}
             </div>
           </div>
           <% current_tz = Agent.user_timezone() %>
@@ -2570,7 +2568,7 @@ defmodule LongWeb.ManageLive do
               list="tz-datalist"
               autocomplete="off"
               phx-debounce="300"
-              placeholder={"now: #{current_tz} — type to change"}
+              placeholder={gettext("now: %{tz} — type to change", tz: current_tz)}
               class="border border-zinc-300 rounded-md px-2 py-1.5 text-sm w-72"
             />
             <datalist id="tz-datalist">
@@ -2578,7 +2576,7 @@ defmodule LongWeb.ManageLive do
             </datalist>
           </form>
         </div>
-      </.card>
+      </div>
 
       <div class="rounded-lg border border-blue-200 bg-blue-50 p-4 text-xs text-zinc-600 max-w-3xl leading-relaxed space-y-2">
         <p class="font-medium text-zinc-800">How members link their WeChat / Telegram</p>
@@ -2600,63 +2598,57 @@ defmodule LongWeb.ManageLive do
         </p>
       </div>
 
-      <.card variant="bordered" color="natural" rounded="large" padding="none">
+      <div class="rounded-lg border border-zinc-200 bg-white">
         <form phx-submit="new_group" class="flex items-end gap-3 p-4">
           <label class="flex-1 block">
-            <span class="text-xs font-medium text-zinc-600">New group</span>
+            <span class="text-xs font-medium text-zinc-600">{gettext("New group")}</span>
             <input
               name="group[name]"
               required
-              placeholder="e.g. My Home"
+              placeholder={gettext("e.g. My Home")}
               class="mt-1 w-full border border-zinc-300 rounded-md px-3 py-2 text-sm"
             />
           </label>
-          <.button type="submit" color="primary" icon="hero-plus" rounded="medium" size="small">
-            Create
-          </.button>
+          <Button.button type="submit" color="primary" icon="hero-plus" radius="md" size="sm">
+            {gettext("Create")}
+          </Button.button>
         </form>
-      </.card>
+      </div>
 
-      <.card
-        :for={hh <- @groups}
-        variant="bordered"
-        color="natural"
-        rounded="large"
-        padding="none"
-      >
+      <div :for={hh <- @groups} class="rounded-lg border border-zinc-200 bg-white overflow-hidden">
         <div class="flex items-center gap-2 px-4 py-3 border-b border-zinc-200 bg-zinc-50">
           <.icon name="hero-user-group" class="size-4 text-zinc-500" />
           <span class="font-semibold flex-1">{hh.name}</span>
-          <span class="text-xs text-zinc-500">Default language</span>
+          <span class="text-xs text-zinc-500">{gettext("Default language")}</span>
           <form id={"locsel-set_group_locale-#{hh.id}"} phx-change="set_group_locale">
             <input type="hidden" name="group_id" value={hh.id} />
             <select name="locale" class="border border-zinc-300 rounded-md px-2 py-1.5 text-sm">
-              <option value="">— inherit —</option>
+              <option value="">{gettext("— inherit —")}</option>
               <option :for={{code, label} <- locale_options()} value={code} selected={code == hh.locale}>{label}</option>
             </select>
           </form>
-          <.button
+          <Button.icon_button
             phx-click="destroy_group"
             phx-value-id={hh.id}
-            variant="base"
             color="danger"
-            size="extra_small"
-            icon="hero-trash"
-            rounded="medium"
-            data-confirm={"Delete group \"#{hh.name}\"? Its members and their bindings are removed too."}
-          />
+            size="xs"
+            data-confirm={gettext("Delete group \"%{name}\"? Its members and their bindings are removed too.", name: hh.name)}
+            title={gettext("Delete")}
+          >
+            <.icon name="hero-trash" class="size-4" />
+          </Button.icon_button>
         </div>
 
         <table class="w-full text-sm">
           <thead class="text-xs uppercase text-zinc-500 bg-white">
             <tr>
-              <th class="text-left px-4 py-2">Member</th>
-              <th class="text-left px-4 py-2">Relation</th>
-              <th class="text-left px-4 py-2">Role</th>
-              <th class="text-left px-4 py-2">Language</th>
-              <th class="text-left px-4 py-2">Bind command</th>
-              <th class="text-left px-4 py-2">Bound accounts</th>
-              <th class="text-right px-4 py-2">Actions</th>
+              <th class="text-left px-4 py-2">{gettext("Member")}</th>
+              <th class="text-left px-4 py-2">{gettext("Relation")}</th>
+              <th class="text-left px-4 py-2">{gettext("Role")}</th>
+              <th class="text-left px-4 py-2">{gettext("Language")}</th>
+              <th class="text-left px-4 py-2">{gettext("Bind command")}</th>
+              <th class="text-left px-4 py-2">{gettext("Bound accounts")}</th>
+              <th class="text-right px-4 py-2">{gettext("Actions")}</th>
             </tr>
           </thead>
           <tbody>
@@ -2668,7 +2660,7 @@ defmodule LongWeb.ManageLive do
                 <form id={"locsel-set_member_locale-#{m.id}"} phx-change="set_member_locale">
                   <input type="hidden" name="member_id" value={m.id} />
                   <select name="locale" class="border border-zinc-300 rounded-md px-2 py-1.5 text-sm">
-                    <option value="">— inherit —</option>
+                    <option value="">{gettext("— inherit —")}</option>
                     <option :for={{code, label} <- locale_options()} value={code} selected={code == m.locale}>{label}</option>
                   </select>
                 </form>
@@ -2676,37 +2668,36 @@ defmodule LongWeb.ManageLive do
               <td class="px-4 py-2">
                 <div class="flex items-center gap-1.5">
                   <code class="text-xs font-mono bg-zinc-100 px-1.5 py-0.5 rounded">/bind {m.bind_code}</code>
-                  <.button
+                  <Button.icon_button
                     phx-click="regenerate_bind_code"
                     phx-value-id={m.id}
-                    variant="base"
-                    color="natural"
-                    size="extra_small"
-                    icon="hero-arrow-path"
-                    rounded="medium"
-                    title="Regenerate bind code"
-                  />
+                    color="gray"
+                    size="xs"
+                    title={gettext("Regenerate bind code")}
+                  >
+                    <.icon name="hero-arrow-path" class="size-4" />
+                  </Button.icon_button>
                 </div>
               </td>
               <td class="px-4 py-2 text-xs">{bound_accounts(m)}</td>
               <td class="px-4 py-2">
                 <div class="flex justify-end">
-                  <.button
+                  <Button.icon_button
                     phx-click="destroy_member"
                     phx-value-id={m.id}
-                    variant="base"
                     color="danger"
-                    size="extra_small"
-                    icon="hero-trash"
-                    rounded="medium"
-                    data-confirm={"Delete member \"#{m.display_name}\"?"}
-                  />
+                    size="xs"
+                    data-confirm={gettext("Delete member \"%{name}\"?", name: m.display_name)}
+                    title={gettext("Delete")}
+                  >
+                    <.icon name="hero-trash" class="size-4" />
+                  </Button.icon_button>
                 </div>
               </td>
             </tr>
             <tr :if={hh.members == []}>
               <td colspan="7" class="px-4 py-6 text-center text-zinc-400 text-sm">
-                No members yet — add one below.
+                {gettext("No members yet — add one below.")}
               </td>
             </tr>
           </tbody>
@@ -2715,34 +2706,34 @@ defmodule LongWeb.ManageLive do
         <form phx-submit="new_member" class="flex items-end gap-2 px-4 py-3 border-t border-zinc-200 bg-zinc-50">
           <input type="hidden" name="member[group_id]" value={hh.id} />
           <label class="flex-1 block">
-            <span class="text-xs font-medium text-zinc-600">Name</span>
+            <span class="text-xs font-medium text-zinc-600">{gettext("Name")}</span>
             <input
               name="member[display_name]"
               required
-              placeholder="e.g. Alex"
+              placeholder={gettext("e.g. Alex")}
               class="mt-1 w-full border border-zinc-300 rounded-md px-2 py-1.5 text-sm"
             />
           </label>
           <label class="block">
-            <span class="text-xs font-medium text-zinc-600">Relation</span>
+            <span class="text-xs font-medium text-zinc-600">{gettext("Relation")}</span>
             <select name="member[relation]" class="mt-1 border border-zinc-300 rounded-md px-2 py-1.5 text-sm">
               <option :for={r <- member_relations()} value={r}>{relation_label(r)}</option>
             </select>
           </label>
           <label class="block">
-            <span class="text-xs font-medium text-zinc-600">Role</span>
+            <span class="text-xs font-medium text-zinc-600">{gettext("Role")}</span>
             <select name="member[role]" class="mt-1 border border-zinc-300 rounded-md px-2 py-1.5 text-sm">
               <option :for={r <- member_roles()} value={r}>{r}</option>
             </select>
           </label>
-          <.button type="submit" color="primary" icon="hero-plus" rounded="medium" size="small">
-            Add member
-          </.button>
+          <Button.button type="submit" color="primary" icon="hero-plus" radius="md" size="sm">
+            {gettext("Add member")}
+          </Button.button>
         </form>
-      </.card>
+      </div>
 
       <div :if={@groups == []} class="text-center text-zinc-400 text-sm py-8">
-        No groups yet — create one above.
+        {gettext("No groups yet — create one above.")}
       </div>
     </div>
     """
@@ -2750,14 +2741,14 @@ defmodule LongWeb.ManageLive do
 
   # Display label for a member's neutral identity tag (self vs. everyone
   # else). Accepts the enum atom or its string form (select round-trips).
-  defp relation_label(r) when r in [:self, "self"], do: "Self"
-  defp relation_label(_), do: "Member"
+  defp relation_label(r) when r in [:self, "self"], do: gettext("Self")
+  defp relation_label(_), do: gettext("Member")
 
   # Comma-joined platforms this member has bound, or a placeholder.
   defp bound_accounts(%{bot_users: bus}) when is_list(bus) and bus != [],
     do: bus |> Enum.map(&to_string(&1.platform)) |> Enum.join(" · ")
 
-  defp bound_accounts(_), do: "Not bound"
+  defp bound_accounts(_), do: gettext("Not bound")
 
   defp phrases_section(assigns) do
     ~H"""
