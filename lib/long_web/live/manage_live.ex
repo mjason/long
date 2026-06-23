@@ -1366,22 +1366,22 @@ defmodule LongWeb.ManageLive do
     ~H"""
     <div class="p-6 space-y-4">
       <div class="flex items-center gap-3">
-        <h1 class="text-xl font-semibold flex-1">LLM configurations</h1>
-        <.button phx-click="new_llm" color="primary" icon="hero-plus" rounded="medium" size="small">
-          New LLM
-        </.button>
+        <h1 class="text-xl font-semibold flex-1">{gettext("LLM configurations")}</h1>
+        <Button.button phx-click="new_llm" color="primary" icon="hero-plus" radius="md" size="sm">
+          {gettext("New LLM")}
+        </Button.button>
       </div>
 
-      <.card variant="bordered" color="natural" rounded="large" padding="none">
+      <div class="rounded-lg border border-zinc-200 bg-white overflow-hidden">
         <table class="w-full text-sm">
           <thead class="text-xs uppercase text-zinc-500 bg-zinc-50">
             <tr>
-              <th class="text-left px-4 py-2.5">Alias</th>
-              <th class="text-left px-4 py-2.5">Provider</th>
-              <th class="text-left px-4 py-2.5">Wire</th>
-              <th class="text-left px-4 py-2.5">Model</th>
-              <th class="text-left px-4 py-2.5">Status</th>
-              <th class="text-right px-4 py-2.5">Actions</th>
+              <th class="text-left px-4 py-2.5">{gettext("Alias")}</th>
+              <th class="text-left px-4 py-2.5">{gettext("Provider")}</th>
+              <th class="text-left px-4 py-2.5">{gettext("Wire")}</th>
+              <th class="text-left px-4 py-2.5">{gettext("Model")}</th>
+              <th class="text-left px-4 py-2.5">{gettext("Status")}</th>
+              <th class="text-right px-4 py-2.5">{gettext("Actions")}</th>
             </tr>
           </thead>
           <tbody>
@@ -1393,86 +1393,70 @@ defmodule LongWeb.ManageLive do
                 </span>
               </td>
               <td class="px-4 py-2 text-zinc-600">
-                <.badge
-                  color={if llm.provider, do: "info", else: "silver"}
-                  size="extra_small"
-                  rounded="full"
-                  title={
-                    if !llm.provider,
-                      do:
-                        "Legacy row — set `provider` and `wire_protocol` via Edit to use the new runtime path.",
-                      else: nil
-                  }
-                >
-                  {display_provider(llm)}
-                </.badge>
+                <span title={if !llm.provider, do: gettext("Legacy row — set provider + wire_protocol via Edit."), else: nil}>
+                  <Badge.badge color={if llm.provider, do: "info", else: "gray"} size="xs">
+                    {display_provider(llm)}
+                  </Badge.badge>
+                </span>
               </td>
               <td class="px-4 py-2 text-xs text-zinc-500">{llm.wire_protocol || "—"}</td>
               <td class="px-4 py-2 text-zinc-600 font-mono text-xs">{llm.model}</td>
               <td class="px-4 py-2">
-                <.badge
-                  color={if llm.enabled, do: "success", else: "silver"}
-                  size="extra_small"
-                  rounded="full"
-                >
-                  {if llm.enabled, do: "enabled", else: "disabled"}
-                </.badge>
+                <Badge.badge color={if llm.enabled, do: "success", else: "gray"} size="xs">
+                  {if llm.enabled, do: gettext("enabled"), else: gettext("disabled")}
+                </Badge.badge>
               </td>
               <td class="px-4 py-2">
-                <div class="flex justify-end gap-1.5">
-                  <.button
+                <div class="flex justify-end gap-1">
+                  <Button.icon_button
                     :if={!llm.default}
                     phx-click="set_default_llm"
                     phx-value-alias={llm.alias}
-                    variant="base"
                     color="warning"
-                    size="extra_small"
-                    icon="hero-star"
-                    rounded="medium"
-                    title="Set as default"
-                  />
-                  <.button
+                    size="xs"
+                    title={gettext("Set as default")}
+                  >
+                    <.icon name="hero-star" class="size-4" />
+                  </Button.icon_button>
+                  <Button.icon_button
                     phx-click="toggle_llm_enabled"
                     phx-value-alias={llm.alias}
-                    variant="base"
-                    color="natural"
-                    size="extra_small"
-                    icon={if llm.enabled, do: "hero-pause", else: "hero-play"}
-                    rounded="medium"
-                    title={if llm.enabled, do: "Disable", else: "Enable"}
-                  />
-                  <.button
+                    color="gray"
+                    size="xs"
+                    title={if llm.enabled, do: gettext("Disable"), else: gettext("Enable")}
+                  >
+                    <.icon name={if llm.enabled, do: "hero-pause", else: "hero-play"} class="size-4" />
+                  </Button.icon_button>
+                  <Button.icon_button
                     phx-click="edit_llm"
                     phx-value-alias={llm.alias}
-                    variant="base"
-                    color="natural"
-                    size="extra_small"
-                    icon="hero-pencil-square"
-                    rounded="medium"
-                    title="Edit"
-                  />
-                  <.button
+                    color="gray"
+                    size="xs"
+                    title={gettext("Edit")}
+                  >
+                    <.icon name="hero-pencil-square" class="size-4" />
+                  </Button.icon_button>
+                  <Button.icon_button
                     phx-click="destroy_llm"
                     phx-value-alias={llm.alias}
-                    variant="base"
                     color="danger"
-                    size="extra_small"
-                    icon="hero-trash"
-                    rounded="medium"
-                    data-confirm={"Delete \"#{llm.alias}\"?"}
-                    title="Delete"
-                  />
+                    size="xs"
+                    data-confirm={gettext("Delete \"%{name}\"?", name: llm.alias)}
+                    title={gettext("Delete")}
+                  >
+                    <.icon name="hero-trash" class="size-4" />
+                  </Button.icon_button>
                 </div>
               </td>
             </tr>
             <tr :if={@llms == []}>
               <td colspan="6" class="px-4 py-8 text-center text-zinc-400 text-sm">
-                No LLM configurations yet. Click <strong>New LLM</strong> above to add one.
+                {gettext("No LLM configurations yet. Click \"New LLM\" above to add one.")}
               </td>
             </tr>
           </tbody>
         </table>
-      </.card>
+      </div>
     </div>
     """
   end
@@ -1864,80 +1848,76 @@ defmodule LongWeb.ManageLive do
     ~H"""
     <div class="p-6 space-y-4">
       <div class="flex items-center gap-3">
-        <h1 class="text-xl font-semibold flex-1">Search providers</h1>
-        <.button phx-click="new_search" color="primary" icon="hero-plus" rounded="medium" size="small">
-          New provider
-        </.button>
+        <h1 class="text-xl font-semibold flex-1">{gettext("Search providers")}</h1>
+        <Button.button phx-click="new_search" color="primary" icon="hero-plus" radius="md" size="sm">
+          {gettext("New provider")}
+        </Button.button>
       </div>
 
-      <.card variant="bordered" color="natural" rounded="large" padding="none">
+      <div class="rounded-lg border border-zinc-200 bg-white overflow-hidden">
         <table class="w-full text-sm">
           <thead class="text-xs uppercase text-zinc-500 bg-zinc-50">
             <tr>
-              <th class="text-left px-4 py-2.5">Alias</th>
-              <th class="text-left px-4 py-2.5">Provider</th>
-              <th class="text-left px-4 py-2.5">Status</th>
-              <th class="text-right px-4 py-2.5">Sort</th>
-              <th class="text-right px-4 py-2.5">Actions</th>
+              <th class="text-left px-4 py-2.5">{gettext("Alias")}</th>
+              <th class="text-left px-4 py-2.5">{gettext("Provider")}</th>
+              <th class="text-left px-4 py-2.5">{gettext("Status")}</th>
+              <th class="text-right px-4 py-2.5">{gettext("Sort")}</th>
+              <th class="text-right px-4 py-2.5">{gettext("Actions")}</th>
             </tr>
           </thead>
           <tbody>
             <tr :for={row <- @search_configs} class="border-t border-zinc-100">
               <td class="px-4 py-2 font-medium">{row.alias}</td>
               <td class="px-4 py-2">
-                <.badge color="info" size="extra_small" rounded="full">{row.provider}</.badge>
+                <Badge.badge color="info" size="xs">{row.provider}</Badge.badge>
               </td>
               <td class="px-4 py-2">
-                <.badge
-                  color={if row.enabled, do: "success", else: "silver"}
-                  size="extra_small"
-                  rounded="full"
-                >
-                  {if row.enabled, do: "enabled", else: "disabled"}
-                </.badge>
+                <Badge.badge color={if row.enabled, do: "success", else: "gray"} size="xs">
+                  {if row.enabled, do: gettext("enabled"), else: gettext("disabled")}
+                </Badge.badge>
               </td>
               <td class="px-4 py-2 text-right text-xs text-zinc-500">{row.sort_order}</td>
               <td class="px-4 py-2">
-                <div class="flex justify-end gap-1.5">
-                  <.button
+                <div class="flex justify-end gap-1">
+                  <Button.icon_button
                     phx-click="toggle_search_enabled"
                     phx-value-alias={row.alias}
-                    variant="base"
-                    color="natural"
-                    size="extra_small"
-                    icon={if row.enabled, do: "hero-pause", else: "hero-play"}
-                    rounded="medium"
-                  />
-                  <.button
+                    color="gray"
+                    size="xs"
+                    title={if row.enabled, do: gettext("Disable"), else: gettext("Enable")}
+                  >
+                    <.icon name={if row.enabled, do: "hero-pause", else: "hero-play"} class="size-4" />
+                  </Button.icon_button>
+                  <Button.icon_button
                     phx-click="edit_search"
                     phx-value-alias={row.alias}
-                    variant="base"
-                    color="natural"
-                    size="extra_small"
-                    icon="hero-pencil-square"
-                    rounded="medium"
-                  />
-                  <.button
+                    color="gray"
+                    size="xs"
+                    title={gettext("Edit")}
+                  >
+                    <.icon name="hero-pencil-square" class="size-4" />
+                  </Button.icon_button>
+                  <Button.icon_button
                     phx-click="destroy_search"
                     phx-value-alias={row.alias}
-                    variant="base"
                     color="danger"
-                    size="extra_small"
-                    icon="hero-trash"
-                    rounded="medium"
-                    data-confirm={"Delete \"#{row.alias}\"?"}
-                  />
+                    size="xs"
+                    data-confirm={gettext("Delete \"%{name}\"?", name: row.alias)}
+                    title={gettext("Delete")}
+                  >
+                    <.icon name="hero-trash" class="size-4" />
+                  </Button.icon_button>
                 </div>
               </td>
             </tr>
             <tr :if={@search_configs == []}>
               <td colspan="5" class="px-4 py-8 text-center text-zinc-400 text-sm">
-                No search providers. Click <strong>New provider</strong> to add Tavily or Brave.
+                {gettext("No search providers. Click \"New provider\" to add Tavily or Brave.")}
               </td>
             </tr>
           </tbody>
         </table>
-      </.card>
+      </div>
     </div>
     """
   end
