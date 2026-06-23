@@ -176,10 +176,10 @@ defmodule Long.Agent.Workers.RunMonitor do
 
     decision = Map.get(output, "decision")
 
-    # History: keep NOTABLE runs (an alert, a suppressed alert, an error) — never
-    # the silent "no_notify" heartbeat. `last_*` above already shows the latest
-    # tick; recording every "nothing happened" would just be noise.
-    if decision != "no_notify", do: log_run(monitor, status, decision, output, tail)
+    # History: record EVERY run — including the silent "nothing happened" ticks —
+    # so the user can confirm the monitor is alive and see what it decided each
+    # time. Bounded by `prune_runs` (newest @keep_runs per monitor).
+    log_run(monitor, status, decision, output, tail)
 
     if status == "error" do
       Logger.warning("RunMonitor: #{monitor.name} → error: #{inspect(output)}")

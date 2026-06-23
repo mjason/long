@@ -124,7 +124,7 @@ defmodule Long.Agent.MonitorTest do
       assert updated.last_output["decision"] == "notified"
     end
 
-    test "notable runs are recorded in history; silent ticks are not", %{sess: sess} do
+    test "every run is recorded in history (silent ticks too)", %{sess: sess} do
       {:ok, silent} =
         Agent.create_monitor(%{
           name: "hist-silent",
@@ -135,7 +135,10 @@ defmodule Long.Agent.MonitorTest do
         })
 
       :ok = perform_job(RunMonitor, %{"monitor_id" => silent.id})
-      assert monitor_runs(silent.id) == []
+      silent_runs = monitor_runs(silent.id)
+      assert length(silent_runs) == 1
+      assert hd(silent_runs).status == "silent"
+      assert hd(silent_runs).decision == "no_notify"
 
       {:ok, noisy} =
         Agent.create_monitor(%{

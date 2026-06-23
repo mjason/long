@@ -4,11 +4,9 @@ defmodule Long.Agent.MonitorRun do
   admin panel and the agent can look at ("did it run? what did it decide? why
   didn't it notify? what errored?").
 
-  Only **notable** runs are stored: a notification, a suppressed notification
-  (cooldown / unchanged), or an error. The boring silent heartbeat (`no_notify`)
-  is NOT recorded — the monitor's own `last_run_at` / `last_status` already shows
-  the latest tick, so recording every 5-minute "nothing happened" would just be
-  noise. `RunMonitor` prunes to the newest `@keep_runs` per monitor.
+  EVERY run is recorded, including the silent "nothing happened" ticks, so the
+  user can confirm the monitor is alive and see each decision. `RunMonitor`
+  prunes to the newest `@keep_runs` per monitor to keep it bounded.
   """
 
   use Ash.Resource,

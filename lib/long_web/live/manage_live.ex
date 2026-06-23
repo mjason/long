@@ -2547,7 +2547,7 @@ defmodule LongWeb.ManageLive do
 
         <div :if={!@is_new?} class="rounded-md border border-zinc-200">
           <div class="text-xs font-medium text-zinc-600 px-3 py-2 bg-zinc-50 border-b border-zinc-200">
-            Recent runs — notifications &amp; errors (silent ticks aren't recorded)
+            Recent runs (latest executions — silent / notified / error)
           </div>
           <div class="max-h-56 overflow-auto">
             <table class="w-full text-xs">
