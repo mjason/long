@@ -18,6 +18,9 @@ defmodule LongWeb.ManageLive do
 
   import LongWeb.Components.Alert, only: [flash_group: 1]
 
+  # Petal Components called qualified during the gradual migration off mishka.
+  alias PetalComponents.{Badge, Button}
+
   alias Long.Agent
   alias Long.Agent.{LLMConfig, SearchConfig}
   alias Long.Agent.Skill.Store, as: SkillStore
@@ -2318,114 +2321,102 @@ defmodule LongWeb.ManageLive do
     ~H"""
     <div class="p-6 space-y-4">
       <div class="flex items-center gap-3">
-        <h1 class="text-xl font-semibold flex-1">Monitors</h1>
+        <h1 class="text-xl font-semibold flex-1">{gettext("Monitors")}</h1>
         <p class="text-xs text-zinc-500 max-w-sm">
-          Scripts that run on an interval and notify only when there's something. The agent
-          authors these (skill <code>monitor-authoring</code>); <strong>⚡</strong> runs one now.
+          {gettext("Scripts that run on an interval and notify only when there's something. ⚡ runs one now.")}
         </p>
-        <.button
-          phx-click="new_monitor"
-          color="primary"
-          icon="hero-plus"
-          rounded="medium"
-          size="small"
-        >
-          New monitor
-        </.button>
+        <Button.button phx-click="new_monitor" color="primary" icon="hero-plus" radius="md" size="sm">
+          {gettext("New monitor")}
+        </Button.button>
       </div>
 
-      <.card variant="bordered" color="natural" rounded="large" padding="none">
+      <div class="rounded-lg border border-zinc-200 bg-white overflow-hidden">
         <table class="w-full text-sm">
           <thead class="text-xs uppercase text-zinc-500 bg-zinc-50">
             <tr>
-              <th class="text-left px-4 py-2.5">Name</th>
-              <th class="text-left px-4 py-2.5">Every</th>
-              <th class="text-left px-4 py-2.5">On</th>
-              <th class="text-left px-4 py-2.5">Last status</th>
-              <th class="text-left px-4 py-2.5">Next run</th>
-              <th class="text-left px-4 py-2.5">Last run</th>
-              <th class="text-right px-4 py-2.5">Actions</th>
+              <th class="text-left px-4 py-2.5">{gettext("Name")}</th>
+              <th class="text-left px-4 py-2.5">{gettext("Every")}</th>
+              <th class="text-left px-4 py-2.5">{gettext("On")}</th>
+              <th class="text-left px-4 py-2.5">{gettext("Last status")}</th>
+              <th class="text-left px-4 py-2.5">{gettext("Next run")}</th>
+              <th class="text-left px-4 py-2.5">{gettext("Last run")}</th>
+              <th class="text-right px-4 py-2.5">{gettext("Actions")}</th>
             </tr>
           </thead>
           <tbody>
             <tr :for={m <- @monitors} class="border-t border-zinc-100">
               <td class="px-4 py-2 font-medium">{m.name}</td>
               <td class="px-4 py-2">
-                <.badge color="info" size="extra_small" rounded="full">{repeat_label(m)}</.badge>
+                <Badge.badge color="info" size="xs">{repeat_label(m)}</Badge.badge>
               </td>
               <td class="px-4 py-2">
-                <.badge
-                  color={if m.enabled, do: "success", else: "silver"}
-                  size="extra_small"
-                  rounded="full"
-                >
-                  {if m.enabled, do: "on", else: "off"}
-                </.badge>
+                <Badge.badge color={if m.enabled, do: "success", else: "gray"} size="xs">
+                  {if m.enabled, do: gettext("on"), else: gettext("off")}
+                </Badge.badge>
               </td>
               <td class="px-4 py-2">
-                <.badge color={monitor_status_color(m.last_status)} size="extra_small" rounded="full">
+                <Badge.badge color={monitor_status_color(m.last_status)} size="xs">
                   {m.last_status || "—"}
-                </.badge>
+                </Badge.badge>
               </td>
               <td class="px-4 py-2 text-xs text-zinc-500">{format_dt(m.next_run_at)}</td>
               <td class="px-4 py-2 text-xs text-zinc-500">{format_dt(m.last_run_at)}</td>
               <td class="px-4 py-2">
-                <div class="flex justify-end gap-1.5">
-                  <.button
+                <div class="flex justify-end gap-1">
+                  <Button.icon_button
                     phx-click="run_monitor_now"
                     phx-value-id={m.id}
-                    variant="base"
-                    color="natural"
-                    size="extra_small"
-                    icon="hero-bolt"
-                    rounded="medium"
-                  />
-                  <.button
+                    color="gray"
+                    size="xs"
+                    title={gettext("Run now")}
+                  >
+                    <.icon name="hero-bolt" class="size-4" />
+                  </Button.icon_button>
+                  <Button.icon_button
                     phx-click="toggle_monitor_enabled"
                     phx-value-id={m.id}
-                    variant="base"
-                    color="natural"
-                    size="extra_small"
-                    icon={if m.enabled, do: "hero-pause", else: "hero-play"}
-                    rounded="medium"
-                  />
-                  <.button
+                    color="gray"
+                    size="xs"
+                    title={if m.enabled, do: gettext("Disable"), else: gettext("Enable")}
+                  >
+                    <.icon name={if m.enabled, do: "hero-pause", else: "hero-play"} class="size-4" />
+                  </Button.icon_button>
+                  <Button.icon_button
                     phx-click="edit_monitor"
                     phx-value-id={m.id}
-                    variant="base"
-                    color="natural"
-                    size="extra_small"
-                    icon="hero-pencil-square"
-                    rounded="medium"
-                  />
-                  <.button
+                    color="gray"
+                    size="xs"
+                    title={gettext("Edit")}
+                  >
+                    <.icon name="hero-pencil-square" class="size-4" />
+                  </Button.icon_button>
+                  <Button.icon_button
                     phx-click="destroy_monitor"
                     phx-value-id={m.id}
-                    variant="base"
                     color="danger"
-                    size="extra_small"
-                    icon="hero-trash"
-                    rounded="medium"
-                    data-confirm={"Delete \"#{m.name}\"?"}
-                  />
+                    size="xs"
+                    data-confirm={gettext("Delete \"%{name}\"?", name: m.name)}
+                    title={gettext("Delete")}
+                  >
+                    <.icon name="hero-trash" class="size-4" />
+                  </Button.icon_button>
                 </div>
               </td>
             </tr>
             <tr :if={@monitors == []}>
               <td colspan="7" class="px-4 py-8 text-center text-zinc-400 text-sm">
-                No monitors. Click <strong>New monitor</strong>, or let the agent create one via
-                GraphQL <code>createMonitor</code>.
+                {gettext("No monitors yet. Click \"New monitor\", or let the agent create one.")}
               </td>
             </tr>
           </tbody>
         </table>
-      </.card>
+      </div>
     </div>
     """
   end
 
   defp monitor_status_color("notified"), do: "success"
-  defp monitor_status_color("silent"), do: "silver"
+  defp monitor_status_color("silent"), do: "gray"
   defp monitor_status_color("error"), do: "danger"
   defp monitor_status_color(_), do: "info"
 

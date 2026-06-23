@@ -18,9 +18,10 @@ msgstr "账号:"
 
 #: lib/long_web/components/core_components.ex:375
 #: lib/long_web/components/table.ex:188
+#: lib/long_web/live/manage_live.ex:2343
 #, elixir-autogen, elixir-format
 msgid "Actions"
-msgstr ""
+msgstr "操作"
 
 #: lib/long_web/components/alert.ex:199
 #: lib/long_web/components/layouts.ex:99
@@ -313,67 +314,68 @@ msgstr ""
 msgid "regenerate"
 msgstr "重新生成"
 
-#: lib/long_web/live/manage_live.ex:1253
+#: lib/long_web/live/manage_live.ex:1256
 #, elixir-autogen, elixir-format
 msgid "Back to home"
 msgstr "返回首页"
 
-#: lib/long_web/live/manage_live.ex:3419
+#: lib/long_web/live/manage_live.ex:3410
 #, elixir-autogen, elixir-format
 msgid "Channels"
 msgstr "渠道"
 
-#: lib/long_web/live/manage_live.ex:3414
+#: lib/long_web/live/manage_live.ex:3405
 #, elixir-autogen, elixir-format
 msgid "Groups"
 msgstr "群组"
 
-#: lib/long_web/live/manage_live.ex:3413
+#: lib/long_web/live/manage_live.ex:3404
 #, elixir-autogen, elixir-format
 msgid "LLMs"
 msgstr "模型"
 
-#: lib/long_web/live/manage_live.ex:3415
+#: lib/long_web/live/manage_live.ex:3406
 #, elixir-autogen, elixir-format
 msgid "Memories"
 msgstr "记忆"
 
-#: lib/long_web/live/manage_live.ex:3421
+#: lib/long_web/live/manage_live.ex:2324
+#: lib/long_web/live/manage_live.ex:3412
 #, elixir-autogen, elixir-format
 msgid "Monitors"
 msgstr "监控"
 
-#: lib/long_web/live/manage_live.ex:3424
+#: lib/long_web/live/manage_live.ex:3415
 #, elixir-autogen, elixir-format
 msgid "Phrases"
 msgstr "措辞"
 
-#: lib/long_web/live/manage_live.ex:3422
+#: lib/long_web/live/manage_live.ex:3413
 #, elixir-autogen, elixir-format
 msgid "Reflection"
 msgstr "反思"
 
-#: lib/long_web/live/manage_live.ex:3420
+#: lib/long_web/live/manage_live.ex:3411
 #, elixir-autogen, elixir-format
 msgid "Scheduled"
 msgstr "定时任务"
 
-#: lib/long_web/live/manage_live.ex:3418
+#: lib/long_web/live/manage_live.ex:3409
 #, elixir-autogen, elixir-format
 msgid "Search"
 msgstr "搜索"
 
-#: lib/long_web/live/manage_live.ex:3423
+#: lib/long_web/live/manage_live.ex:3414
 #, elixir-autogen, elixir-format
 msgid "Secrets"
 msgstr "密钥"
 
-#: lib/long_web/live/manage_live.ex:3417
+#: lib/long_web/live/manage_live.ex:3408
 #, elixir-autogen, elixir-format
 msgid "Sessions"
 msgstr "会话"
 
-#: lib/long_web/live/manage_live.ex:3416
+#: lib/long_web/live/manage_live.ex:3407
 #, elixir-autogen, elixir-format
 msgid "Skills"
 msgstr "技能"
@@ -524,3 +526,88 @@ msgstr "文件太多"
 #, elixir-autogen, elixir-format
 msgid "type not accepted"
 msgstr "不支持的文件类型"
+
+#: lib/long_web/live/manage_live.ex:2399
+#, elixir-autogen, elixir-format, fuzzy
+msgid "Delete"
+msgstr "删除"
+
+#: lib/long_web/live/manage_live.ex:2398
+#, elixir-autogen, elixir-format
+msgid "Delete \"%{name}\"?"
+msgstr "删除「%{name}」?"
+
+#: lib/long_web/live/manage_live.ex:2380
+#, elixir-autogen, elixir-format
+msgid "Disable"
+msgstr "停用"
+
+#: lib/long_web/live/manage_live.ex:2389
+#, elixir-autogen, elixir-format
+msgid "Edit"
+msgstr "编辑"
+
+#: lib/long_web/live/manage_live.ex:2380
+#, elixir-autogen, elixir-format
+msgid "Enable"
+msgstr "启用"
+
+#: lib/long_web/live/manage_live.ex:2338
+#, elixir-autogen, elixir-format
+msgid "Every"
+msgstr "频率"
+
+#: lib/long_web/live/manage_live.ex:2342
+#, elixir-autogen, elixir-format
+msgid "Last run"
+msgstr "上次运行"
+
+#: lib/long_web/live/manage_live.ex:2340
+#, elixir-autogen, elixir-format
+msgid "Last status"
+msgstr "最近状态"
+
+#: lib/long_web/live/manage_live.ex:2337
+#, elixir-autogen, elixir-format
+msgid "Name"
+msgstr "名称"
+
+#: lib/long_web/live/manage_live.ex:2329
+#, elixir-autogen, elixir-format
+msgid "New monitor"
+msgstr "新建监控"
+
+#: lib/long_web/live/manage_live.ex:2341
+#, elixir-autogen, elixir-format
+msgid "Next run"
+msgstr "下次运行"
+
+#: lib/long_web/live/manage_live.ex:2408
+#, elixir-autogen, elixir-format
+msgid "No monitors yet. Click \"New monitor\", or let the agent create one."
+msgstr "还没有监控。点「新建监控」,或让 agent 帮你建一个。"
+
+#: lib/long_web/live/manage_live.ex:2339
+#, elixir-autogen, elixir-format
+msgid "On"
+msgstr "启用"
+
+#: lib/long_web/live/manage_live.ex:2371
+#, elixir-autogen, elixir-format
+msgid "Run now"
+msgstr "立即运行"
+
+#: lib/long_web/live/manage_live.ex:2326
+#, elixir-autogen, elixir-format
+msgid "Scripts that run on an interval and notify only when there's something. ⚡ runs one now."
+msgstr "按间隔运行的脚本,只在有情况时才提醒。⚡ 立即运行一次。"
+
+#: lib/long_web/live/manage_live.ex:2354
+#, elixir-autogen, elixir-format
+msgid "off"
+msgstr "关"
+
+#: lib/long_web/live/manage_live.ex:2354
+#, elixir-autogen, elixir-format
+msgid "on"
+msgstr "开"
