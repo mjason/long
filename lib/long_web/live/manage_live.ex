@@ -2363,12 +2363,9 @@ defmodule LongWeb.ManageLive do
     assigns = assign(assigns, :is_new?, assigns.editing.__action__ == :create_monitor)
 
     ~H"""
-    <.modal
-      id="monitor-edit-modal"
-      show
-      title={if @is_new?, do: "New monitor", else: "Edit #{@editing.name}"}
-      on_cancel={JS.push("cancel_edit")}
-      size="large"
+    <.shell_modal
+      max_width="max-w-2xl"
+      title={if @is_new?, do: gettext("New monitor"), else: gettext("Edit %{name}", name: @editing.name)}
     >
       <form phx-submit="save_monitor" class="space-y-3">
         <div class="grid grid-cols-2 gap-3">
@@ -2506,24 +2503,14 @@ defmodule LongWeb.ManageLive do
 
         <label class="flex items-center gap-2 text-sm text-zinc-700 pt-1">
           <input type="checkbox" name="monitor[enabled]" value="true" checked={@editing.enabled} />
-          Enabled
+          {gettext("Enabled")}
         </label>
 
-        <div class="flex justify-end gap-2 pt-2">
-          <.button
-            type="button"
-            phx-click="cancel_edit"
-            variant="base"
-            color="natural"
-            rounded="medium"
-            size="small"
-          >
-            Cancel
-          </.button>
-          <.button type="submit" color="primary" rounded="medium" size="small">Save</.button>
-        </div>
+        <.modal_footer>
+          <Button.button type="submit" color="primary" size="sm">{gettext("Save")}</Button.button>
+        </.modal_footer>
       </form>
-    </.modal>
+    </.shell_modal>
     """
   end
 
@@ -3783,20 +3770,54 @@ defmodule LongWeb.ManageLive do
 
   attr :editing, :map, required: true
 
+  # Custom overlay modal (replaces mishka `<.modal>`): visible as soon as it's
+  # rendered (the editing :if controls it), click-away / Esc → cancel_edit.
+  attr :title, :string, required: true
+  attr :max_width, :string, default: "max-w-lg"
+  slot :inner_block, required: true
+
+  defp shell_modal(assigns) do
+    ~H"""
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-zinc-900/40 p-4">
+      <div
+        class={["w-full rounded-xl bg-white shadow-xl max-h-[90vh] overflow-y-auto", @max_width]}
+        phx-click-away="cancel_edit"
+        phx-window-keydown="cancel_edit"
+        phx-key="escape"
+      >
+        <div class="flex items-center justify-between border-b border-zinc-100 px-5 py-3">
+          <h3 class="font-semibold text-zinc-900">{@title}</h3>
+          <button type="button" phx-click="cancel_edit" class="text-zinc-400 hover:text-zinc-700">
+            <.icon name="hero-x-mark" class="size-5" />
+          </button>
+        </div>
+        <div class="p-5">{render_slot(@inner_block)}</div>
+      </div>
+    </div>
+    """
+  end
+
+  # Cancel / Save footer shared by the edit modals.
+  slot :inner_block
+  defp modal_footer(assigns) do
+    ~H"""
+    <div class="flex justify-end gap-2 pt-2">
+      <Button.button type="button" phx-click="cancel_edit" variant="outline" color="gray" size="sm">
+        {gettext("Cancel")}
+      </Button.button>
+      {render_slot(@inner_block)}
+    </div>
+    """
+  end
+
   defp telegram_modal(assigns) do
     assigns = assign(assigns, :is_new?, assigns.editing.__action__ == :create_telegram)
 
     ~H"""
-    <.modal
-      id="telegram-edit-modal"
-      show
-      title={if @is_new?, do: "New Telegram bot", else: "Edit #{@editing.name}"}
-      on_cancel={JS.push("cancel_edit")}
-      size="medium"
-    >
+    <.shell_modal title={if @is_new?, do: gettext("New Telegram bot"), else: gettext("Edit %{name}", name: @editing.name)}>
       <form phx-submit="save_telegram_credential" class="space-y-3">
         <label class="block">
-          <span class="text-xs font-medium text-zinc-600">Name</span>
+          <span class="text-xs font-medium text-zinc-600">{gettext("Name")}</span>
           <input
             name="telegram[name]"
             value={@editing.name}
@@ -3806,13 +3827,13 @@ defmodule LongWeb.ManageLive do
             placeholder="default"
           />
           <span class="text-[11px] text-zinc-500">
-            Single-bot deployments leave this as <code>default</code>.
+            {gettext("Single-bot deployments leave this as \"default\".")}
           </span>
         </label>
 
         <label class="block">
           <span class="text-xs font-medium text-zinc-600">
-            Bot token (from <code>@BotFather</code>)
+            {gettext("Bot token (from @BotFather)")}
           </span>
           <input
             type="password"
@@ -3826,7 +3847,7 @@ defmodule LongWeb.ManageLive do
 
         <label class="block">
           <span class="text-xs font-medium text-zinc-600">
-            Username (optional, e.g. <code>@my_long_bot</code>)
+            {gettext("Username (optional, e.g. @my_long_bot)")}
           </span>
           <input
             name="telegram[username]"
@@ -3838,24 +3859,14 @@ defmodule LongWeb.ManageLive do
 
         <label class="flex items-center gap-2 text-sm text-zinc-700 pt-1">
           <input type="checkbox" name="telegram[enabled]" value="true" checked={@editing.enabled} />
-          Enabled (worker long-polls Telegram)
+          {gettext("Enabled (worker long-polls Telegram)")}
         </label>
 
-        <div class="flex justify-end gap-2 pt-2">
-          <.button
-            type="button"
-            phx-click="cancel_edit"
-            variant="base"
-            color="natural"
-            rounded="medium"
-            size="small"
-          >
-            Cancel
-          </.button>
-          <.button type="submit" color="primary" rounded="medium" size="small">Save</.button>
-        </div>
+        <.modal_footer>
+          <Button.button type="submit" color="primary" size="sm">{gettext("Save")}</Button.button>
+        </.modal_footer>
       </form>
-    </.modal>
+    </.shell_modal>
     """
   end
 
