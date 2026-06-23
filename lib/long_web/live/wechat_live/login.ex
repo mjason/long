@@ -12,6 +12,10 @@ defmodule LongWeb.WechatLive.Login do
 
   use LongWeb, :live_view
 
+  # Petal Components are called qualified during the gradual migration off
+  # mishka (which still owns the global `<.button>` etc.).
+  alias PetalComponents.Button
+
   alias Long.Agent.Bots.Wechat.{Client, Credential, Manager}
 
   @poll_interval_ms 2_000
@@ -23,6 +27,7 @@ defmodule LongWeb.WechatLive.Login do
     {:ok,
      socket
      |> assign(:page_title, "WeChat login")
+     |> assign_new(:locale, fn -> "en" end)
      |> assign(:name, name)
      |> assign(:embedded?, session["embedded"] == true)
      |> assign_credential()
@@ -136,10 +141,10 @@ defmodule LongWeb.WechatLive.Login do
     |> EQRCode.svg(width: 256, color: "#000", background_color: "#fff")
   end
 
-  defp status_label("new"), do: "Waiting for scan…"
-  defp status_label("scanned"), do: "Scanned — confirm on your phone…"
-  defp status_label("confirmed"), do: "Confirmed!"
-  defp status_label("expired"), do: "QR code expired"
+  defp status_label("new"), do: gettext("Waiting for scan…")
+  defp status_label("scanned"), do: gettext("Scanned — confirm on your phone…")
+  defp status_label("confirmed"), do: gettext("Confirmed!")
+  defp status_label("expired"), do: gettext("QR code expired")
   defp status_label(other), do: other
 
   # ── view ─────────────────────────────────────────────────────────────
@@ -148,41 +153,56 @@ defmodule LongWeb.WechatLive.Login do
   def render(assigns) do
     ~H"""
     <div class={if @embedded?, do: "", else: "mx-auto max-w-2xl px-4 py-10"}>
+      <div :if={!@embedded?} class="flex justify-end mb-2 gap-2 text-xs">
+        <.link
+          href={~p"/locale/en"}
+          class={["px-1.5", if(@locale == "en", do: "font-semibold text-zinc-900", else: "text-zinc-400 hover:text-zinc-600")]}
+        >
+          EN
+        </.link>
+        <span class="text-zinc-300">|</span>
+        <.link
+          href={~p"/locale/zh"}
+          class={["px-1.5", if(@locale == "zh", do: "font-semibold text-zinc-900", else: "text-zinc-400 hover:text-zinc-600")]}
+        >
+          中文
+        </.link>
+      </div>
+
       <header :if={!@embedded?} class="mb-8">
-        <h1 class="text-2xl font-semibold">WeChat iLink bot login</h1>
+        <h1 class="text-2xl font-semibold">{gettext("WeChat iLink bot login")}</h1>
         <p class="mt-2 text-sm text-zinc-500">
-          Scan to connect a WeChat account; messages sent to it flow into the agent.
+          {gettext("Scan to connect a WeChat account; messages sent to it flow into the agent.")}
         </p>
       </header>
 
       <p class="text-xs text-zinc-400 mb-3">
-        Account: <span class="font-mono text-zinc-600">{@name}</span>
+        {gettext("Account:")} <span class="font-mono text-zinc-600">{@name}</span>
       </p>
 
       <%= if @credential do %>
         <section class="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
           <div class="flex items-center justify-between">
             <div>
-              <p class="text-sm text-zinc-500">Connected</p>
+              <p class="text-sm text-zinc-500">{gettext("Connected")}</p>
               <p class="font-mono text-sm mt-1">
-                bot_id: <span class="text-zinc-900">{@credential.ilink_bot_id}</span>
+                {gettext("bot_id:")} <span class="text-zinc-900">{@credential.ilink_bot_id}</span>
               </p>
-              <p class="text-xs text-zinc-400 mt-1">Worker is long-polling iLink</p>
+              <p class="text-xs text-zinc-400 mt-1">{gettext("Worker is long-polling iLink")}</p>
             </div>
             <div class="flex gap-2">
-              <button
-                phx-click="start_login"
-                class="rounded-md bg-zinc-100 px-3 py-1.5 text-sm font-medium hover:bg-zinc-200"
-              >
-                Re-login
-              </button>
-              <button
+              <Button.button color="gray" variant="outline" size="sm" phx-click="start_login">
+                {gettext("Re-login")}
+              </Button.button>
+              <Button.button
+                color="danger"
+                variant="light"
+                size="sm"
                 phx-click="logout"
-                data-confirm="Remove this credential? You'll need to scan again."
-                class="rounded-md bg-red-50 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-100"
+                data-confirm={gettext("Remove this credential? You'll need to scan again.")}
               >
-                Log out
-              </button>
+                {gettext("Log out")}
+              </Button.button>
             </div>
           </div>
         </section>
@@ -194,14 +214,11 @@ defmodule LongWeb.WechatLive.Login do
             <%= if is_nil(@credential) do %>
               <div class="rounded-lg border border-zinc-200 bg-white p-6 shadow-sm text-center">
                 <p class="text-sm text-zinc-600 mb-4">
-                  No WeChat account connected yet. Click below to generate a QR code.
+                  {gettext("No WeChat account connected yet. Click below to generate a QR code.")}
                 </p>
-                <button
-                  phx-click="start_login"
-                  class="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800"
-                >
-                  Start login
-                </button>
+                <Button.button color="primary" phx-click="start_login">
+                  {gettext("Start login")}
+                </Button.button>
               </div>
             <% end %>
           <% :scanning -> %>
@@ -211,18 +228,18 @@ defmodule LongWeb.WechatLive.Login do
               </div>
               <p class="mt-4 text-sm font-medium">{status_label(@status)}</p>
               <p class="mt-1 text-xs text-zinc-500">
-                Open the WeChat account you want to connect → Scan → confirm on your phone
+                {gettext("Open the WeChat account you want to connect → Scan → confirm on your phone")}
               </p>
               <p class="mt-3 text-xs text-zinc-400">
-                The QR expires in ~5 minutes. After that, click
-                <button phx-click="retry" class="underline">regenerate</button>.
+                {gettext("The QR expires in ~5 minutes. After that, click")}
+                <button phx-click="retry" class="underline">{gettext("regenerate")}</button>.
               </p>
             </div>
           <% :done -> %>
             <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-6 shadow-sm text-center">
-              <p class="text-emerald-900 font-medium">Logged in!</p>
+              <p class="text-emerald-900 font-medium">{gettext("Logged in!")}</p>
               <p class="mt-2 text-sm text-emerald-700">
-                Credential saved and the worker started — this account is live.
+                {gettext("Credential saved and the worker started — this account is live.")}
               </p>
             </div>
         <% end %>

@@ -1,0 +1,314 @@
+## "msgid"s in this file come from POT (.pot) files.
+###
+### Do not add, change, or remove "msgid"s manually here as
+### they're tied to the ones in the corresponding POT file
+### (with the same domain).
+###
+### Use "mix gettext.extract --merge" or "mix gettext.merge"
+### to merge POT files into PO files.
+msgid ""
+msgstr ""
+"Language: en\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: lib/long_web/live/wechat_live/login.ex:180
+#, elixir-autogen, elixir-format
+msgid "Account:"
+msgstr ""
+
+#: lib/long_web/components/core_components.ex:375
+#: lib/long_web/components/table.ex:188
+#, elixir-autogen, elixir-format
+msgid "Actions"
+msgstr ""
+
+#: lib/long_web/components/alert.ex:199
+#: lib/long_web/components/layouts.ex:99
+#: lib/long_web/components/layouts.ex:111
+#, elixir-autogen, elixir-format
+msgid "Attempting to reconnect"
+msgstr ""
+
+#: lib/long_web/components/blockquote.ex:167
+#, elixir-autogen, elixir-format
+msgid "Author image"
+msgstr ""
+
+#: lib/long_web/components/file_field.ex:171
+#: lib/long_web/components/file_field.ex:254
+#, elixir-autogen, elixir-format
+msgid "Cancel upload for %{file}"
+msgstr ""
+
+#: lib/long_web/components/drawer.ex:144
+#: lib/long_web/components/drawer.ex:148
+#: lib/long_web/components/sidebar.ex:160
+#, elixir-autogen, elixir-format
+msgid "Close menu"
+msgstr ""
+
+#: lib/long_web/components/sidebar.ex:156
+#, elixir-autogen, elixir-format
+msgid "Close sidebar"
+msgstr ""
+
+#: lib/long_web/live/wechat_live/login.ex:146
+#, elixir-autogen, elixir-format
+msgid "Confirmed!"
+msgstr ""
+
+#: lib/long_web/live/wechat_live/login.ex:187
+#, elixir-autogen, elixir-format
+msgid "Connected"
+msgstr ""
+
+#: lib/long_web/components/clipboard.ex:169
+#, elixir-autogen, elixir-format
+msgid "Copied!"
+msgstr ""
+
+#: lib/long_web/components/clipboard.ex:170
+#, elixir-autogen, elixir-format
+msgid "Copy failed"
+msgstr ""
+
+#: lib/long_web/components/clipboard.ex:171
+#, elixir-autogen, elixir-format
+msgid "Copy to clipboard"
+msgstr ""
+
+#: lib/long_web/live/wechat_live/login.ex:242
+#, elixir-autogen, elixir-format
+msgid "Credential saved and the worker started — this account is live."
+msgstr ""
+
+#: lib/long_web/components/drawer.ex:161
+#, elixir-autogen, elixir-format
+msgid "Drawer content"
+msgstr ""
+
+#: lib/long_web/components/alert.ex:184
+#, elixir-autogen, elixir-format
+msgid "Error!"
+msgstr ""
+
+#: lib/long_web/components/gallery.ex:196
+#, elixir-autogen, elixir-format
+msgid "Filter options"
+msgstr ""
+
+#: lib/long_web/components/pagination.ex:176
+#, elixir-autogen, elixir-format
+msgid "First page"
+msgstr ""
+
+#: lib/long_web/components/pagination.ex:266
+#, elixir-autogen, elixir-format
+msgid "Go to page %{page}"
+msgstr ""
+
+#: lib/long_web/components/carousel.ex:312
+#, elixir-autogen, elixir-format
+msgid "Go to slide %{index}"
+msgstr ""
+
+#: lib/long_web/components/alert.ex:213
+#, elixir-autogen, elixir-format
+msgid "Hang in there while we get back on track"
+msgstr ""
+
+#: lib/long_web/components/pagination.ex:237
+#, elixir-autogen, elixir-format
+msgid "Last page"
+msgstr ""
+
+#: lib/long_web/components/skeleton.ex:87
+#: lib/long_web/components/spinner.ex:88
+#: lib/long_web/components/spinner.ex:167
+#: lib/long_web/components/spinner.ex:176
+#: lib/long_web/components/spinner.ex:185
+#, elixir-autogen, elixir-format
+msgid "Loading..."
+msgstr ""
+
+#: lib/long_web/live/wechat_live/login.ex:204
+#, elixir-autogen, elixir-format
+msgid "Log out"
+msgstr ""
+
+#: lib/long_web/live/wechat_live/login.ex:240
+#, elixir-autogen, elixir-format
+msgid "Logged in!"
+msgstr ""
+
+#: lib/long_web/components/navbar.ex:188
+#, elixir-autogen, elixir-format
+msgid "Logo"
+msgstr ""
+
+#: lib/long_web/components/sidebar.ex:137
+#: lib/long_web/components/sidebar.ex:146
+#, elixir-autogen, elixir-format
+msgid "Minimize sidebar"
+msgstr ""
+
+#: lib/long_web/components/pagination.ex:226
+#, elixir-autogen, elixir-format
+msgid "Next page"
+msgstr ""
+
+#: lib/long_web/live/wechat_live/login.ex:217
+#, elixir-autogen, elixir-format
+msgid "No WeChat account connected yet. Click below to generate a QR code."
+msgstr ""
+
+#: lib/long_web/components/combobox.ex:347
+#: lib/long_web/components/combobox.ex:541
+#, elixir-autogen, elixir-format
+msgid "Nothing found!"
+msgstr ""
+
+#: lib/long_web/components/speed_dial.ex:210
+#, elixir-autogen, elixir-format
+msgid "Open actions menu"
+msgstr ""
+
+#: lib/long_web/live/wechat_live/login.ex:231
+#, elixir-autogen, elixir-format
+msgid "Open the WeChat account you want to connect → Scan → confirm on your phone"
+msgstr ""
+
+#: lib/long_web/components/pagination.ex:264
+#, elixir-autogen, elixir-format
+msgid "Page %{page}, current page"
+msgstr ""
+
+#: lib/long_web/components/pagination.ex:187
+#, elixir-autogen, elixir-format
+msgid "Previous page"
+msgstr ""
+
+#: lib/long_web/live/wechat_live/login.ex:147
+#, elixir-autogen, elixir-format
+msgid "QR code expired"
+msgstr ""
+
+#: lib/long_web/components/rating.ex:136
+#, elixir-autogen, elixir-format
+msgid "Rate %{count} star"
+msgstr ""
+
+#: lib/long_web/live/wechat_live/login.ex:195
+#, elixir-autogen, elixir-format
+msgid "Re-login"
+msgstr ""
+
+#: lib/long_web/live/wechat_live/login.ex:202
+#, elixir-autogen, elixir-format
+msgid "Remove this credential? You'll need to scan again."
+msgstr ""
+
+#: lib/long_web/live/wechat_live/login.ex:175
+#, elixir-autogen, elixir-format
+msgid "Scan to connect a WeChat account; messages sent to it flow into the agent."
+msgstr ""
+
+#: lib/long_web/live/wechat_live/login.ex:145
+#, elixir-autogen, elixir-format
+msgid "Scanned — confirm on your phone…"
+msgstr ""
+
+#: lib/long_web/components/alert.ex:207
+#: lib/long_web/components/layouts.ex:106
+#, elixir-autogen, elixir-format
+msgid "Something went wrong!"
+msgstr ""
+
+#: lib/long_web/live/wechat_live/login.ex:220
+#, elixir-autogen, elixir-format
+msgid "Start login"
+msgstr ""
+
+#: lib/long_web/components/chat.ex:188
+#, elixir-autogen, elixir-format
+msgid "Status:"
+msgstr ""
+
+#: lib/long_web/components/stepper.ex:207
+#: lib/long_web/components/stepper.ex:282
+#, elixir-autogen, elixir-format
+msgid "Step %{number}: %{title}"
+msgstr ""
+
+#: lib/long_web/components/alert.ex:177
+#, elixir-autogen, elixir-format
+msgid "Success!"
+msgstr ""
+
+#: lib/long_web/live/wechat_live/login.ex:234
+#, elixir-autogen, elixir-format
+msgid "The QR expires in ~5 minutes. After that, click"
+msgstr ""
+
+#: lib/long_web/components/chat.ex:184
+#, elixir-autogen, elixir-format
+msgid "Time:"
+msgstr ""
+
+#: lib/long_web/components/file_field.ex:144
+#: lib/long_web/components/file_field.ex:241
+#: lib/long_web/components/file_field.ex:266
+#, elixir-autogen, elixir-format
+msgid "Uploading %{file}"
+msgstr ""
+
+#: lib/long_web/components/file_field.ex:159
+#, elixir-autogen, elixir-format
+msgid "Uploading %{file}: %{progress} percent"
+msgstr ""
+
+#: lib/long_web/live/wechat_live/login.ex:144
+#, elixir-autogen, elixir-format
+msgid "Waiting for scan…"
+msgstr ""
+
+#: lib/long_web/components/alert.ex:193
+#: lib/long_web/components/layouts.ex:94
+#, elixir-autogen, elixir-format
+msgid "We can't find the internet"
+msgstr ""
+
+#: lib/long_web/live/wechat_live/login.ex:173
+#, elixir-autogen, elixir-format
+msgid "WeChat iLink bot login"
+msgstr ""
+
+#: lib/long_web/live/wechat_live/login.ex:191
+#, elixir-autogen, elixir-format
+msgid "Worker is long-polling iLink"
+msgstr ""
+
+#: lib/long_web/components/video.ex:140
+#, elixir-autogen, elixir-format
+msgid "Your browser does not support the video tag."
+msgstr ""
+
+#: lib/long_web/live/wechat_live/login.ex:189
+#, elixir-autogen, elixir-format
+msgid "bot_id:"
+msgstr ""
+
+#: lib/long_web/components/alert.ex:137
+#: lib/long_web/components/badge.ex:190
+#: lib/long_web/components/banner.ex:199
+#: lib/long_web/components/core_components.ex:81
+#: lib/long_web/components/modal.ex:154
+#: lib/long_web/components/toast.ex:295
+#, elixir-autogen, elixir-format
+msgid "close"
+msgstr ""
+
+#: lib/long_web/live/wechat_live/login.ex:235
+#, elixir-autogen, elixir-format
+msgid "regenerate"
+msgstr ""

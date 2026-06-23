@@ -7,6 +7,7 @@ defmodule LongWeb.Router do
   pipeline :browser do
     plug :accepts, ["html"]
     plug :fetch_session
+    plug LongWeb.Plugs.Locale
     plug :fetch_live_flash
     plug :put_root_layout, html: {LongWeb.Layouts, :root}
     plug :protect_from_forgery
@@ -26,25 +27,30 @@ defmodule LongWeb.Router do
     pipe_through :browser
 
     get "/", PageController, :home
-
-    live "/chat", AgentLive.Chat
-    live "/chat/:session_id", AgentLive.Chat
+    get "/locale/:locale", LocaleController, :set
     get "/chat/media/:session_id/:name", AgentLive.MediaController, :show
-    live "/wechat", WechatLive.Login
 
-    live "/manage", ManageLive, :llms
-    live "/manage/llms", ManageLive, :llms
-    live "/manage/groups", ManageLive, :groups
-    live "/manage/memories", ManageLive, :memories
-    live "/manage/skills", ManageLive, :skills
-    live "/manage/sessions", ManageLive, :sessions
-    live "/manage/search", ManageLive, :search
-    live "/manage/credentials", ManageLive, :credentials
-    live "/manage/scheduled", ManageLive, :scheduled
-    live "/manage/monitors", ManageLive, :monitors
-    live "/manage/reflection", ManageLive, :reflection
-    live "/manage/secrets", ManageLive, :secrets
-    live "/manage/phrases", ManageLive, :phrases
+    # One live_session so the locale on_mount applies to every live page and
+    # navigation between them stays a live patch (no full reload).
+    live_session :app, on_mount: LongWeb.LocaleHook do
+      live "/chat", AgentLive.Chat
+      live "/chat/:session_id", AgentLive.Chat
+      live "/wechat", WechatLive.Login
+
+      live "/manage", ManageLive, :llms
+      live "/manage/llms", ManageLive, :llms
+      live "/manage/groups", ManageLive, :groups
+      live "/manage/memories", ManageLive, :memories
+      live "/manage/skills", ManageLive, :skills
+      live "/manage/sessions", ManageLive, :sessions
+      live "/manage/search", ManageLive, :search
+      live "/manage/credentials", ManageLive, :credentials
+      live "/manage/scheduled", ManageLive, :scheduled
+      live "/manage/monitors", ManageLive, :monitors
+      live "/manage/reflection", ManageLive, :reflection
+      live "/manage/secrets", ManageLive, :secrets
+      live "/manage/phrases", ManageLive, :phrases
+    end
   end
 
   scope "/webhooks/feishu", LongWeb do

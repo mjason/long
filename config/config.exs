@@ -175,6 +175,10 @@ config :logger, :default_formatter,
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
 
+# Web UI internationalization. The bot-chat side has its own per-channel locale
+# (Group / credential / Phrase); this is for the browser admin + chat UI.
+config :long, LongWeb.Gettext, default_locale: "en", locales: ~w(en zh)
+
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 import_config "#{config_env()}.exs"
