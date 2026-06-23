@@ -402,13 +402,13 @@ msgstr ""
 msgid "Skills"
 msgstr ""
 
-#: lib/long_web/live/agent_live/chat.ex:1081
-#: lib/long_web/live/agent_live/chat.ex:1086
+#: lib/long_web/live/agent_live/chat.ex:1057
+#: lib/long_web/live/agent_live/chat.ex:1062
 #, elixir-autogen, elixir-format
 msgid "(empty)"
 msgstr ""
 
-#: lib/long_web/live/agent_live/chat.ex:1030
+#: lib/long_web/live/agent_live/chat.ex:1006
 #, elixir-autogen, elixir-format
 msgid "Attach images or files"
 msgstr ""
@@ -444,12 +444,12 @@ msgstr ""
 msgid "Hide sessions"
 msgstr ""
 
-#: lib/long_web/live/agent_live/chat.ex:1080
+#: lib/long_web/live/agent_live/chat.ex:1056
 #, elixir-autogen, elixir-format
 msgid "L1 · Working memory"
 msgstr ""
 
-#: lib/long_web/live/agent_live/chat.ex:1085
+#: lib/long_web/live/agent_live/chat.ex:1061
 #: lib/long_web/live/manage_live.ex:1516
 #, elixir-autogen, elixir-format
 msgid "L2 · Global memory"
@@ -476,13 +476,13 @@ msgstr ""
 msgid "Save (Enter)"
 msgstr ""
 
-#: lib/long_web/live/agent_live/chat.ex:962
-#: lib/long_web/live/agent_live/chat.ex:1054
+#: lib/long_web/live/agent_live/chat.ex:938
+#: lib/long_web/live/agent_live/chat.ex:1030
 #, elixir-autogen, elixir-format
 msgid "Send"
 msgstr ""
 
-#: lib/long_web/live/agent_live/chat.ex:1042
+#: lib/long_web/live/agent_live/chat.ex:1018
 #, elixir-autogen, elixir-format
 msgid "Send a message  (Enter to send · Shift+Enter for newline)"
 msgstr ""
@@ -502,7 +502,7 @@ msgstr ""
 msgid "Start a conversation"
 msgstr ""
 
-#: lib/long_web/live/agent_live/chat.ex:950
+#: lib/long_web/live/agent_live/chat.ex:928
 #, elixir-autogen, elixir-format
 msgid "The agent is asking"
 msgstr ""
@@ -512,17 +512,17 @@ msgstr ""
 msgid "Type a message below. The agent has access to file I/O, code execution, memory, HTTP fetch, and browser tools."
 msgstr ""
 
-#: lib/long_web/live/agent_live/chat.ex:960
+#: lib/long_web/live/agent_live/chat.ex:936
 #, elixir-autogen, elixir-format
 msgid "Type your answer…"
 msgstr ""
 
-#: lib/long_web/live/agent_live/chat.ex:1041
+#: lib/long_web/live/agent_live/chat.ex:1017
 #, elixir-autogen, elixir-format
 msgid "Working…"
 msgstr ""
 
-#: lib/long_web/live/agent_live/chat.ex:937
+#: lib/long_web/live/agent_live/chat.ex:915
 #, elixir-autogen, elixir-format
 msgid "dismiss"
 msgstr ""
@@ -532,22 +532,22 @@ msgstr ""
 msgid "echo (demo)"
 msgstr ""
 
-#: lib/long_web/live/agent_live/chat.ex:873
+#: lib/long_web/live/agent_live/chat.ex:854
 #, elixir-autogen, elixir-format
 msgid "thinking"
 msgstr ""
 
-#: lib/long_web/live/agent_live/chat.ex:1132
+#: lib/long_web/live/agent_live/chat.ex:1108
 #, elixir-autogen, elixir-format
 msgid "too large (max 25MB)"
 msgstr ""
 
-#: lib/long_web/live/agent_live/chat.ex:1133
+#: lib/long_web/live/agent_live/chat.ex:1109
 #, elixir-autogen, elixir-format
 msgid "too many files"
 msgstr ""
 
-#: lib/long_web/live/agent_live/chat.ex:1134
+#: lib/long_web/live/agent_live/chat.ex:1110
 #, elixir-autogen, elixir-format
 msgid "type not accepted"
 msgstr ""
@@ -1453,4 +1453,19 @@ msgstr ""
 #: lib/long_web/live/manage_live.ex:3817
 #, elixir-autogen, elixir-format
 msgid "WeChat login — %{name}"
+msgstr ""
+
+#: lib/long_web/live/agent_live/chat.ex:886
+#, elixir-autogen, elixir-format
+msgid "args"
+msgstr ""
+
+#: lib/long_web/live/agent_live/chat.ex:894
+#, elixir-autogen, elixir-format
+msgid "result"
+msgstr ""
+
+#: lib/long_web/live/agent_live/chat.ex:844
+#, elixir-autogen, elixir-format
+msgid "thinking…"
 msgstr ""

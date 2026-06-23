@@ -8,7 +8,7 @@ defmodule LongWeb.AgentLive.Chat do
   use LongWeb, :live_view
 
   # Petal Components are called qualified during the gradual migration off mishka.
-  alias PetalComponents.Button
+  alias PetalComponents.{Badge, Button}
 
   alias Long.Agent
   alias Long.SessionRunner
@@ -461,11 +461,11 @@ defmodule LongWeb.AgentLive.Chat do
   # a new variant.
   defp tool_status_badge(:running), do: {"warning", "running…", true}
   defp tool_status_badge(:done), do: {"success", "✓ done", false}
-  defp tool_status_badge(_), do: {"silver", "?", false}
+  defp tool_status_badge(_), do: {"gray", "?", false}
 
-  defp notice_alert_kind(:warning), do: :warning
-  defp notice_alert_kind(:error), do: :danger
-  defp notice_alert_kind(_), do: :natural
+  defp notice_classes(:warning), do: "border-amber-200 bg-amber-50 text-amber-900"
+  defp notice_classes(:error), do: "border-red-200 bg-red-50 text-red-900"
+  defp notice_classes(_), do: "border-zinc-200 bg-zinc-50 text-zinc-700"
 
   defp llm_label(%{alias: a, default: true}), do: "★ " <> a
   defp llm_label(%{alias: a}), do: a
@@ -777,15 +777,8 @@ defmodule LongWeb.AgentLive.Chat do
       |> assign(:attachments, attachments_of(assigns.msg))
 
     ~H"""
-    <.chat
-      position="flipped"
-      color="info"
-      variant="default"
-      rounded="extra_large"
-      padding="none"
-      class="[&>.chat-section-bubble]:!max-w-[75%]"
-    >
-      <.chat_section class="px-4 py-2.5 text-[15px] leading-relaxed">
+    <div class="flex justify-end">
+      <div class="max-w-[75%] rounded-2xl bg-primary-600 px-4 py-2.5 text-[15px] leading-relaxed text-white">
         <div :if={@body != ""} class="whitespace-pre-wrap break-words">{@body}</div>
         <.attachment_list
           :if={@attachments != []}
@@ -793,8 +786,8 @@ defmodule LongWeb.AgentLive.Chat do
           session_id={@msg.session_id}
           dark?={true}
         />
-      </.chat_section>
-    </.chat>
+      </div>
+    </div>
     """
   end
 
@@ -802,15 +795,8 @@ defmodule LongWeb.AgentLive.Chat do
     assigns = assign(assigns, :attachments, attachments_of(assigns.msg))
 
     ~H"""
-    <.chat
-      position="normal"
-      color="natural"
-      variant="bordered"
-      rounded="extra_large"
-      padding="none"
-      class="[&>.chat-section-bubble]:!max-w-[85%] [&>.chat-section-bubble]:bg-white [&>.chat-section-bubble]:border-zinc-300 [&>.chat-section-bubble]:shadow-sm"
-    >
-      <.chat_section class="px-4 py-3 text-[15px] leading-relaxed">
+    <div class="flex justify-start">
+      <div class="max-w-[85%] rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-[15px] leading-relaxed shadow-sm">
         <.attachment_list
           :if={@attachments != []}
           attachments={@attachments}
@@ -821,8 +807,8 @@ defmodule LongWeb.AgentLive.Chat do
           {format_text(@msg.content)}
         </div>
         <.tool_call_list :if={(@msg.tool_calls || []) != []} tool_calls={@msg.tool_calls} />
-      </.chat_section>
-    </.chat>
+      </div>
+    </div>
     """
   end
 
@@ -835,9 +821,11 @@ defmodule LongWeb.AgentLive.Chat do
     <div class="mt-3 space-y-1.5">
       <details :for={tc <- @tool_calls} class="group">
         <summary class="cursor-pointer text-xs text-zinc-600 hover:text-zinc-900 select-none flex items-center gap-2">
-          <.badge color="misc" size="extra_small" icon="hero-wrench-screwdriver" rounded="full">
-            {tc["name"]}
-          </.badge>
+          <Badge.badge color="gray" size="xs">
+            <span class="inline-flex items-center gap-1">
+              <.icon name="hero-wrench-screwdriver" class="size-3" />{tc["name"]}
+            </span>
+          </Badge.badge>
           <span class="text-zinc-400 font-mono">({short_args(tc["input"] || %{})})</span>
         </summary>
         <pre class="mt-1.5 text-[11px] bg-zinc-50 border border-zinc-200 rounded p-2 overflow-x-auto leading-snug font-mono">{format_data(tc["input"] || %{})}</pre>
@@ -850,17 +838,10 @@ defmodule LongWeb.AgentLive.Chat do
 
   defp streaming_bubble(assigns) do
     ~H"""
-    <.chat
-      position="normal"
-      color="natural"
-      variant="bordered"
-      rounded="extra_large"
-      padding="none"
-      class="[&>.chat-section-bubble]:!max-w-[85%] [&>.chat-section-bubble]:bg-white [&>.chat-section-bubble]:border-zinc-300 [&>.chat-section-bubble]:shadow-sm"
-    >
-      <.chat_section class="px-4 py-3 text-[15px] leading-relaxed">
+    <div class="flex justify-start">
+      <div class="max-w-[85%] rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-[15px] leading-relaxed shadow-sm">
         <details :if={@streaming.thinking != ""} class="mb-2">
-          <summary class="cursor-pointer text-xs text-zinc-400">thinking…</summary>
+          <summary class="cursor-pointer text-xs text-zinc-400">{gettext("thinking…")}</summary>
           <pre class="mt-1.5 text-xs text-zinc-500 whitespace-pre-wrap leading-snug">{@streaming.thinking}</pre>
         </details>
         <div :if={@streaming.text != ""} class="whitespace-pre-wrap break-words leading-relaxed">
@@ -870,11 +851,11 @@ defmodule LongWeb.AgentLive.Chat do
           :if={@streaming.text == "" and @streaming.tool_runs == []}
           class="flex items-center gap-2 text-sm text-zinc-400"
         >
-          <.spinner color="natural" size="extra_small" /> {gettext("thinking")}
+          <.icon name="hero-arrow-path" class="size-4 animate-spin" /> {gettext("thinking")}
         </div>
         <.tool_run_card :for={run <- @streaming.tool_runs} run={run} />
-      </.chat_section>
-    </.chat>
+      </div>
+    </div>
     """
   end
 
@@ -890,22 +871,19 @@ defmodule LongWeb.AgentLive.Chat do
       |> assign(:pulse?, pulse?)
 
     ~H"""
-    <.card variant="bordered" color="silver" rounded="large" padding="none" class="mt-3">
+    <div class="mt-3 rounded-lg border border-zinc-200 bg-zinc-50/50 overflow-hidden">
       <div class="px-3 py-2 flex items-center justify-between text-xs">
-        <.badge color="misc" size="extra_small" icon="hero-wrench-screwdriver" rounded="full">
-          {@run.name}
-        </.badge>
-        <.badge
-          color={@badge_color}
-          size="extra_small"
-          rounded="full"
-          class={@pulse? && "animate-pulse"}
-        >
+        <Badge.badge color="gray" size="xs">
+          <span class="inline-flex items-center gap-1">
+            <.icon name="hero-wrench-screwdriver" class="size-3" />{@run.name}
+          </span>
+        </Badge.badge>
+        <Badge.badge color={@badge_color} size="xs" class={@pulse? && "animate-pulse"}>
           {@badge_label}
-        </.badge>
+        </Badge.badge>
       </div>
       <details class="px-3 pb-2 text-[11px] text-zinc-500">
-        <summary class="cursor-pointer">args</summary>
+        <summary class="cursor-pointer">{gettext("args")}</summary>
         <pre class="mt-1 bg-white border border-zinc-200 rounded p-2 overflow-x-auto leading-snug font-mono text-zinc-700">{format_data(@run.args || %{})}</pre>
       </details>
       <pre
@@ -913,20 +891,20 @@ defmodule LongWeb.AgentLive.Chat do
         class="mx-3 mb-2 text-[11px] bg-zinc-900 text-zinc-100 rounded p-2 overflow-x-auto whitespace-pre-wrap break-words leading-snug font-mono"
       >{@run.output}</pre>
       <details :if={@run.data != nil} class="px-3 pb-2 text-[11px] text-zinc-500">
-        <summary class="cursor-pointer">result</summary>
+        <summary class="cursor-pointer">{gettext("result")}</summary>
         <pre class="mt-1 bg-white border border-zinc-200 rounded p-2 overflow-x-auto leading-snug font-mono text-zinc-700">{format_data(@run.data)}</pre>
       </details>
-    </.card>
+    </div>
     """
   end
 
   attr :notice, :map, required: true
 
   defp loop_notice(assigns) do
-    assigns = assign(assigns, :alert_kind, notice_alert_kind(assigns.notice.kind))
+    assigns = assign(assigns, :classes, notice_classes(assigns.notice.kind))
 
     ~H"""
-    <.alert kind={@alert_kind} rounded="extra_large" class="max-w-2xl mx-auto">
+    <div class={["max-w-2xl mx-auto rounded-xl border px-4 py-3 text-sm", @classes]}>
       <div class="flex items-start gap-3">
         <div class="flex-1">{@notice.text}</div>
         <button
@@ -937,7 +915,7 @@ defmodule LongWeb.AgentLive.Chat do
           {gettext("dismiss")}
         </button>
       </div>
-    </.alert>
+    </div>
     """
   end
 
@@ -945,13 +923,11 @@ defmodule LongWeb.AgentLive.Chat do
 
   defp ask_user_card(assigns) do
     ~H"""
-    <.alert
-      kind={:warning}
-      title={gettext("The agent is asking")}
-      rounded="extra_large"
-      class="max-w-2xl mx-auto"
-    >
-      <p class="mb-3">{@ask["question"]}</p>
+    <div class="max-w-2xl mx-auto rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+      <div class="text-sm font-semibold text-amber-900 mb-2 flex items-center gap-1.5">
+        <.icon name="hero-question-mark-circle" class="size-4" />{gettext("The agent is asking")}
+      </div>
+      <p class="mb-3 text-amber-900">{@ask["question"]}</p>
       <form phx-submit="answer_ask_user" class="flex gap-2 mb-3">
         <input
           name="answer"
@@ -974,7 +950,7 @@ defmodule LongWeb.AgentLive.Chat do
           {c}
         </Button.button>
       </div>
-    </.alert>
+    </div>
     """
   end
 
@@ -1076,13 +1052,13 @@ defmodule LongWeb.AgentLive.Chat do
       !@open? && "w-0"
     ]}>
       <div class="p-4 space-y-4">
-        <.card variant="bordered" color="natural" rounded="large" padding="small">
-          <.card_title title={gettext("L1 · Working memory")} size="extra_small" class="text-zinc-500 uppercase" />
+        <div class="rounded-lg border border-zinc-200 bg-white p-3">
+          <div class="text-[11px] font-medium uppercase text-zinc-500 mb-1">{gettext("L1 · Working memory")}</div>
           <pre class="text-xs whitespace-pre-wrap text-zinc-700 leading-snug min-h-[1.5em]">{(@checkpoint && @checkpoint.key_info) || gettext("(empty)")}</pre>
-        </.card>
+        </div>
 
-        <.card variant="bordered" color="natural" rounded="large" padding="small">
-          <.card_title title={gettext("L2 · Global memory")} size="extra_small" class="text-zinc-500 uppercase" />
+        <div class="rounded-lg border border-zinc-200 bg-white p-3">
+          <div class="text-[11px] font-medium uppercase text-zinc-500 mb-1">{gettext("L2 · Global memory")}</div>
           <p :if={@global_memory == []} class="text-xs text-zinc-400">{gettext("(empty)")}</p>
           <ul :if={@global_memory != []} class="space-y-2 text-xs">
             <li :for={entry <- @global_memory} class="border-l-2 border-zinc-200 pl-2.5">
@@ -1091,7 +1067,7 @@ defmodule LongWeb.AgentLive.Chat do
               <div class="text-zinc-500 leading-snug">{entry.value}</div>
             </li>
           </ul>
-        </.card>
+        </div>
       </div>
     </aside>
     """

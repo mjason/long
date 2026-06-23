@@ -402,13 +402,13 @@ msgstr "会话"
 msgid "Skills"
 msgstr "技能"
 
-#: lib/long_web/live/agent_live/chat.ex:1081
-#: lib/long_web/live/agent_live/chat.ex:1086
+#: lib/long_web/live/agent_live/chat.ex:1057
+#: lib/long_web/live/agent_live/chat.ex:1062
 #, elixir-autogen, elixir-format
 msgid "(empty)"
 msgstr "(空)"
 
-#: lib/long_web/live/agent_live/chat.ex:1030
+#: lib/long_web/live/agent_live/chat.ex:1006
 #, elixir-autogen, elixir-format
 msgid "Attach images or files"
 msgstr "附加图片或文件"
@@ -444,12 +444,12 @@ msgstr "隐藏记忆"
 msgid "Hide sessions"
 msgstr "隐藏会话列表"
 
-#: lib/long_web/live/agent_live/chat.ex:1080
+#: lib/long_web/live/agent_live/chat.ex:1056
 #, elixir-autogen, elixir-format
 msgid "L1 · Working memory"
 msgstr "L1 · 工作记忆"
 
-#: lib/long_web/live/agent_live/chat.ex:1085
+#: lib/long_web/live/agent_live/chat.ex:1061
 #: lib/long_web/live/manage_live.ex:1516
 #, elixir-autogen, elixir-format
 msgid "L2 · Global memory"
@@ -476,13 +476,13 @@ msgstr "新会话"
 msgid "Save (Enter)"
 msgstr "保存(回车)"
 
-#: lib/long_web/live/agent_live/chat.ex:962
-#: lib/long_web/live/agent_live/chat.ex:1054
+#: lib/long_web/live/agent_live/chat.ex:938
+#: lib/long_web/live/agent_live/chat.ex:1030
 #, elixir-autogen, elixir-format
 msgid "Send"
 msgstr "发送"
 
-#: lib/long_web/live/agent_live/chat.ex:1042
+#: lib/long_web/live/agent_live/chat.ex:1018
 #, elixir-autogen, elixir-format
 msgid "Send a message  (Enter to send · Shift+Enter for newline)"
 msgstr "输入消息(回车发送 · Shift+回车换行)"
@@ -502,7 +502,7 @@ msgstr "显示会话列表"
 msgid "Start a conversation"
 msgstr "开始对话"
 
-#: lib/long_web/live/agent_live/chat.ex:950
+#: lib/long_web/live/agent_live/chat.ex:928
 #, elixir-autogen, elixir-format
 msgid "The agent is asking"
 msgstr "agent 在询问"
@@ -512,17 +512,17 @@ msgstr "agent 在询问"
 msgid "Type a message below. The agent has access to file I/O, code execution, memory, HTTP fetch, and browser tools."
 msgstr "在下面输入消息。agent 可以读写文件、执行代码、使用记忆、HTTP 抓取和浏览器工具。"
 
-#: lib/long_web/live/agent_live/chat.ex:960
+#: lib/long_web/live/agent_live/chat.ex:936
 #, elixir-autogen, elixir-format
 msgid "Type your answer…"
 msgstr "输入你的回答…"
 
-#: lib/long_web/live/agent_live/chat.ex:1041
+#: lib/long_web/live/agent_live/chat.ex:1017
 #, elixir-autogen, elixir-format
 msgid "Working…"
 msgstr "处理中…"
 
-#: lib/long_web/live/agent_live/chat.ex:937
+#: lib/long_web/live/agent_live/chat.ex:915
 #, elixir-autogen, elixir-format
 msgid "dismiss"
 msgstr "忽略"
@@ -532,22 +532,22 @@ msgstr "忽略"
 msgid "echo (demo)"
 msgstr "echo(演示)"
 
-#: lib/long_web/live/agent_live/chat.ex:873
+#: lib/long_web/live/agent_live/chat.ex:854
 #, elixir-autogen, elixir-format
 msgid "thinking"
 msgstr "思考中"
 
-#: lib/long_web/live/agent_live/chat.ex:1132
+#: lib/long_web/live/agent_live/chat.ex:1108
 #, elixir-autogen, elixir-format
 msgid "too large (max 25MB)"
 msgstr "文件太大(最大 25MB)"
 
-#: lib/long_web/live/agent_live/chat.ex:1133
+#: lib/long_web/live/agent_live/chat.ex:1109
 #, elixir-autogen, elixir-format
 msgid "too many files"
 msgstr "文件太多"
 
-#: lib/long_web/live/agent_live/chat.ex:1134
+#: lib/long_web/live/agent_live/chat.ex:1110
 #, elixir-autogen, elixir-format
 msgid "type not accepted"
 msgstr "不支持的文件类型"
@@ -1454,3 +1454,18 @@ msgstr "技能 · %{name}"
 #, elixir-autogen, elixir-format
 msgid "WeChat login — %{name}"
 msgstr "微信登录 —— %{name}"
+
+#: lib/long_web/live/agent_live/chat.ex:886
+#, elixir-autogen, elixir-format, fuzzy
+msgid "args"
+msgstr "参数"
+
+#: lib/long_web/live/agent_live/chat.ex:894
+#, elixir-autogen, elixir-format
+msgid "result"
+msgstr "结果"
+
+#: lib/long_web/live/agent_live/chat.ex:844
+#, elixir-autogen, elixir-format, fuzzy
+msgid "thinking…"
+msgstr "思考中…"
