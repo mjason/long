@@ -1383,7 +1383,7 @@ defmodule LongWeb.ManageLive do
             </tr>
           </thead>
           <tbody>
-            <tr :for={llm <- @llms} class="border-t border-zinc-100">
+            <tr :for={llm <- @llms} class="border-t border-zinc-100 transition-colors hover:bg-zinc-50/70">
               <td class="px-4 py-2 font-medium">
                 <span class="flex items-center gap-2">
                   <.icon :if={llm.default} name="hero-star-solid" class="size-4 text-amber-500" />
@@ -1478,7 +1478,7 @@ defmodule LongWeb.ManageLive do
               </tr>
             </thead>
             <tbody>
-              <tr :for={row <- @checkpoints} class="border-t border-zinc-100">
+              <tr :for={row <- @checkpoints} class="border-t border-zinc-100 transition-colors hover:bg-zinc-50/70">
                 <td class="px-4 py-2 text-xs font-mono text-zinc-500">
                   {row.session.title || row.session.id}
                 </td>
@@ -1526,7 +1526,7 @@ defmodule LongWeb.ManageLive do
               </tr>
             </thead>
             <tbody>
-              <tr :for={row <- @globals} class="border-t border-zinc-100">
+              <tr :for={row <- @globals} class="border-t border-zinc-100 transition-colors hover:bg-zinc-50/70">
                 <td class="px-4 py-2">
                   <Badge.badge color="info" size="xs">{row.scope}</Badge.badge>
                 </td>
@@ -1584,7 +1584,7 @@ defmodule LongWeb.ManageLive do
               </tr>
             </thead>
             <tbody>
-              <tr :for={row <- @session_memories} class="border-t border-zinc-100">
+              <tr :for={row <- @session_memories} class="border-t border-zinc-100 transition-colors hover:bg-zinc-50/70">
                 <td class="px-4 py-2 text-xs font-mono text-zinc-500">{short(row.session_id)}</td>
                 <td class="px-4 py-2 text-xs text-zinc-500">{row.kind}</td>
                 <td class="px-4 py-2 font-medium text-zinc-800">{row.key}</td>
@@ -1684,7 +1684,7 @@ defmodule LongWeb.ManageLive do
             </tr>
           </thead>
           <tbody>
-            <tr :for={s <- @skills} class="border-t border-zinc-100">
+            <tr :for={s <- @skills} class="border-t border-zinc-100 transition-colors hover:bg-zinc-50/70">
               <td class="px-4 py-2 font-mono text-zinc-800">{s.name}</td>
               <td class="px-4 py-2"><.skill_scope_badge skill={s} owners={@skill_owner_names} /></td>
               <td class="px-4 py-2 text-zinc-600 leading-snug max-w-md">
@@ -1779,7 +1779,7 @@ defmodule LongWeb.ManageLive do
             </tr>
           </thead>
           <tbody>
-            <tr :for={s <- @sessions_rows} class="border-t border-zinc-100">
+            <tr :for={s <- @sessions_rows} class="border-t border-zinc-100 transition-colors hover:bg-zinc-50/70">
               <td class="px-4 py-2 font-medium text-zinc-800">
                 <.link navigate={~p"/chat/#{s.id}"} class="hover:underline">
                   {s.title || short(s.id)}
@@ -1850,7 +1850,7 @@ defmodule LongWeb.ManageLive do
             </tr>
           </thead>
           <tbody>
-            <tr :for={row <- @search_configs} class="border-t border-zinc-100">
+            <tr :for={row <- @search_configs} class="border-t border-zinc-100 transition-colors hover:bg-zinc-50/70">
               <td class="px-4 py-2 font-medium">{row.alias}</td>
               <td class="px-4 py-2">
                 <Badge.badge color="info" size="xs">{row.provider}</Badge.badge>
@@ -1929,7 +1929,7 @@ defmodule LongWeb.ManageLive do
               </tr>
             </thead>
             <tbody>
-              <tr :for={c <- @wechat_credentials} id={"wechat-row-#{c.id}"} class="border-t border-zinc-100">
+              <tr :for={c <- @wechat_credentials} id={"wechat-row-#{c.id}"} class="border-t border-zinc-100 transition-colors hover:bg-zinc-50/70">
                 <td class="px-4 py-2 font-mono text-zinc-800">{c.name}</td>
                 <td class="px-4 py-2">
                   <div class="flex items-center gap-2">
@@ -2034,7 +2034,7 @@ defmodule LongWeb.ManageLive do
               </tr>
             </thead>
             <tbody>
-              <tr :for={u <- @bot_users} class="border-t border-zinc-100">
+              <tr :for={u <- @bot_users} class="border-t border-zinc-100 transition-colors hover:bg-zinc-50/70">
                 <td class="px-4 py-2">
                   <Badge.badge color="info" size="xs">{u.platform}</Badge.badge>
                 </td>
@@ -2087,7 +2087,7 @@ defmodule LongWeb.ManageLive do
               </tr>
             </thead>
             <tbody>
-              <tr :for={c <- @telegram_credentials} id={"telegram-row-#{c.id}"} class="border-t border-zinc-100">
+              <tr :for={c <- @telegram_credentials} id={"telegram-row-#{c.id}"} class="border-t border-zinc-100 transition-colors hover:bg-zinc-50/70">
                 <td class="px-4 py-2 font-medium">{c.name}</td>
                 <td class="px-4 py-2 text-xs font-mono text-zinc-500">{c.username || "—"}</td>
                 <td class="px-4 py-2">
@@ -2193,7 +2193,7 @@ defmodule LongWeb.ManageLive do
             </tr>
           </thead>
           <tbody>
-            <tr :for={t <- @scheduled_tasks} class="border-t border-zinc-100">
+            <tr :for={t <- @scheduled_tasks} class="border-t border-zinc-100 transition-colors hover:bg-zinc-50/70">
               <td class="px-4 py-2 font-medium">{t.name}</td>
               <td class="px-4 py-2">
                 <Badge.badge color="info" size="xs">{repeat_label(t)}</Badge.badge>
@@ -2278,7 +2278,7 @@ defmodule LongWeb.ManageLive do
             </tr>
           </thead>
           <tbody>
-            <tr :for={m <- @monitors} class="border-t border-zinc-100">
+            <tr :for={m <- @monitors} class="border-t border-zinc-100 transition-colors hover:bg-zinc-50/70">
               <td class="px-4 py-2 font-medium">{m.name}</td>
               <td class="px-4 py-2">
                 <Badge.badge color="info" size="xs">{repeat_label(m)}</Badge.badge>
@@ -2637,7 +2637,7 @@ defmodule LongWeb.ManageLive do
             </tr>
           </thead>
           <tbody>
-            <tr :for={m <- hh.members} id={"member-row-#{m.id}"} class="border-t border-zinc-100">
+            <tr :for={m <- hh.members} id={"member-row-#{m.id}"} class="border-t border-zinc-100 transition-colors hover:bg-zinc-50/70">
               <td class="px-4 py-2 text-zinc-800">{m.display_name}</td>
               <td class="px-4 py-2 text-zinc-600">{relation_label(m.relation)}</td>
               <td class="px-4 py-2 text-xs text-zinc-500">{m.role}</td>
@@ -2859,7 +2859,7 @@ defmodule LongWeb.ManageLive do
             </tr>
           </thead>
           <tbody>
-            <tr :for={t <- @reflection_tasks} class="border-t border-zinc-100">
+            <tr :for={t <- @reflection_tasks} class="border-t border-zinc-100 transition-colors hover:bg-zinc-50/70">
               <td class="px-4 py-2 font-mono text-xs">{reflection_session_label(t)}</td>
               <td class="px-4 py-2">{t.schedule_time} UTC</td>
               <td class="px-4 py-2 text-xs text-zinc-500">{reflection_dt(t.next_run_at)}</td>
@@ -2936,7 +2936,7 @@ defmodule LongWeb.ManageLive do
             </tr>
           </thead>
           <tbody>
-            <tr :for={s <- @secrets} class="border-t border-zinc-100">
+            <tr :for={s <- @secrets} class="border-t border-zinc-100 transition-colors hover:bg-zinc-50/70">
               <td class="px-4 py-2 font-mono text-zinc-800">{s.name}</td>
               <td class="px-4 py-2 text-xs font-mono text-zinc-500">
                 {mask_secret(s.value)}
