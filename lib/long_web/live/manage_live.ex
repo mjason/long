@@ -2254,11 +2254,13 @@ defmodule LongWeb.ManageLive do
   defp monitors_section(assigns) do
     ~H"""
     <div class="p-6 space-y-4">
-      <div class="flex items-center gap-3">
-        <h1 class="text-xl font-semibold tracking-tight flex-1">{gettext("Monitors")}</h1>
-        <p class="text-xs text-zinc-500 max-w-sm">
-          {gettext("Scripts that run on an interval and notify only when there's something. ⚡ runs one now.")}
-        </p>
+      <div class="flex items-start justify-between gap-4">
+        <div>
+          <h1 class="text-xl font-semibold tracking-tight">{gettext("Monitors")}</h1>
+          <p class="mt-1 max-w-md text-xs text-zinc-500">
+            {gettext("Scripts that run on an interval and notify only when there's something. ⚡ runs one now.")}
+          </p>
+        </div>
         <Button.button phx-click="new_monitor" color="primary" icon="hero-plus" radius="md" size="sm">
           {gettext("New monitor")}
         </Button.button>
