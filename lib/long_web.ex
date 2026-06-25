@@ -93,6 +93,12 @@ defmodule LongWeb do
       # with reconnect flashes); pages call it as `Layouts.flash_group`.
       import LongWeb.CoreComponents, only: [flash: 1, show: 1, show: 2, hide: 1, hide: 2]
 
+      # Admin-console building blocks (panel, field, control, data_table, …).
+      # Our `field/1` replaces Petal's same-named one (unused here), so drop
+      # Petal's to avoid an ambiguous-import clash.
+      import PetalComponents.Field, except: [field: 1]
+      import LongWeb.Components.Console
+
       # Common modules used in templates
       alias Phoenix.LiveView.JS
       alias LongWeb.Layouts

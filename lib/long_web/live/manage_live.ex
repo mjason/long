@@ -1363,12 +1363,13 @@ defmodule LongWeb.ManageLive do
   defp llm_section(assigns) do
     ~H"""
     <div class="p-6 space-y-4">
-      <div class="flex items-center gap-3">
-        <h1 class="text-xl font-semibold tracking-tight flex-1">{gettext("LLM configurations")}</h1>
-        <Button.button phx-click="new_llm" color="primary" icon="hero-plus" radius="md" size="sm">
-          {gettext("New LLM")}
-        </Button.button>
-      </div>
+      <.section_header title={gettext("LLM configurations")}>
+        <:actions>
+          <Button.button phx-click="new_llm" color="primary" icon="hero-plus" radius="md" size="sm">
+            {gettext("New LLM")}
+          </Button.button>
+        </:actions>
+      </.section_header>
 
       <div class="rounded-xl border border-zinc-200/80 bg-white shadow-sm overflow-hidden">
         <table class="w-full text-sm">
@@ -1400,9 +1401,7 @@ defmodule LongWeb.ManageLive do
               <td class="px-4 py-2 text-xs text-zinc-500">{llm.wire_protocol || "—"}</td>
               <td class="px-4 py-2 text-zinc-600 font-mono text-xs">{llm.model}</td>
               <td class="px-4 py-2">
-                <Badge.badge color={if llm.enabled, do: "success", else: "gray"} size="xs">
-                  {if llm.enabled, do: gettext("enabled"), else: gettext("disabled")}
-                </Badge.badge>
+                <.enabled_badge on={llm.enabled} on_label={gettext("enabled")} off_label={gettext("disabled")} />
               </td>
               <td class="px-4 py-2">
                 <div class="flex justify-end gap-1">
@@ -1462,7 +1461,7 @@ defmodule LongWeb.ManageLive do
   defp memory_section(assigns) do
     ~H"""
     <div class="p-6 space-y-6">
-      <h1 class="text-xl font-semibold tracking-tight">{gettext("Memory editor")}</h1>
+      <.section_header title={gettext("Memory editor")} />
 
       <section class="space-y-2">
         <h2 class="text-sm font-semibold text-zinc-700 uppercase tracking-wide">
@@ -1629,13 +1628,14 @@ defmodule LongWeb.ManageLive do
   defp skill_section(assigns) do
     ~H"""
     <div class="p-6 space-y-4">
-      <div class="flex items-center gap-3">
-        <h1 class="text-xl font-semibold tracking-tight flex-1">{gettext("Skills")}</h1>
-        <span class="text-xs text-zinc-400 font-mono">{SkillStore.root()}</span>
-        <Button.button phx-click="skill_reindex" color="primary" variant="outline" icon="hero-arrow-path" radius="md" size="sm">
-          {gettext("Reindex")}
-        </Button.button>
-      </div>
+      <.section_header title={gettext("Skills")}>
+        <:actions>
+          <span class="text-xs text-zinc-400 font-mono">{SkillStore.root()}</span>
+          <Button.button phx-click="skill_reindex" color="primary" variant="outline" icon="hero-arrow-path" radius="md" size="sm">
+            {gettext("Reindex")}
+          </Button.button>
+        </:actions>
+      </.section_header>
 
       <div class="rounded-lg border border-zinc-200 bg-white p-4">
         <p class="text-xs text-zinc-500 mb-2">
@@ -1766,7 +1766,7 @@ defmodule LongWeb.ManageLive do
   defp sessions_section(assigns) do
     ~H"""
     <div class="p-6 space-y-4">
-      <h1 class="text-xl font-semibold tracking-tight">{gettext("Sessions")}</h1>
+      <.section_header title={gettext("Sessions")} />
       <div class="rounded-xl border border-zinc-200/80 bg-white shadow-sm overflow-hidden">
         <table class="w-full text-sm">
           <thead class="text-[11px] uppercase tracking-wider text-zinc-400 bg-zinc-50/80">
@@ -1832,12 +1832,13 @@ defmodule LongWeb.ManageLive do
   defp search_section(assigns) do
     ~H"""
     <div class="p-6 space-y-4">
-      <div class="flex items-center gap-3">
-        <h1 class="text-xl font-semibold tracking-tight flex-1">{gettext("Search providers")}</h1>
-        <Button.button phx-click="new_search" color="primary" icon="hero-plus" radius="md" size="sm">
-          {gettext("New provider")}
-        </Button.button>
-      </div>
+      <.section_header title={gettext("Search providers")}>
+        <:actions>
+          <Button.button phx-click="new_search" color="primary" icon="hero-plus" radius="md" size="sm">
+            {gettext("New provider")}
+          </Button.button>
+        </:actions>
+      </.section_header>
 
       <div class="rounded-xl border border-zinc-200/80 bg-white shadow-sm overflow-hidden">
         <table class="w-full text-sm">
@@ -1857,9 +1858,7 @@ defmodule LongWeb.ManageLive do
                 <Badge.badge color="info" size="xs">{row.provider}</Badge.badge>
               </td>
               <td class="px-4 py-2">
-                <Badge.badge color={if row.enabled, do: "success", else: "gray"} size="xs">
-                  {if row.enabled, do: gettext("enabled"), else: gettext("disabled")}
-                </Badge.badge>
+                <.enabled_badge on={row.enabled} on_label={gettext("enabled")} off_label={gettext("disabled")} />
               </td>
               <td class="px-4 py-2 text-right text-xs text-zinc-500">{row.sort_order}</td>
               <td class="px-4 py-2">
@@ -1910,7 +1909,7 @@ defmodule LongWeb.ManageLive do
   defp credentials_section(assigns) do
     ~H"""
     <div class="p-6 space-y-6">
-      <h1 class="text-xl font-semibold tracking-tight">{gettext("Channels")}</h1>
+      <.section_header title={gettext("Channels")} />
 
       <section class="space-y-2">
         <h2 class="text-sm font-semibold text-zinc-700 uppercase tracking-wide">{gettext("WeChat accounts")}</h2>
@@ -1934,9 +1933,7 @@ defmodule LongWeb.ManageLive do
                 <td class="px-4 py-2 font-mono text-zinc-800">{c.name}</td>
                 <td class="px-4 py-2">
                   <div class="flex items-center gap-2">
-                    <Badge.badge color={if wechat_connected?(c), do: "success", else: "gray"} size="xs">
-                      {if wechat_connected?(c), do: gettext("connected"), else: gettext("no token")}
-                    </Badge.badge>
+                    <.enabled_badge on={wechat_connected?(c)} on_label={gettext("connected")} off_label={gettext("no token")} />
                     <span :if={c.ilink_bot_id} class="text-xs font-mono text-zinc-400">
                       {c.ilink_bot_id}
                     </span>
@@ -2005,15 +2002,14 @@ defmodule LongWeb.ManageLive do
             phx-submit="add_wechat_account"
             class="flex items-end gap-2 px-4 py-3 border-t border-zinc-200 bg-zinc-50"
           >
-            <label class="flex-1 block">
-              <span class="text-xs font-medium text-zinc-600">{gettext("New account name")}</span>
-              <input
+            <.field label={gettext("New account name")} class="flex-1 block">
+              <.control
                 name="name"
+                size="sm"
                 required
                 placeholder={gettext("e.g. dad-phone")}
-                class="mt-1 w-full rounded-lg border border-zinc-300 transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none px-2 py-1.5 text-sm"
               />
-            </label>
+            </.field>
             <Button.button type="submit" color="primary" icon="hero-plus" radius="md" size="sm">
               {gettext("Add & scan")}
             </Button.button>
@@ -2120,9 +2116,7 @@ defmodule LongWeb.ManageLive do
                 </td>
                 <td class="px-4 py-2 text-xs font-mono text-zinc-500">{mask_secret(c.bot_token)}</td>
                 <td class="px-4 py-2">
-                  <Badge.badge color={if c.enabled, do: "success", else: "gray"} size="xs">
-                    {if c.enabled, do: gettext("enabled"), else: gettext("paused")}
-                  </Badge.badge>
+                  <.enabled_badge on={c.enabled} on_label={gettext("enabled")} off_label={gettext("paused")} />
                 </td>
                 <td class="px-4 py-2">
                   <div class="flex justify-end gap-1">
@@ -2173,12 +2167,13 @@ defmodule LongWeb.ManageLive do
   defp scheduled_section(assigns) do
     ~H"""
     <div class="p-6 space-y-4">
-      <div class="flex items-center gap-3">
-        <h1 class="text-xl font-semibold tracking-tight flex-1">{gettext("Scheduled tasks")}</h1>
-        <Button.button phx-click="new_scheduled" color="primary" icon="hero-plus" radius="md" size="sm">
-          {gettext("New task")}
-        </Button.button>
-      </div>
+      <.section_header title={gettext("Scheduled tasks")}>
+        <:actions>
+          <Button.button phx-click="new_scheduled" color="primary" icon="hero-plus" radius="md" size="sm">
+            {gettext("New task")}
+          </Button.button>
+        </:actions>
+      </.section_header>
 
       <div class="rounded-xl border border-zinc-200/80 bg-white shadow-sm overflow-hidden">
         <table class="w-full text-sm">
@@ -2201,9 +2196,7 @@ defmodule LongWeb.ManageLive do
               </td>
               <td class="px-4 py-2 text-zinc-600 max-w-md">{Text.preview(t.prompt || "", 80)}</td>
               <td class="px-4 py-2">
-                <Badge.badge color={if t.enabled, do: "success", else: "gray"} size="xs">
-                  {if t.enabled, do: gettext("on"), else: gettext("off")}
-                </Badge.badge>
+                <.enabled_badge on={t.enabled} on_label={gettext("on")} off_label={gettext("off")} />
               </td>
               <td class="px-4 py-2 text-xs text-zinc-500">{format_dt(t.next_run_at)}</td>
               <td class="px-4 py-2 text-xs text-zinc-500">{format_dt(t.last_run_at)}</td>
@@ -2255,17 +2248,16 @@ defmodule LongWeb.ManageLive do
   defp monitors_section(assigns) do
     ~H"""
     <div class="p-6 space-y-4">
-      <div class="flex items-start justify-between gap-4">
-        <div>
-          <h1 class="text-xl font-semibold tracking-tight">{gettext("Monitors")}</h1>
-          <p class="mt-1 max-w-md text-xs text-zinc-500">
-            {gettext("Scripts that run on an interval and notify only when there's something. ⚡ runs one now.")}
-          </p>
-        </div>
-        <Button.button phx-click="new_monitor" color="primary" icon="hero-plus" radius="md" size="sm">
-          {gettext("New monitor")}
-        </Button.button>
-      </div>
+      <.section_header title={gettext("Monitors")}>
+        <:desc>
+          {gettext("Scripts that run on an interval and notify only when there's something. ⚡ runs one now.")}
+        </:desc>
+        <:actions>
+          <Button.button phx-click="new_monitor" color="primary" icon="hero-plus" radius="md" size="sm">
+            {gettext("New monitor")}
+          </Button.button>
+        </:actions>
+      </.section_header>
 
       <div class="rounded-xl border border-zinc-200/80 bg-white shadow-sm overflow-hidden">
         <table class="w-full text-sm">
@@ -2287,9 +2279,7 @@ defmodule LongWeb.ManageLive do
                 <Badge.badge color="info" size="xs">{repeat_label(m)}</Badge.badge>
               </td>
               <td class="px-4 py-2">
-                <Badge.badge color={if m.enabled, do: "success", else: "gray"} size="xs">
-                  {if m.enabled, do: gettext("on"), else: gettext("off")}
-                </Badge.badge>
+                <.enabled_badge on={m.enabled} on_label={gettext("on")} off_label={gettext("off")} />
               </td>
               <td class="px-4 py-2">
                 <Badge.badge color={monitor_status_color(m.last_status)} size="xs">
@@ -2370,101 +2360,54 @@ defmodule LongWeb.ManageLive do
     >
       <form phx-submit="save_monitor" class="space-y-3">
         <div class="grid grid-cols-2 gap-3">
-          <label class="block">
-            <span class="text-xs font-medium text-zinc-600">Name</span>
-            <input
+          <.field label="Name">
+            <.control
               name="monitor[name]"
               value={@editing.name}
+              mono
               required
               readonly={!@is_new?}
-              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none font-mono"
               placeholder="e.g. xiaomi_stock_watch"
             />
-          </label>
-          <label class="block">
-            <span class="text-xs font-medium text-zinc-600">Repeat</span>
-            <select
-              name="monitor[repeat]"
-              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none"
-            >
+          </.field>
+          <.field label="Repeat">
+            <.control type="select" name="monitor[repeat]">
               <option :for={r <- @repeats} value={r} selected={@editing.repeat == r}>{r}</option>
-            </select>
-          </label>
+            </.control>
+          </.field>
         </div>
 
-        <label class="block">
-          <span class="text-xs font-medium text-zinc-600">
-            Script — Deno/TS. Print one JSON line as the last stdout line:
-            notify (bool), message (string), optional key.
-          </span>
+        <.field label="Script — Deno/TS. Print one JSON line as the last stdout line: notify (bool), message (string), optional key.">
           <textarea
             name="monitor[script]"
             rows="12"
             required
             class="mt-1 w-full rounded-lg border border-zinc-300 transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none px-3 py-2 text-xs font-mono leading-snug"
           >{@editing.script}</textarea>
-        </label>
+        </.field>
 
         <div class="grid grid-cols-4 gap-3">
-          <label class="block">
-            <span class="text-xs font-medium text-zinc-600">Every N</span>
-            <input
-              type="number"
-              min="1"
-              name="monitor[every_n]"
-              value={@editing.every_n}
-              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none"
-            />
-          </label>
-          <label class="block">
-            <span class="text-xs font-medium text-zinc-600">Time (UTC)</span>
-            <input
-              name="monitor[schedule_time]"
-              value={@editing.schedule_time}
-              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none font-mono"
-              placeholder="08:00"
-            />
-          </label>
-          <label class="block">
-            <span class="text-xs font-medium text-zinc-600">Cooldown (min)</span>
-            <input
-              type="number"
-              min="0"
-              name="monitor[cooldown_minutes]"
-              value={@editing.cooldown_minutes}
-              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none"
-            />
-          </label>
-          <label class="block">
-            <span class="text-xs font-medium text-zinc-600">Max delay (h)</span>
-            <input
-              type="number"
-              min="0"
-              name="monitor[max_delay_hours]"
-              value={@editing.max_delay_hours}
-              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none"
-            />
-          </label>
+          <.field label="Every N">
+            <.control type="number" min="1" name="monitor[every_n]" value={@editing.every_n} />
+          </.field>
+          <.field label="Time (UTC)">
+            <.control name="monitor[schedule_time]" value={@editing.schedule_time} mono placeholder="08:00" />
+          </.field>
+          <.field label="Cooldown (min)">
+            <.control type="number" min="0" name="monitor[cooldown_minutes]" value={@editing.cooldown_minutes} />
+          </.field>
+          <.field label="Max delay (h)">
+            <.control type="number" min="0" name="monitor[max_delay_hours]" value={@editing.max_delay_hours} />
+          </.field>
         </div>
 
         <div class="grid grid-cols-2 gap-3">
-          <label class="block">
-            <span class="text-xs font-medium text-zinc-600">Secret name (optional → SECRET env)</span>
-            <input
-              name="monitor[secret_name]"
-              value={@editing.secret_name}
-              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none font-mono"
-            />
-          </label>
-          <label :if={@is_new?} class="block">
-            <span class="text-xs font-medium text-zinc-600">Session id (where to notify)</span>
-            <input
-              name="monitor[session_id]"
-              value={@editing.session_id}
-              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none font-mono"
-              placeholder="UUID"
-            />
-          </label>
+          <.field label="Secret name (optional → SECRET env)">
+            <.control name="monitor[secret_name]" value={@editing.secret_name} mono />
+          </.field>
+          <.field :if={@is_new?} label="Session id (where to notify)">
+            <.control name="monitor[session_id]" value={@editing.session_id} mono placeholder="UUID" />
+          </.field>
         </div>
 
         <div
@@ -2518,9 +2461,7 @@ defmodule LongWeb.ManageLive do
   defp groups_section(assigns) do
     ~H"""
     <div class="p-6 space-y-6">
-      <div class="flex items-center gap-3">
-        <h1 class="text-xl font-semibold tracking-tight flex-1">{gettext("Groups")}</h1>
-      </div>
+      <.section_header title={gettext("Groups")} />
 
       <div class="rounded-xl border border-zinc-200/80 bg-white shadow-sm">
         <div class="flex items-center gap-3 p-4">
@@ -2588,15 +2529,13 @@ defmodule LongWeb.ManageLive do
 
       <div class="rounded-xl border border-zinc-200/80 bg-white shadow-sm">
         <form phx-submit="new_group" class="flex items-end gap-3 p-4">
-          <label class="flex-1 block">
-            <span class="text-xs font-medium text-zinc-600">{gettext("New group")}</span>
-            <input
+          <.field label={gettext("New group")} class="flex-1 block">
+            <.control
               name="group[name]"
               required
               placeholder={gettext("e.g. My Home")}
-              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none"
             />
-          </label>
+          </.field>
           <Button.button type="submit" color="primary" icon="hero-plus" radius="md" size="sm">
             {gettext("Create")}
           </Button.button>
@@ -2693,27 +2632,24 @@ defmodule LongWeb.ManageLive do
 
         <form phx-submit="new_member" class="flex items-end gap-2 px-4 py-3 border-t border-zinc-200 bg-zinc-50">
           <input type="hidden" name="member[group_id]" value={hh.id} />
-          <label class="flex-1 block">
-            <span class="text-xs font-medium text-zinc-600">{gettext("Name")}</span>
-            <input
+          <.field label={gettext("Name")} class="flex-1 block">
+            <.control
               name="member[display_name]"
+              size="sm"
               required
               placeholder={gettext("e.g. Alex")}
-              class="mt-1 w-full rounded-lg border border-zinc-300 transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none px-2 py-1.5 text-sm"
             />
-          </label>
-          <label class="block">
-            <span class="text-xs font-medium text-zinc-600">{gettext("Relation")}</span>
-            <select name="member[relation]" class="mt-1 rounded-lg border border-zinc-300 transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none px-2 py-1.5 text-sm">
+          </.field>
+          <.field label={gettext("Relation")}>
+            <.control type="select" name="member[relation]" size="sm" full={false}>
               <option :for={r <- member_relations()} value={r}>{relation_label(r)}</option>
-            </select>
-          </label>
-          <label class="block">
-            <span class="text-xs font-medium text-zinc-600">{gettext("Role")}</span>
-            <select name="member[role]" class="mt-1 rounded-lg border border-zinc-300 transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none px-2 py-1.5 text-sm">
+            </.control>
+          </.field>
+          <.field label={gettext("Role")}>
+            <.control type="select" name="member[role]" size="sm" full={false}>
               <option :for={r <- member_roles()} value={r}>{r}</option>
-            </select>
-          </label>
+            </.control>
+          </.field>
           <Button.button type="submit" color="primary" icon="hero-plus" radius="md" size="sm">
             {gettext("Add member")}
           </Button.button>
@@ -2741,7 +2677,7 @@ defmodule LongWeb.ManageLive do
   defp phrases_section(assigns) do
     ~H"""
     <div class="p-6 space-y-4">
-      <h1 class="text-xl font-semibold tracking-tight">{gettext("Phrases")}</h1>
+      <.section_header title={gettext("Phrases")} />
       <p class="text-xs text-zinc-500 max-w-3xl leading-relaxed">
         {gettext("Central catalog of bot / system copy, per locale. Each phrase has a built-in default; set an override here to customize the wording. Placeholder tokens are filled at runtime — keep them. Leave an override blank to fall back to the default.")}
       </p>
@@ -2792,7 +2728,7 @@ defmodule LongWeb.ManageLive do
     ~H"""
     <div class="p-6 space-y-4">
       <div>
-        <h1 class="text-xl font-semibold tracking-tight">{gettext("Reflection")}</h1>
+        <.section_header title={gettext("Reflection")} />
         <p class="text-sm text-zinc-500 mt-1 max-w-2xl">
           {gettext("Silent reflection: off-peak, each session's agent quietly consolidates its own memory and never messages anyone. System-managed, kept out of the Scheduled list on purpose.")}
         </p>
@@ -2809,9 +2745,7 @@ defmodule LongWeb.ManageLive do
                   else: gettext("Off — no session reflects and none are auto-enrolled.")}
               </div>
             </div>
-            <Badge.badge color={if @reflection_enabled, do: "success", else: "gray"} size="xs">
-              {if @reflection_enabled, do: gettext("on"), else: gettext("off")}
-            </Badge.badge>
+            <.enabled_badge on={@reflection_enabled} on_label={gettext("on")} off_label={gettext("off")} />
             <Button.button
               phx-click="toggle_reflection"
               variant="outline"
@@ -2867,9 +2801,7 @@ defmodule LongWeb.ManageLive do
               <td class="px-4 py-2">{t.schedule_time} UTC</td>
               <td class="px-4 py-2 text-xs text-zinc-500">{reflection_dt(t.next_run_at)}</td>
               <td class="px-4 py-2">
-                <Badge.badge color={if t.enabled, do: "success", else: "gray"} size="xs">
-                  {if t.enabled, do: gettext("enabled"), else: gettext("disabled")}
-                </Badge.badge>
+                <.enabled_badge on={t.enabled} on_label={gettext("enabled")} off_label={gettext("disabled")} />
               </td>
               <td class="px-4 py-2">
                 <div class="flex justify-end gap-1">
@@ -2916,12 +2848,13 @@ defmodule LongWeb.ManageLive do
   defp secrets_section(assigns) do
     ~H"""
     <div class="p-6 space-y-4">
-      <div class="flex items-center gap-3">
-        <h1 class="text-xl font-semibold tracking-tight flex-1">{gettext("Secrets")}</h1>
-        <Button.button phx-click="new_secret" color="primary" icon="hero-plus" radius="md" size="sm">
-          {gettext("New secret")}
-        </Button.button>
-      </div>
+      <.section_header title={gettext("Secrets")}>
+        <:actions>
+          <Button.button phx-click="new_secret" color="primary" icon="hero-plus" radius="md" size="sm">
+            {gettext("New secret")}
+          </Button.button>
+        </:actions>
+      </.section_header>
 
       <p class="text-xs text-zinc-500 max-w-2xl leading-relaxed">
         {gettext("Flat key/value store for tokens the agent needs at tool-call time. Stored plaintext (LAN-only) but kept out of memory + chat history. The agent reads these via the graphql tool.")}
@@ -3016,83 +2949,70 @@ defmodule LongWeb.ManageLive do
     >
       <form phx-submit="save_llm" class="space-y-3">
         <div class="grid grid-cols-2 gap-3">
-          <label class="block">
-            <span class="text-xs font-medium text-zinc-600">Alias</span>
-            <input
+          <.field label="Alias">
+            <.control
               name="llm[alias]"
               value={@editing.alias}
+              mono
               required
               readonly={!@is_new?}
-              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none font-mono"
               placeholder="e.g. claude_main"
             />
-          </label>
-          <label class="block">
-            <span class="text-xs font-medium text-zinc-600">Model</span>
-            <input
+          </.field>
+          <.field label="Model">
+            <.control
               name="llm[model]"
               value={@editing.model}
+              mono
               required
-              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none font-mono"
               placeholder="e.g. claude-sonnet-4"
             />
-          </label>
+          </.field>
         </div>
 
         <div class="grid grid-cols-2 gap-3">
-          <label class="block">
-            <span class="text-xs font-medium text-zinc-600">Provider</span>
-            <select
-              name="llm[provider]"
-              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none"
-            >
+          <.field label="Provider">
+            <.control type="select" name="llm[provider]">
               <option :for={p <- @providers} value={p} selected={@editing.provider == p}>{p}</option>
-            </select>
-          </label>
-          <label class="block">
-            <span class="text-xs font-medium text-zinc-600">Wire protocol</span>
-            <select
-              name="llm[wire_protocol]"
-              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none"
-            >
+            </.control>
+          </.field>
+          <.field label="Wire protocol">
+            <.control type="select" name="llm[wire_protocol]">
               <option value="">(provider default)</option>
               <option :for={w <- @wire_protocols} value={w} selected={@editing.wire_protocol == w}>
                 {w}
               </option>
-            </select>
-          </label>
+            </.control>
+          </.field>
         </div>
 
-        <label class="block">
-          <span class="text-xs font-medium text-zinc-600">API base URL</span>
-          <input
+        <.field label="API base URL">
+          <.control
             name="llm[api_base]"
             value={@editing.api_base}
-            class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none font-mono"
+            mono
             placeholder="https://api.anthropic.com"
           />
-        </label>
+        </.field>
 
         <div class="grid grid-cols-2 gap-3">
-          <label class="block">
-            <span class="text-xs font-medium text-zinc-600">API key</span>
-            <input
+          <.field label="API key">
+            <.control
               type="password"
               name="llm[api_key]"
               value={@editing.api_key}
-              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none font-mono"
+              mono
               placeholder="sk-…"
             />
-          </label>
-          <label class="block">
-            <span class="text-xs font-medium text-zinc-600">…or env var name</span>
-            <input
+          </.field>
+          <.field label="…or env var name">
+            <.control
               name="llm[api_key_env_var]"
               value={@editing.api_key_env_var}
-              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none font-mono"
+              mono
               placeholder="ANTHROPIC_API_KEY"
             />
-          </label>
+          </.field>
         </div>
 
         <div class="flex items-center gap-6 pt-1">
@@ -3123,54 +3043,39 @@ defmodule LongWeb.ManageLive do
     <.shell_modal title={gettext("Edit \"%{name}\"", name: @editing.key)}>
       <form phx-submit="save_global_memory" class="space-y-3">
         <div class="grid grid-cols-2 gap-3">
-          <label class="block">
-            <span class="text-xs font-medium text-zinc-600">Scope</span>
-            <select
-              name="memory[scope]"
-              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none"
-            >
+          <.field label="Scope">
+            <.control type="select" name="memory[scope]">
               <option :for={s <- @scopes} value={s} selected={@editing.scope == s}>{s}</option>
-            </select>
-          </label>
-          <label class="block">
-            <span class="text-xs font-medium text-zinc-600">Kind</span>
-            <select
-              name="memory[kind]"
-              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none"
-            >
+            </.control>
+          </.field>
+          <.field label="Kind">
+            <.control type="select" name="memory[kind]">
               <option :for={k <- @kinds} value={k} selected={@editing.kind == k}>{k}</option>
-            </select>
-          </label>
+            </.control>
+          </.field>
         </div>
-        <label class="block">
-          <span class="text-xs font-medium text-zinc-600">Key</span>
-          <input
+        <.field label="Key">
+          <.control
             name="memory[key]"
             value={@editing.key}
+            mono
+            class="bg-zinc-50"
             required
             readonly
-            class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none font-mono bg-zinc-50"
           />
-        </label>
-        <label class="block">
-          <span class="text-xs font-medium text-zinc-600">Value</span>
-          <textarea
-            name="memory[value]"
-            rows="5"
-            class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none leading-snug"
-          >{@editing.value}</textarea>
-        </label>
-        <label class="block w-40">
-          <span class="text-xs font-medium text-zinc-600">Importance (1-5)</span>
-          <input
+        </.field>
+        <.field label="Value">
+          <.control type="textarea" name="memory[value]" rows="5" value={@editing.value} class="leading-snug" />
+        </.field>
+        <.field label="Importance (1-5)" class="block w-40">
+          <.control
             type="number"
             name="memory[importance]"
             value={@editing.importance}
             min="1"
             max="5"
-            class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none"
           />
-        </label>
+        </.field>
         <.modal_footer>
           <Button.button type="submit" color="primary" size="sm">{gettext("Save")}</Button.button>
         </.modal_footer>
@@ -3185,45 +3090,34 @@ defmodule LongWeb.ManageLive do
       <form phx-submit="save_session_memory" class="space-y-3">
         <input type="hidden" name="memory[session_id]" value={@editing.session_id} />
         <div class="grid grid-cols-2 gap-3">
-          <label class="block">
-            <span class="text-xs font-medium text-zinc-600">Kind</span>
-            <select
-              name="memory[kind]"
-              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none"
-            >
+          <.field label="Kind">
+            <.control type="select" name="memory[kind]">
               <option :for={k <- @kinds} value={k} selected={@editing.kind == k}>{k}</option>
-            </select>
-          </label>
-          <label class="block">
-            <span class="text-xs font-medium text-zinc-600">Importance (1-5)</span>
-            <input
+            </.control>
+          </.field>
+          <.field label="Importance (1-5)">
+            <.control
               type="number"
               name="memory[importance]"
               value={@editing.importance}
               min="1"
               max="5"
-              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none"
             />
-          </label>
+          </.field>
         </div>
-        <label class="block">
-          <span class="text-xs font-medium text-zinc-600">Key</span>
-          <input
+        <.field label="Key">
+          <.control
             name="memory[key]"
             value={@editing.key}
+            mono
+            class="bg-zinc-50"
             required
             readonly
-            class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none font-mono bg-zinc-50"
           />
-        </label>
-        <label class="block">
-          <span class="text-xs font-medium text-zinc-600">Value (full)</span>
-          <textarea
-            name="memory[value]"
-            rows="6"
-            class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none leading-snug"
-          >{@editing.value}</textarea>
-        </label>
+        </.field>
+        <.field label="Value (full)">
+          <.control type="textarea" name="memory[value]" rows="6" value={@editing.value} class="leading-snug" />
+        </.field>
         <.modal_footer>
           <Button.button type="submit" color="primary" size="sm">{gettext("Save")}</Button.button>
         </.modal_footer>
@@ -3408,47 +3302,40 @@ defmodule LongWeb.ManageLive do
     <.shell_modal title={if @is_new?, do: gettext("New search provider"), else: gettext("Edit %{name}", name: @editing.alias)}>
       <form phx-submit="save_search" class="space-y-3">
         <div class="grid grid-cols-2 gap-3">
-          <label class="block">
-            <span class="text-xs font-medium text-zinc-600">Alias</span>
-            <input
+          <.field label="Alias">
+            <.control
               name="search[alias]"
               value={@editing.alias}
+              mono
               required
               readonly={!@is_new?}
-              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none font-mono"
               placeholder="e.g. tavily_main"
             />
-          </label>
-          <label class="block">
-            <span class="text-xs font-medium text-zinc-600">Provider</span>
-            <select
-              name="search[provider]"
-              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none"
-            >
+          </.field>
+          <.field label="Provider">
+            <.control type="select" name="search[provider]">
               <option :for={p <- @providers} value={p} selected={@editing.provider == p}>{p}</option>
-            </select>
-          </label>
+            </.control>
+          </.field>
         </div>
 
         <div class="grid grid-cols-2 gap-3">
-          <label class="block">
-            <span class="text-xs font-medium text-zinc-600">API key</span>
-            <input
+          <.field label="API key">
+            <.control
               type="password"
               name="search[api_key]"
               value={@editing.api_key}
-              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none font-mono"
+              mono
             />
-          </label>
-          <label class="block">
-            <span class="text-xs font-medium text-zinc-600">…or env var name</span>
-            <input
+          </.field>
+          <.field label="…or env var name">
+            <.control
               name="search[api_key_env_var]"
               value={@editing.api_key_env_var}
-              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none font-mono"
+              mono
               placeholder="TAVILY_API_KEY"
             />
-          </label>
+          </.field>
         </div>
 
         <div class="flex items-center gap-6 pt-1">
@@ -3456,15 +3343,13 @@ defmodule LongWeb.ManageLive do
             <input type="checkbox" name="search[enabled]" value="true" checked={@editing.enabled} />
             Enabled
           </label>
-          <label class="block w-32">
-            <span class="text-xs font-medium text-zinc-600">Sort order</span>
-            <input
+          <.field label="Sort order" class="block w-32">
+            <.control
               type="number"
               name="search[sort_order]"
               value={@editing.sort_order}
-              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none"
             />
-          </label>
+          </.field>
         </div>
 
         <.modal_footer>
@@ -3488,82 +3373,50 @@ defmodule LongWeb.ManageLive do
     >
       <form phx-submit="save_scheduled" class="space-y-3">
         <div class="grid grid-cols-2 gap-3">
-          <label class="block">
-            <span class="text-xs font-medium text-zinc-600">Name</span>
-            <input
+          <.field label="Name">
+            <.control
               name="scheduled[name]"
               value={@editing.name}
+              mono
               required
               readonly={!@is_new?}
-              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none font-mono"
               placeholder="e.g. morning_hn_digest"
             />
-          </label>
-          <label class="block">
-            <span class="text-xs font-medium text-zinc-600">Repeat</span>
-            <select
-              name="scheduled[repeat]"
-              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none"
-            >
+          </.field>
+          <.field label="Repeat">
+            <.control type="select" name="scheduled[repeat]">
               <option :for={r <- @repeats} value={r} selected={@editing.repeat == r}>{r}</option>
-            </select>
-          </label>
+            </.control>
+          </.field>
         </div>
 
-        <label class="block">
-          <span class="text-xs font-medium text-zinc-600">Prompt</span>
-          <textarea
+        <.field label="Prompt">
+          <.control
+            type="textarea"
             name="scheduled[prompt]"
             rows="4"
             required
-            class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none leading-snug"
+            value={@editing.prompt}
+            class="leading-snug"
             placeholder="What should the agent do when this fires?"
-          >{@editing.prompt}</textarea>
-        </label>
+          />
+        </.field>
 
         <div class="grid grid-cols-3 gap-3">
-          <label class="block">
-            <span class="text-xs font-medium text-zinc-600">Time (UTC HH:MM)</span>
-            <input
-              name="scheduled[schedule_time]"
-              value={@editing.schedule_time}
-              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none font-mono"
-              placeholder="08:00"
-            />
-          </label>
-          <label class="block">
-            <span class="text-xs font-medium text-zinc-600">Every N</span>
-            <input
-              type="number"
-              min="1"
-              name="scheduled[every_n]"
-              value={@editing.every_n}
-              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none"
-            />
-          </label>
-          <label class="block">
-            <span class="text-xs font-medium text-zinc-600">Max delay (h)</span>
-            <input
-              type="number"
-              min="0"
-              name="scheduled[max_delay_hours]"
-              value={@editing.max_delay_hours}
-              class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none"
-            />
-          </label>
+          <.field label="Time (UTC HH:MM)">
+            <.control name="scheduled[schedule_time]" value={@editing.schedule_time} mono placeholder="08:00" />
+          </.field>
+          <.field label="Every N">
+            <.control type="number" min="1" name="scheduled[every_n]" value={@editing.every_n} />
+          </.field>
+          <.field label="Max delay (h)">
+            <.control type="number" min="0" name="scheduled[max_delay_hours]" value={@editing.max_delay_hours} />
+          </.field>
         </div>
 
-        <label class="block">
-          <span class="text-xs font-medium text-zinc-600">
-            Session id (optional — leave blank to fire into a fresh session)
-          </span>
-          <input
-            name="scheduled[session_id]"
-            value={@editing.session_id}
-            class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none font-mono"
-            placeholder="UUID"
-          />
-        </label>
+        <.field label="Session id (optional — leave blank to fire into a fresh session)">
+          <.control name="scheduled[session_id]" value={@editing.session_id} mono placeholder="UUID" />
+        </.field>
 
         <label class="flex items-center gap-2 text-sm text-zinc-700 pt-1">
           <input type="checkbox" name="scheduled[enabled]" value="true" checked={@editing.enabled} />
@@ -3586,41 +3439,36 @@ defmodule LongWeb.ManageLive do
     ~H"""
     <.shell_modal title={if @is_new?, do: gettext("New secret"), else: gettext("Edit %{name}", name: @editing.name)}>
       <form phx-submit="save_secret" class="space-y-3">
-        <label class="block">
-          <span class="text-xs font-medium text-zinc-600">Name</span>
-          <input
+        <.field label="Name" hint="Stable identifier the agent passes around. Lowercase + underscores recommended.">
+          <.control
             name="secret[name]"
             value={@editing.name}
+            mono
             required
             readonly={!@is_new?}
-            class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none font-mono"
             placeholder="e.g. github_personal"
           />
-          <span class="text-[11px] text-zinc-500">
-            Stable identifier the agent passes around. Lowercase + underscores recommended.
-          </span>
-        </label>
+        </.field>
 
-        <label class="block">
-          <span class="text-xs font-medium text-zinc-600">Value</span>
-          <textarea
+        <.field label="Value">
+          <.control
+            type="textarea"
             name="secret[value]"
             rows="3"
             required
-            class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none font-mono"
+            value={@editing.value}
+            mono
             placeholder="Paste the token / key / cookie here"
-          >{@editing.value}</textarea>
-        </label>
+          />
+        </.field>
 
-        <label class="block">
-          <span class="text-xs font-medium text-zinc-600">Description (optional)</span>
-          <input
+        <.field label="Description (optional)">
+          <.control
             name="secret[description]"
             value={@editing.description}
-            class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none"
             placeholder="What is this for? Helps the agent pick the right one."
           />
-        </label>
+        </.field>
 
         <.modal_footer>
           <Button.button type="submit" color="primary" size="sm">{gettext("Save")}</Button.button>
@@ -3710,46 +3558,36 @@ defmodule LongWeb.ManageLive do
     ~H"""
     <.shell_modal title={if @is_new?, do: gettext("New Telegram bot"), else: gettext("Edit %{name}", name: @editing.name)}>
       <form phx-submit="save_telegram_credential" class="space-y-3">
-        <label class="block">
-          <span class="text-xs font-medium text-zinc-600">{gettext("Name")}</span>
-          <input
+        <.field label={gettext("Name")} hint={gettext("Single-bot deployments leave this as \"default\".")}>
+          <.control
             name="telegram[name]"
             value={@editing.name}
+            mono
             required
             readonly={!@is_new?}
-            class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none font-mono"
             placeholder="default"
           />
-          <span class="text-[11px] text-zinc-500">
-            {gettext("Single-bot deployments leave this as \"default\".")}
-          </span>
-        </label>
+        </.field>
 
-        <label class="block">
-          <span class="text-xs font-medium text-zinc-600">
-            {gettext("Bot token (from @BotFather)")}
-          </span>
-          <input
+        <.field label={gettext("Bot token (from @BotFather)")}>
+          <.control
             type="password"
             name="telegram[bot_token]"
             value={@editing.bot_token}
+            mono
             required
-            class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none font-mono"
             placeholder="123456789:ABC-DEF..."
           />
-        </label>
+        </.field>
 
-        <label class="block">
-          <span class="text-xs font-medium text-zinc-600">
-            {gettext("Username (optional, e.g. @my_long_bot)")}
-          </span>
-          <input
+        <.field label={gettext("Username (optional, e.g. @my_long_bot)")}>
+          <.control
             name="telegram[username]"
             value={@editing.username}
-            class="mt-1 w-full rounded-lg border border-zinc-300 px-3 py-2 text-sm transition focus:border-primary-400 focus:ring-2 focus:ring-primary-100 focus:outline-none font-mono"
+            mono
             placeholder="my_long_bot"
           />
-        </label>
+        </.field>
 
         <label class="flex items-center gap-2 text-sm text-zinc-700 pt-1">
           <input type="checkbox" name="telegram[enabled]" value="true" checked={@editing.enabled} />
