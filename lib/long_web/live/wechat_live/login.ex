@@ -153,20 +153,8 @@ defmodule LongWeb.WechatLive.Login do
   def render(assigns) do
     ~H"""
     <div class={if @embedded?, do: "", else: "mx-auto max-w-2xl px-4 py-10"}>
-      <div :if={!@embedded?} class="flex justify-end mb-2 gap-2 text-xs">
-        <.link
-          href={~p"/locale/en"}
-          class={["px-1.5", if(@locale == "en", do: "font-semibold text-zinc-900", else: "text-zinc-400 hover:text-zinc-600")]}
-        >
-          EN
-        </.link>
-        <span class="text-zinc-300">|</span>
-        <.link
-          href={~p"/locale/zh"}
-          class={["px-1.5", if(@locale == "zh", do: "font-semibold text-zinc-900", else: "text-zinc-400 hover:text-zinc-600")]}
-        >
-          中文
-        </.link>
+      <div :if={!@embedded?} class="flex justify-end mb-2">
+        <.locale_switcher locale={@locale} variant="plain" />
       </div>
 
       <header :if={!@embedded?} class="mb-8">

@@ -1052,12 +1052,12 @@ defmodule LongWeb.AgentLive.Chat do
       !@open? && "w-0"
     ]}>
       <div class="p-4 space-y-4">
-        <div class="rounded-xl border border-zinc-200/80 bg-white p-3">
+        <.panel class="p-3">
           <div class="text-[11px] font-medium uppercase text-zinc-500 mb-1">{gettext("L1 · Working memory")}</div>
           <pre class="text-xs whitespace-pre-wrap text-zinc-700 leading-snug min-h-[1.5em]">{(@checkpoint && @checkpoint.key_info) || gettext("(empty)")}</pre>
-        </div>
+        </.panel>
 
-        <div class="rounded-xl border border-zinc-200/80 bg-white p-3">
+        <.panel class="p-3">
           <div class="text-[11px] font-medium uppercase text-zinc-500 mb-1">{gettext("L2 · Global memory")}</div>
           <p :if={@global_memory == []} class="text-xs text-zinc-400">{gettext("(empty)")}</p>
           <ul :if={@global_memory != []} class="space-y-2 text-xs">
@@ -1067,7 +1067,7 @@ defmodule LongWeb.AgentLive.Chat do
               <div class="text-zinc-500 leading-snug">{entry.value}</div>
             </li>
           </ul>
-        </div>
+        </.panel>
       </div>
     </aside>
     """

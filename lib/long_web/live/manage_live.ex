@@ -1271,7 +1271,7 @@ defmodule LongWeb.ManageLive do
           </.link>
         </nav>
         <div class="border-t border-zinc-100 p-3">
-          <.language_switcher locale={@locale} />
+          <.locale_switcher locale={@locale} />
         </div>
       </aside>
 
@@ -2219,7 +2219,7 @@ defmodule LongWeb.ManageLive do
     <div class="p-6 space-y-6">
       <.section_header title={gettext("Groups")} />
 
-      <div class="rounded-xl border border-zinc-200/80 bg-white shadow-sm">
+      <.panel class="shadow-sm">
         <div class="flex items-center gap-3 p-4">
           <div class="flex-1">
             <div class="text-sm font-medium text-zinc-800">{gettext("System default language")}</div>
@@ -2235,9 +2235,9 @@ defmodule LongWeb.ManageLive do
             </select>
           </form>
         </div>
-      </div>
+      </.panel>
 
-      <div class="rounded-xl border border-zinc-200/80 bg-white shadow-sm">
+      <.panel class="shadow-sm">
         <div class="flex items-center gap-3 p-4">
           <div class="flex-1">
             <div class="text-sm font-medium text-zinc-800">{gettext("System timezone")}</div>
@@ -2261,7 +2261,7 @@ defmodule LongWeb.ManageLive do
             </datalist>
           </form>
         </div>
-      </div>
+      </.panel>
 
       <div class="rounded-xl border border-primary-200/70 bg-primary-50/60 p-4 text-xs text-zinc-600 max-w-3xl leading-relaxed space-y-2">
         <p class="font-medium text-zinc-800">How members link their WeChat / Telegram</p>
@@ -2283,7 +2283,7 @@ defmodule LongWeb.ManageLive do
         </p>
       </div>
 
-      <div class="rounded-xl border border-zinc-200/80 bg-white shadow-sm">
+      <.panel class="shadow-sm">
         <form phx-submit="new_group" class="flex items-end gap-3 p-4">
           <.field label={gettext("New group")} class="flex-1 block">
             <.control
@@ -2296,7 +2296,7 @@ defmodule LongWeb.ManageLive do
             {gettext("Create")}
           </Button.button>
         </form>
-      </div>
+      </.panel>
 
       <div :for={hh <- @groups} class="rounded-xl border border-zinc-200/80 bg-white shadow-sm overflow-hidden">
         <div class="flex items-center gap-2 px-4 py-3 border-b border-zinc-200 bg-zinc-50">
@@ -2490,7 +2490,7 @@ defmodule LongWeb.ManageLive do
         </p>
       </div>
 
-      <div class="rounded-xl border border-zinc-200/80 bg-white shadow-sm">
+      <.panel class="shadow-sm">
         <div class="p-5 space-y-4">
           <div class="flex items-center gap-4">
             <div class="flex-1">
@@ -2538,7 +2538,7 @@ defmodule LongWeb.ManageLive do
             </form>
           </div>
         </div>
-      </div>
+      </.panel>
 
       <.data_table
         rows={@reflection_tasks}
@@ -2840,28 +2840,6 @@ defmodule LongWeb.ManageLive do
   defp nav_label(:secrets), do: gettext("Secrets")
   defp nav_label(:phrases), do: gettext("Phrases")
   defp nav_label(key), do: to_string(key)
-
-  attr :locale, :string, required: true
-
-  defp language_switcher(assigns) do
-    ~H"""
-    <div class="flex items-center gap-1 text-xs">
-      <.icon name="hero-language" class="size-4 text-zinc-400" />
-      <.link
-        href={~p"/locale/en"}
-        class={["rounded px-1.5 py-0.5", if(@locale == "en", do: "bg-zinc-100 font-semibold text-zinc-900", else: "text-zinc-400 hover:text-zinc-700")]}
-      >
-        EN
-      </.link>
-      <.link
-        href={~p"/locale/zh"}
-        class={["rounded px-1.5 py-0.5", if(@locale == "zh", do: "bg-zinc-100 font-semibold text-zinc-900", else: "text-zinc-400 hover:text-zinc-700")]}
-      >
-        中文
-      </.link>
-    </div>
-    """
-  end
 
   defp section_path(:llms), do: ~p"/manage/llms"
   defp section_path(:groups), do: ~p"/manage/groups"

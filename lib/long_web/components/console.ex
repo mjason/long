@@ -208,6 +208,48 @@ defmodule LongWeb.Components.Console do
     """
   end
 
+  @doc """
+  EN | 中文 locale links. `variant` "bar" is the icon + pill style used in the
+  console sidebar; "plain" is the separator style used on the login page.
+  """
+  attr :locale, :string, required: true
+  attr :variant, :string, default: "bar", values: ~w(bar plain)
+
+  def locale_switcher(assigns) do
+    ~H"""
+    <div :if={@variant == "bar"} class="flex items-center gap-1 text-xs">
+      <.icon name="hero-language" class="size-4 text-zinc-400" />
+      <.link
+        href="/locale/en"
+        class={["rounded px-1.5 py-0.5", (@locale == "en" && "bg-zinc-100 font-semibold text-zinc-900") || "text-zinc-400 hover:text-zinc-700"]}
+      >
+        EN
+      </.link>
+      <.link
+        href="/locale/zh"
+        class={["rounded px-1.5 py-0.5", (@locale == "zh" && "bg-zinc-100 font-semibold text-zinc-900") || "text-zinc-400 hover:text-zinc-700"]}
+      >
+        中文
+      </.link>
+    </div>
+    <span :if={@variant == "plain"} class="inline-flex items-center gap-2 text-xs">
+      <.link
+        href="/locale/en"
+        class={["px-1.5", (@locale == "en" && "font-semibold text-zinc-900") || "text-zinc-400 hover:text-zinc-600"]}
+      >
+        EN
+      </.link>
+      <span class="text-zinc-300">|</span>
+      <.link
+        href="/locale/zh"
+        class={["px-1.5", (@locale == "zh" && "font-semibold text-zinc-900") || "text-zinc-400 hover:text-zinc-600"]}
+      >
+        中文
+      </.link>
+    </span>
+    """
+  end
+
   @doc "Plain (non-table) Quiet card container. Opt into shadow via `class`."
   attr :class, :any, default: nil
   attr :rest, :global
