@@ -122,18 +122,18 @@ defmodule LongWeb.Components.Console do
     ~H"""
     <span
       :if={@scope == :personal}
-      class="inline-flex items-center gap-1 rounded-full bg-zinc-100 py-0.5 pl-1.5 pr-2 text-xs font-medium text-zinc-700"
+      class="inline-flex w-fit items-center gap-1 whitespace-nowrap rounded-full bg-zinc-100 py-0.5 pl-1.5 pr-2 text-xs font-medium text-zinc-700"
       title={gettext("Personal — only this member's chats see it")}
     >
-      <.icon name="hero-user" class="size-3 text-zinc-400" />
+      <.icon name="hero-user" class="size-3 shrink-0 text-zinc-400" />
       {@owner || gettext("unknown")}
     </span>
     <span
       :if={@scope != :personal}
-      class="inline-flex items-center gap-1 rounded-full bg-emerald-50 py-0.5 pl-1.5 pr-2 text-xs font-medium text-emerald-700"
+      class="inline-flex w-fit items-center gap-1 whitespace-nowrap rounded-full bg-emerald-50 py-0.5 pl-1.5 pr-2 text-xs font-medium text-emerald-700"
       title={gettext("Global — available to everyone")}
     >
-      <.icon name="hero-globe-alt" class="size-3 text-emerald-500" />
+      <.icon name="hero-globe-alt" class="size-3 shrink-0 text-emerald-500" />
       {gettext("Global")}
     </span>
     """
