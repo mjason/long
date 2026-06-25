@@ -1371,89 +1371,52 @@ defmodule LongWeb.ManageLive do
         </:actions>
       </.section_header>
 
-      <div class="rounded-xl border border-zinc-200/80 bg-white shadow-sm overflow-hidden">
-        <table class="w-full text-sm">
-          <thead class="text-[11px] uppercase tracking-wider text-zinc-400 bg-zinc-50/80">
-            <tr>
-              <th class="text-left px-4 py-2.5">{gettext("Alias")}</th>
-              <th class="text-left px-4 py-2.5">{gettext("Provider")}</th>
-              <th class="text-left px-4 py-2.5">{gettext("Wire")}</th>
-              <th class="text-left px-4 py-2.5">{gettext("Model")}</th>
-              <th class="text-left px-4 py-2.5">{gettext("Status")}</th>
-              <th class="text-right px-4 py-2.5">{gettext("Actions")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr :for={llm <- @llms} class="border-t border-zinc-100 transition-colors hover:bg-zinc-50/70">
-              <td class="px-4 py-2 font-medium">
-                <span class="flex items-center gap-2">
-                  <.icon :if={llm.default} name="hero-star-solid" class="size-4 text-amber-500" />
-                  {llm.alias}
-                </span>
-              </td>
-              <td class="px-4 py-2 text-zinc-600">
-                <span title={if !llm.provider, do: gettext("Legacy row — set provider + wire_protocol via Edit."), else: nil}>
-                  <Badge.badge color={if llm.provider, do: "info", else: "gray"} size="xs">
-                    {display_provider(llm)}
-                  </Badge.badge>
-                </span>
-              </td>
-              <td class="px-4 py-2 text-xs text-zinc-500">{llm.wire_protocol || "—"}</td>
-              <td class="px-4 py-2 text-zinc-600 font-mono text-xs">{llm.model}</td>
-              <td class="px-4 py-2">
-                <.enabled_badge on={llm.enabled} on_label={gettext("enabled")} off_label={gettext("disabled")} />
-              </td>
-              <td class="px-4 py-2">
-                <div class="flex justify-end gap-1">
-                  <Button.icon_button
-                    :if={!llm.default}
-                    phx-click="set_default_llm"
-                    phx-value-alias={llm.alias}
-                    color="warning"
-                    size="xs"
-                    title={gettext("Set as default")}
-                  >
-                    <.icon name="hero-star" class="size-4" />
-                  </Button.icon_button>
-                  <Button.icon_button
-                    phx-click="toggle_llm_enabled"
-                    phx-value-alias={llm.alias}
-                    color="gray"
-                    size="xs"
-                    title={if llm.enabled, do: gettext("Disable"), else: gettext("Enable")}
-                  >
-                    <.icon name={if llm.enabled, do: "hero-pause", else: "hero-play"} class="size-4" />
-                  </Button.icon_button>
-                  <Button.icon_button
-                    phx-click="edit_llm"
-                    phx-value-alias={llm.alias}
-                    color="gray"
-                    size="xs"
-                    title={gettext("Edit")}
-                  >
-                    <.icon name="hero-pencil-square" class="size-4" />
-                  </Button.icon_button>
-                  <Button.icon_button
-                    phx-click="destroy_llm"
-                    phx-value-alias={llm.alias}
-                    color="danger"
-                    size="xs"
-                    data-confirm={gettext("Delete \"%{name}\"?", name: llm.alias)}
-                    title={gettext("Delete")}
-                  >
-                    <.icon name="hero-trash" class="size-4" />
-                  </Button.icon_button>
-                </div>
-              </td>
-            </tr>
-            <tr :if={@llms == []}>
-              <td colspan="6" class="px-4 py-8 text-center text-zinc-400 text-sm">
-                {gettext("No LLM configurations yet. Click \"New LLM\" above to add one.")}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <.data_table
+        rows={@llms}
+        empty={gettext("No LLM configurations yet. Click \"New LLM\" above to add one.")}
+      >
+        <:col :let={llm} label={gettext("Alias")} class="font-medium">
+          <span class="flex items-center gap-2">
+            <.icon :if={llm.default} name="hero-star-solid" class="size-4 text-amber-500" />
+            {llm.alias}
+          </span>
+        </:col>
+        <:col :let={llm} label={gettext("Provider")} class="text-zinc-600">
+          <span title={if !llm.provider, do: gettext("Legacy row — set provider + wire_protocol via Edit."), else: nil}>
+            <Badge.badge color={if llm.provider, do: "info", else: "gray"} size="xs">
+              {display_provider(llm)}
+            </Badge.badge>
+          </span>
+        </:col>
+        <:col :let={llm} label={gettext("Wire")} class="text-xs text-zinc-500">
+          {llm.wire_protocol || "—"}
+        </:col>
+        <:col :let={llm} label={gettext("Model")} class="text-zinc-600 font-mono text-xs">
+          {llm.model}
+        </:col>
+        <:col :let={llm} label={gettext("Status")}>
+          <.enabled_badge on={llm.enabled} on_label={gettext("enabled")} off_label={gettext("disabled")} />
+        </:col>
+        <:action :let={llm}>
+          <Button.icon_button
+            :if={!llm.default}
+            phx-click="set_default_llm"
+            phx-value-alias={llm.alias}
+            color="warning"
+            size="xs"
+            title={gettext("Set as default")}
+          >
+            <.icon name="hero-star" class="size-4" />
+          </Button.icon_button>
+          <.row_action_toggle on={llm.enabled} phx-click="toggle_llm_enabled" phx-value-alias={llm.alias} />
+          <.row_action_edit phx-click="edit_llm" phx-value-alias={llm.alias} />
+          <.row_action_delete
+            phx-click="destroy_llm"
+            phx-value-alias={llm.alias}
+            confirm={gettext("Delete \"%{name}\"?", name: llm.alias)}
+          />
+        </:action>
+      </.data_table>
     </div>
     """
   end
@@ -1512,114 +1475,57 @@ defmodule LongWeb.ManageLive do
         <h2 class="text-sm font-semibold text-zinc-700 uppercase tracking-wide">
           {gettext("L2 · Global memory")}
         </h2>
-        <div class="rounded-xl border border-zinc-200/80 bg-white shadow-sm overflow-hidden">
-          <table class="w-full text-sm">
-            <thead class="text-[11px] uppercase tracking-wider text-zinc-400 bg-zinc-50/80">
-              <tr>
-                <th class="text-left px-4 py-2.5">{gettext("Scope")}</th>
-                <th class="text-left px-4 py-2.5">{gettext("Kind")}</th>
-                <th class="text-left px-4 py-2.5">{gettext("Key")}</th>
-                <th class="text-left px-4 py-2.5">{gettext("Value")}</th>
-                <th class="text-left px-4 py-2.5">{gettext("Imp")}</th>
-                <th class="text-right px-4 py-2.5">{gettext("Actions")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr :for={row <- @globals} class="border-t border-zinc-100 transition-colors hover:bg-zinc-50/70">
-                <td class="px-4 py-2">
-                  <Badge.badge color="info" size="xs">{row.scope}</Badge.badge>
-                </td>
-                <td class="px-4 py-2 text-xs text-zinc-500">{row.kind}</td>
-                <td class="px-4 py-2 font-medium text-zinc-800">{row.key}</td>
-                <td class="px-4 py-2 text-zinc-600 leading-snug">{Text.preview(row.value, 140)}</td>
-                <td class="px-4 py-2 text-xs">{row.importance || 3}</td>
-                <td class="px-4 py-2 text-right">
-                  <div class="flex justify-end gap-1">
-                    <Button.icon_button
-                      phx-click="edit_global_memory"
-                      phx-value-id={row.id}
-                      color="gray"
-                      size="xs"
-                      title={gettext("Edit")}
-                    >
-                      <.icon name="hero-pencil-square" class="size-4" />
-                    </Button.icon_button>
-                    <Button.icon_button
-                      phx-click="destroy_global_memory"
-                      phx-value-id={row.id}
-                      color="danger"
-                      size="xs"
-                      data-confirm={gettext("Delete \"%{name}\"?", name: row.key)}
-                      title={gettext("Delete")}
-                    >
-                      <.icon name="hero-trash" class="size-4" />
-                    </Button.icon_button>
-                  </div>
-                </td>
-              </tr>
-              <tr :if={@globals == []}>
-                <td colspan="6" class="px-4 py-6 text-center text-zinc-400 text-sm">
-                  {gettext("(no global memory)")}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <.data_table rows={@globals} empty={gettext("(no global memory)")}>
+          <:col :let={row} label={gettext("Scope")}>
+            <Badge.badge color="info" size="xs">{row.scope}</Badge.badge>
+          </:col>
+          <:col :let={row} label={gettext("Kind")} class="text-xs text-zinc-500">{row.kind}</:col>
+          <:col :let={row} label={gettext("Key")} class="font-medium text-zinc-800">{row.key}</:col>
+          <:col :let={row} label={gettext("Value")} class="text-zinc-600 leading-snug">
+            {Text.preview(row.value, 140)}
+          </:col>
+          <:col :let={row} label={gettext("Imp")} class="text-xs">{row.importance || 3}</:col>
+          <:action :let={row}>
+            <.row_action_edit phx-click="edit_global_memory" phx-value-id={row.id} />
+            <.row_action_delete
+              phx-click="destroy_global_memory"
+              phx-value-id={row.id}
+              confirm={gettext("Delete \"%{name}\"?", name: row.key)}
+            />
+          </:action>
+        </.data_table>
       </section>
 
       <section class="space-y-2">
         <h2 class="text-sm font-semibold text-zinc-700 uppercase tracking-wide">
           {gettext("L2 · Session memory")}
         </h2>
-        <div class="rounded-xl border border-zinc-200/80 bg-white shadow-sm overflow-hidden">
-          <table class="w-full text-sm">
-            <thead class="text-[11px] uppercase tracking-wider text-zinc-400 bg-zinc-50/80">
-              <tr>
-                <th class="text-left px-4 py-2.5">{gettext("Session")}</th>
-                <th class="text-left px-4 py-2.5">{gettext("Kind")}</th>
-                <th class="text-left px-4 py-2.5">{gettext("Key")}</th>
-                <th class="text-left px-4 py-2.5">{gettext("Value")}</th>
-                <th class="text-right px-4 py-2.5">{gettext("Actions")}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr :for={row <- @session_memories} class="border-t border-zinc-100 transition-colors hover:bg-zinc-50/70">
-                <td class="px-4 py-2 text-xs font-mono text-zinc-500">{short(row.session_id)}</td>
-                <td class="px-4 py-2 text-xs text-zinc-500">{row.kind}</td>
-                <td class="px-4 py-2 font-medium text-zinc-800">{row.key}</td>
-                <td class="px-4 py-2 text-zinc-600 leading-snug">{Text.preview(row.value, 140)}</td>
-                <td class="px-4 py-2 text-right">
-                  <div class="flex justify-end gap-1">
-                    <Button.icon_button
-                      phx-click="edit_session_memory"
-                      phx-value-id={row.id}
-                      color="gray"
-                      size="xs"
-                      title={gettext("Edit / view full")}
-                    >
-                      <.icon name="hero-pencil-square" class="size-4" />
-                    </Button.icon_button>
-                    <Button.icon_button
-                      phx-click="destroy_session_memory"
-                      phx-value-id={row.id}
-                      color="danger"
-                      size="xs"
-                      data-confirm={gettext("Delete \"%{name}\"?", name: row.key)}
-                      title={gettext("Delete")}
-                    >
-                      <.icon name="hero-trash" class="size-4" />
-                    </Button.icon_button>
-                  </div>
-                </td>
-              </tr>
-              <tr :if={@session_memories == []}>
-                <td colspan="5" class="px-4 py-6 text-center text-zinc-400 text-sm">
-                  {gettext("(no session memory)")}
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+        <.data_table rows={@session_memories} empty={gettext("(no session memory)")}>
+          <:col :let={row} label={gettext("Session")} class="text-xs font-mono text-zinc-500">
+            {short(row.session_id)}
+          </:col>
+          <:col :let={row} label={gettext("Kind")} class="text-xs text-zinc-500">{row.kind}</:col>
+          <:col :let={row} label={gettext("Key")} class="font-medium text-zinc-800">{row.key}</:col>
+          <:col :let={row} label={gettext("Value")} class="text-zinc-600 leading-snug">
+            {Text.preview(row.value, 140)}
+          </:col>
+          <:action :let={row}>
+            <Button.icon_button
+              phx-click="edit_session_memory"
+              phx-value-id={row.id}
+              color="gray"
+              size="xs"
+              title={gettext("Edit / view full")}
+            >
+              <.icon name="hero-pencil-square" class="size-4" />
+            </Button.icon_button>
+            <.row_action_delete
+              phx-click="destroy_session_memory"
+              phx-value-id={row.id}
+              confirm={gettext("Delete \"%{name}\"?", name: row.key)}
+            />
+          </:action>
+        </.data_table>
       </section>
     </div>
     """
@@ -1767,64 +1673,38 @@ defmodule LongWeb.ManageLive do
     ~H"""
     <div class="p-6 space-y-4">
       <.section_header title={gettext("Sessions")} />
-      <div class="rounded-xl border border-zinc-200/80 bg-white shadow-sm overflow-hidden">
-        <table class="w-full text-sm">
-          <thead class="text-[11px] uppercase tracking-wider text-zinc-400 bg-zinc-50/80">
-            <tr>
-              <th class="text-left px-4 py-2.5">{gettext("Title")}</th>
-              <th class="text-left px-4 py-2.5">{gettext("Status")}</th>
-              <th class="text-left px-4 py-2.5">{gettext("LLM")}</th>
-              <th class="text-right px-4 py-2.5">{gettext("Tokens")}</th>
-              <th class="text-left px-4 py-2.5">{gettext("Created")}</th>
-              <th class="text-right px-4 py-2.5">{gettext("Actions")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr :for={s <- @sessions_rows} class="border-t border-zinc-100 transition-colors hover:bg-zinc-50/70">
-              <td class="px-4 py-2 font-medium text-zinc-800">
-                <.link navigate={~p"/chat/#{s.id}"} class="hover:underline">
-                  {s.title || short(s.id)}
-                </.link>
-              </td>
-              <td class="px-4 py-2">
-                <Badge.badge color={session_status_color(s.status)} size="xs">
-                  {s.status}
-                </Badge.badge>
-              </td>
-              <td class="px-4 py-2 text-xs font-mono text-zinc-500">{s.llm_alias || "—"}</td>
-              <td class="px-4 py-2 text-right text-zinc-600">{s.token_usage || 0}</td>
-              <td class="px-4 py-2 text-xs text-zinc-500">{format_dt(s.inserted_at)}</td>
-              <td class="px-4 py-2">
-                <div class="flex justify-end gap-1">
-                  <Button.icon_button
-                    :if={s.status != :archived}
-                    phx-click="archive_session"
-                    phx-value-id={s.id}
-                    color="gray"
-                    size="xs"
-                    title={gettext("Archive")}
-                  >
-                    <.icon name="hero-archive-box-arrow-down" class="size-4" />
-                  </Button.icon_button>
-                  <Button.icon_button
-                    phx-click="destroy_session"
-                    phx-value-id={s.id}
-                    color="danger"
-                    size="xs"
-                    data-confirm={gettext("Delete \"%{title}\" and all its messages?", title: s.title || s.id)}
-                    title={gettext("Delete")}
-                  >
-                    <.icon name="hero-trash" class="size-4" />
-                  </Button.icon_button>
-                </div>
-              </td>
-            </tr>
-            <tr :if={@sessions_rows == []}>
-              <td colspan="6" class="px-4 py-8 text-center text-zinc-400 text-sm">{gettext("(no sessions)")}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <.data_table rows={@sessions_rows} empty={gettext("(no sessions)")}>
+        <:col :let={s} label={gettext("Title")} class="font-medium text-zinc-800">
+          <.link navigate={~p"/chat/#{s.id}"} class="hover:underline">
+            {s.title || short(s.id)}
+          </.link>
+        </:col>
+        <:col :let={s} label={gettext("Status")}>
+          <Badge.badge color={session_status_color(s.status)} size="xs">
+            {s.status}
+          </Badge.badge>
+        </:col>
+        <:col :let={s} label={gettext("LLM")} class="text-xs font-mono text-zinc-500">{s.llm_alias || "—"}</:col>
+        <:col :let={s} label={gettext("Tokens")} align="right" class="text-zinc-600">{s.token_usage || 0}</:col>
+        <:col :let={s} label={gettext("Created")} class="text-xs text-zinc-500">{format_dt(s.inserted_at)}</:col>
+        <:action :let={s}>
+          <Button.icon_button
+            :if={s.status != :archived}
+            phx-click="archive_session"
+            phx-value-id={s.id}
+            color="gray"
+            size="xs"
+            title={gettext("Archive")}
+          >
+            <.icon name="hero-archive-box-arrow-down" class="size-4" />
+          </Button.icon_button>
+          <.row_action_delete
+            phx-click="destroy_session"
+            phx-value-id={s.id}
+            confirm={gettext("Delete \"%{title}\" and all its messages?", title: s.title || s.id)}
+          />
+        </:action>
+      </.data_table>
     </div>
     """
   end
@@ -1840,68 +1720,28 @@ defmodule LongWeb.ManageLive do
         </:actions>
       </.section_header>
 
-      <div class="rounded-xl border border-zinc-200/80 bg-white shadow-sm overflow-hidden">
-        <table class="w-full text-sm">
-          <thead class="text-[11px] uppercase tracking-wider text-zinc-400 bg-zinc-50/80">
-            <tr>
-              <th class="text-left px-4 py-2.5">{gettext("Alias")}</th>
-              <th class="text-left px-4 py-2.5">{gettext("Provider")}</th>
-              <th class="text-left px-4 py-2.5">{gettext("Status")}</th>
-              <th class="text-right px-4 py-2.5">{gettext("Sort")}</th>
-              <th class="text-right px-4 py-2.5">{gettext("Actions")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr :for={row <- @search_configs} class="border-t border-zinc-100 transition-colors hover:bg-zinc-50/70">
-              <td class="px-4 py-2 font-medium">{row.alias}</td>
-              <td class="px-4 py-2">
-                <Badge.badge color="info" size="xs">{row.provider}</Badge.badge>
-              </td>
-              <td class="px-4 py-2">
-                <.enabled_badge on={row.enabled} on_label={gettext("enabled")} off_label={gettext("disabled")} />
-              </td>
-              <td class="px-4 py-2 text-right text-xs text-zinc-500">{row.sort_order}</td>
-              <td class="px-4 py-2">
-                <div class="flex justify-end gap-1">
-                  <Button.icon_button
-                    phx-click="toggle_search_enabled"
-                    phx-value-alias={row.alias}
-                    color="gray"
-                    size="xs"
-                    title={if row.enabled, do: gettext("Disable"), else: gettext("Enable")}
-                  >
-                    <.icon name={if row.enabled, do: "hero-pause", else: "hero-play"} class="size-4" />
-                  </Button.icon_button>
-                  <Button.icon_button
-                    phx-click="edit_search"
-                    phx-value-alias={row.alias}
-                    color="gray"
-                    size="xs"
-                    title={gettext("Edit")}
-                  >
-                    <.icon name="hero-pencil-square" class="size-4" />
-                  </Button.icon_button>
-                  <Button.icon_button
-                    phx-click="destroy_search"
-                    phx-value-alias={row.alias}
-                    color="danger"
-                    size="xs"
-                    data-confirm={gettext("Delete \"%{name}\"?", name: row.alias)}
-                    title={gettext("Delete")}
-                  >
-                    <.icon name="hero-trash" class="size-4" />
-                  </Button.icon_button>
-                </div>
-              </td>
-            </tr>
-            <tr :if={@search_configs == []}>
-              <td colspan="5" class="px-4 py-8 text-center text-zinc-400 text-sm">
-                {gettext("No search providers. Click \"New provider\" to add Tavily or Brave.")}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <.data_table
+        rows={@search_configs}
+        empty={gettext("No search providers. Click \"New provider\" to add Tavily or Brave.")}
+      >
+        <:col :let={row} label={gettext("Alias")} class="font-medium">{row.alias}</:col>
+        <:col :let={row} label={gettext("Provider")}>
+          <Badge.badge color="info" size="xs">{row.provider}</Badge.badge>
+        </:col>
+        <:col :let={row} label={gettext("Status")}>
+          <.enabled_badge on={row.enabled} on_label={gettext("enabled")} off_label={gettext("disabled")} />
+        </:col>
+        <:col :let={row} label={gettext("Sort")} align="right" class="text-xs text-zinc-500">{row.sort_order}</:col>
+        <:action :let={row}>
+          <.row_action_toggle on={row.enabled} phx-click="toggle_search_enabled" phx-value-alias={row.alias} />
+          <.row_action_edit phx-click="edit_search" phx-value-alias={row.alias} />
+          <.row_action_delete
+            phx-click="destroy_search"
+            phx-value-alias={row.alias}
+            confirm={gettext("Delete \"%{name}\"?", name: row.alias)}
+          />
+        </:action>
+      </.data_table>
     </div>
     """
   end
@@ -2175,72 +2015,30 @@ defmodule LongWeb.ManageLive do
         </:actions>
       </.section_header>
 
-      <div class="rounded-xl border border-zinc-200/80 bg-white shadow-sm overflow-hidden">
-        <table class="w-full text-sm">
-          <thead class="text-[11px] uppercase tracking-wider text-zinc-400 bg-zinc-50/80">
-            <tr>
-              <th class="text-left px-4 py-2.5">{gettext("Name")}</th>
-              <th class="text-left px-4 py-2.5">{gettext("Repeat")}</th>
-              <th class="text-left px-4 py-2.5">{gettext("Prompt")}</th>
-              <th class="text-left px-4 py-2.5">{gettext("Status")}</th>
-              <th class="text-left px-4 py-2.5">{gettext("Next run")}</th>
-              <th class="text-left px-4 py-2.5">{gettext("Last run")}</th>
-              <th class="text-right px-4 py-2.5">{gettext("Actions")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr :for={t <- @scheduled_tasks} class="border-t border-zinc-100 transition-colors hover:bg-zinc-50/70">
-              <td class="px-4 py-2 font-medium">{t.name}</td>
-              <td class="px-4 py-2">
-                <Badge.badge color="info" size="xs">{repeat_label(t)}</Badge.badge>
-              </td>
-              <td class="px-4 py-2 text-zinc-600 max-w-md">{Text.preview(t.prompt || "", 80)}</td>
-              <td class="px-4 py-2">
-                <.enabled_badge on={t.enabled} on_label={gettext("on")} off_label={gettext("off")} />
-              </td>
-              <td class="px-4 py-2 text-xs text-zinc-500">{format_dt(t.next_run_at)}</td>
-              <td class="px-4 py-2 text-xs text-zinc-500">{format_dt(t.last_run_at)}</td>
-              <td class="px-4 py-2">
-                <div class="flex justify-end gap-1">
-                  <Button.icon_button
-                    phx-click="toggle_scheduled_enabled"
-                    phx-value-id={t.id}
-                    color="gray"
-                    size="xs"
-                    title={if t.enabled, do: gettext("Disable"), else: gettext("Enable")}
-                  >
-                    <.icon name={if t.enabled, do: "hero-pause", else: "hero-play"} class="size-4" />
-                  </Button.icon_button>
-                  <Button.icon_button
-                    phx-click="edit_scheduled"
-                    phx-value-id={t.id}
-                    color="gray"
-                    size="xs"
-                    title={gettext("Edit")}
-                  >
-                    <.icon name="hero-pencil-square" class="size-4" />
-                  </Button.icon_button>
-                  <Button.icon_button
-                    phx-click="destroy_scheduled"
-                    phx-value-id={t.id}
-                    color="danger"
-                    size="xs"
-                    data-confirm={gettext("Delete \"%{name}\"?", name: t.name)}
-                    title={gettext("Delete")}
-                  >
-                    <.icon name="hero-trash" class="size-4" />
-                  </Button.icon_button>
-                </div>
-              </td>
-            </tr>
-            <tr :if={@scheduled_tasks == []}>
-              <td colspan="7" class="px-4 py-8 text-center text-zinc-400 text-sm">
-                {gettext("No scheduled tasks. Click \"New task\" to add one, or let the agent schedule them.")}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <.data_table
+        rows={@scheduled_tasks}
+        empty={gettext("No scheduled tasks. Click \"New task\" to add one, or let the agent schedule them.")}
+      >
+        <:col :let={t} label={gettext("Name")} class="font-medium">{t.name}</:col>
+        <:col :let={t} label={gettext("Repeat")}>
+          <Badge.badge color="info" size="xs">{repeat_label(t)}</Badge.badge>
+        </:col>
+        <:col :let={t} label={gettext("Prompt")} class="text-zinc-600 max-w-md">{Text.preview(t.prompt || "", 80)}</:col>
+        <:col :let={t} label={gettext("Status")}>
+          <.enabled_badge on={t.enabled} on_label={gettext("on")} off_label={gettext("off")} />
+        </:col>
+        <:col :let={t} label={gettext("Next run")} class="text-xs text-zinc-500">{format_dt(t.next_run_at)}</:col>
+        <:col :let={t} label={gettext("Last run")} class="text-xs text-zinc-500">{format_dt(t.last_run_at)}</:col>
+        <:action :let={t}>
+          <.row_action_toggle on={t.enabled} phx-click="toggle_scheduled_enabled" phx-value-id={t.id} />
+          <.row_action_edit phx-click="edit_scheduled" phx-value-id={t.id} />
+          <.row_action_delete
+            phx-click="destroy_scheduled"
+            phx-value-id={t.id}
+            confirm={gettext("Delete \"%{name}\"?", name: t.name)}
+          />
+        </:action>
+      </.data_table>
     </div>
     """
   end
@@ -2259,85 +2057,43 @@ defmodule LongWeb.ManageLive do
         </:actions>
       </.section_header>
 
-      <div class="rounded-xl border border-zinc-200/80 bg-white shadow-sm overflow-hidden">
-        <table class="w-full text-sm">
-          <thead class="text-[11px] uppercase tracking-wider text-zinc-400 bg-zinc-50/80">
-            <tr>
-              <th class="text-left px-4 py-2.5">{gettext("Name")}</th>
-              <th class="text-left px-4 py-2.5">{gettext("Every")}</th>
-              <th class="text-left px-4 py-2.5">{gettext("On")}</th>
-              <th class="text-left px-4 py-2.5">{gettext("Last status")}</th>
-              <th class="text-left px-4 py-2.5">{gettext("Next run")}</th>
-              <th class="text-left px-4 py-2.5">{gettext("Last run")}</th>
-              <th class="text-right px-4 py-2.5">{gettext("Actions")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr :for={m <- @monitors} class="border-t border-zinc-100 transition-colors hover:bg-zinc-50/70">
-              <td class="px-4 py-2 font-medium">{m.name}</td>
-              <td class="px-4 py-2">
-                <Badge.badge color="info" size="xs">{repeat_label(m)}</Badge.badge>
-              </td>
-              <td class="px-4 py-2">
-                <.enabled_badge on={m.enabled} on_label={gettext("on")} off_label={gettext("off")} />
-              </td>
-              <td class="px-4 py-2">
-                <Badge.badge color={monitor_status_color(m.last_status)} size="xs">
-                  {m.last_status || "—"}
-                </Badge.badge>
-              </td>
-              <td class="px-4 py-2 text-xs text-zinc-500">{format_dt(m.next_run_at)}</td>
-              <td class="px-4 py-2 text-xs text-zinc-500">{format_dt(m.last_run_at)}</td>
-              <td class="px-4 py-2">
-                <div class="flex justify-end gap-1">
-                  <Button.icon_button
-                    phx-click="run_monitor_now"
-                    phx-value-id={m.id}
-                    color="gray"
-                    size="xs"
-                    title={gettext("Run now")}
-                  >
-                    <.icon name="hero-bolt" class="size-4" />
-                  </Button.icon_button>
-                  <Button.icon_button
-                    phx-click="toggle_monitor_enabled"
-                    phx-value-id={m.id}
-                    color="gray"
-                    size="xs"
-                    title={if m.enabled, do: gettext("Disable"), else: gettext("Enable")}
-                  >
-                    <.icon name={if m.enabled, do: "hero-pause", else: "hero-play"} class="size-4" />
-                  </Button.icon_button>
-                  <Button.icon_button
-                    phx-click="edit_monitor"
-                    phx-value-id={m.id}
-                    color="gray"
-                    size="xs"
-                    title={gettext("Edit")}
-                  >
-                    <.icon name="hero-pencil-square" class="size-4" />
-                  </Button.icon_button>
-                  <Button.icon_button
-                    phx-click="destroy_monitor"
-                    phx-value-id={m.id}
-                    color="danger"
-                    size="xs"
-                    data-confirm={gettext("Delete \"%{name}\"?", name: m.name)}
-                    title={gettext("Delete")}
-                  >
-                    <.icon name="hero-trash" class="size-4" />
-                  </Button.icon_button>
-                </div>
-              </td>
-            </tr>
-            <tr :if={@monitors == []}>
-              <td colspan="7" class="px-4 py-8 text-center text-zinc-400 text-sm">
-                {gettext("No monitors yet. Click \"New monitor\", or let the agent create one.")}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <.data_table
+        rows={@monitors}
+        empty={gettext("No monitors yet. Click \"New monitor\", or let the agent create one.")}
+      >
+        <:col :let={m} label={gettext("Name")} class="font-medium">{m.name}</:col>
+        <:col :let={m} label={gettext("Every")}>
+          <Badge.badge color="info" size="xs">{repeat_label(m)}</Badge.badge>
+        </:col>
+        <:col :let={m} label={gettext("On")}>
+          <.enabled_badge on={m.enabled} on_label={gettext("on")} off_label={gettext("off")} />
+        </:col>
+        <:col :let={m} label={gettext("Last status")}>
+          <Badge.badge color={monitor_status_color(m.last_status)} size="xs">
+            {m.last_status || "—"}
+          </Badge.badge>
+        </:col>
+        <:col :let={m} label={gettext("Next run")} class="text-xs text-zinc-500">{format_dt(m.next_run_at)}</:col>
+        <:col :let={m} label={gettext("Last run")} class="text-xs text-zinc-500">{format_dt(m.last_run_at)}</:col>
+        <:action :let={m}>
+          <Button.icon_button
+            phx-click="run_monitor_now"
+            phx-value-id={m.id}
+            color="gray"
+            size="xs"
+            title={gettext("Run now")}
+          >
+            <.icon name="hero-bolt" class="size-4" />
+          </Button.icon_button>
+          <.row_action_toggle on={m.enabled} phx-click="toggle_monitor_enabled" phx-value-id={m.id} />
+          <.row_action_edit phx-click="edit_monitor" phx-value-id={m.id} />
+          <.row_action_delete
+            phx-click="destroy_monitor"
+            phx-value-id={m.id}
+            confirm={gettext("Delete \"%{name}\"?", name: m.name)}
+          />
+        </:action>
+      </.data_table>
     </div>
     """
   end
@@ -2784,56 +2540,29 @@ defmodule LongWeb.ManageLive do
         </div>
       </div>
 
-      <div class="rounded-xl border border-zinc-200/80 bg-white shadow-sm overflow-hidden">
-        <table class="w-full text-sm">
-          <thead class="text-[11px] uppercase tracking-wider text-zinc-400 bg-zinc-50/80">
-            <tr>
-              <th class="text-left px-4 py-2.5">{gettext("Session")}</th>
-              <th class="text-left px-4 py-2.5">{gettext("At")}</th>
-              <th class="text-left px-4 py-2.5">{gettext("Next run (UTC)")}</th>
-              <th class="text-left px-4 py-2.5">{gettext("Status")}</th>
-              <th class="text-right px-4 py-2.5">{gettext("Actions")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr :for={t <- @reflection_tasks} class="border-t border-zinc-100 transition-colors hover:bg-zinc-50/70">
-              <td class="px-4 py-2 font-mono text-xs">{reflection_session_label(t)}</td>
-              <td class="px-4 py-2">{t.schedule_time} UTC</td>
-              <td class="px-4 py-2 text-xs text-zinc-500">{reflection_dt(t.next_run_at)}</td>
-              <td class="px-4 py-2">
-                <.enabled_badge on={t.enabled} on_label={gettext("enabled")} off_label={gettext("disabled")} />
-              </td>
-              <td class="px-4 py-2">
-                <div class="flex justify-end gap-1">
-                  <Button.icon_button
-                    phx-click="run_reflection_now"
-                    phx-value-id={t.id}
-                    color="gray"
-                    size="xs"
-                    title={gettext("Run now")}
-                  >
-                    <.icon name="hero-bolt" class="size-4" />
-                  </Button.icon_button>
-                  <Button.icon_button
-                    phx-click="toggle_reflection_task"
-                    phx-value-id={t.id}
-                    color="gray"
-                    size="xs"
-                    title={if t.enabled, do: gettext("Disable"), else: gettext("Enable")}
-                  >
-                    <.icon name={if t.enabled, do: "hero-pause", else: "hero-play"} class="size-4" />
-                  </Button.icon_button>
-                </div>
-              </td>
-            </tr>
-            <tr :if={@reflection_tasks == []}>
-              <td colspan="5" class="px-4 py-8 text-center text-zinc-400 text-sm">
-                {gettext("No reflection tasks yet — one is created automatically after a session's first real conversation (when reflection is on).")}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <.data_table
+        rows={@reflection_tasks}
+        empty={gettext("No reflection tasks yet — one is created automatically after a session's first real conversation (when reflection is on).")}
+      >
+        <:col :let={t} label={gettext("Session")} class="font-mono text-xs">{reflection_session_label(t)}</:col>
+        <:col :let={t} label={gettext("At")}>{t.schedule_time} UTC</:col>
+        <:col :let={t} label={gettext("Next run (UTC)")} class="text-xs text-zinc-500">{reflection_dt(t.next_run_at)}</:col>
+        <:col :let={t} label={gettext("Status")}>
+          <.enabled_badge on={t.enabled} on_label={gettext("enabled")} off_label={gettext("disabled")} />
+        </:col>
+        <:action :let={t}>
+          <Button.icon_button
+            phx-click="run_reflection_now"
+            phx-value-id={t.id}
+            color="gray"
+            size="xs"
+            title={gettext("Run now")}
+          >
+            <.icon name="hero-bolt" class="size-4" />
+          </Button.icon_button>
+          <.row_action_toggle on={t.enabled} phx-click="toggle_reflection_task" phx-value-id={t.id} />
+        </:action>
+      </.data_table>
     </div>
     """
   end
@@ -2860,59 +2589,27 @@ defmodule LongWeb.ManageLive do
         {gettext("Flat key/value store for tokens the agent needs at tool-call time. Stored plaintext (LAN-only) but kept out of memory + chat history. The agent reads these via the graphql tool.")}
       </p>
 
-      <div class="rounded-xl border border-zinc-200/80 bg-white shadow-sm overflow-hidden">
-        <table class="w-full text-sm">
-          <thead class="text-[11px] uppercase tracking-wider text-zinc-400 bg-zinc-50/80">
-            <tr>
-              <th class="text-left px-4 py-2.5">{gettext("Name")}</th>
-              <th class="text-left px-4 py-2.5">{gettext("Value")}</th>
-              <th class="text-left px-4 py-2.5">{gettext("Description")}</th>
-              <th class="text-left px-4 py-2.5">{gettext("Updated")}</th>
-              <th class="text-right px-4 py-2.5">{gettext("Actions")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr :for={s <- @secrets} class="border-t border-zinc-100 transition-colors hover:bg-zinc-50/70">
-              <td class="px-4 py-2 font-mono text-zinc-800">{s.name}</td>
-              <td class="px-4 py-2 text-xs font-mono text-zinc-500">
-                {mask_secret(s.value)}
-              </td>
-              <td class="px-4 py-2 text-zinc-600 max-w-md">
-                {Text.preview(s.description || "", 80)}
-              </td>
-              <td class="px-4 py-2 text-xs text-zinc-500">{format_dt(s.updated_at)}</td>
-              <td class="px-4 py-2">
-                <div class="flex justify-end gap-1">
-                  <Button.icon_button
-                    phx-click="edit_secret"
-                    phx-value-name={s.name}
-                    color="gray"
-                    size="xs"
-                    title={gettext("Edit")}
-                  >
-                    <.icon name="hero-pencil-square" class="size-4" />
-                  </Button.icon_button>
-                  <Button.icon_button
-                    phx-click="destroy_secret"
-                    phx-value-name={s.name}
-                    color="danger"
-                    size="xs"
-                    data-confirm={gettext("Delete secret \"%{name}\"?", name: s.name)}
-                    title={gettext("Delete")}
-                  >
-                    <.icon name="hero-trash" class="size-4" />
-                  </Button.icon_button>
-                </div>
-              </td>
-            </tr>
-            <tr :if={@secrets == []}>
-              <td colspan="5" class="px-4 py-8 text-center text-zinc-400 text-sm">
-                {gettext("No secrets yet. Click \"New secret\" to add a token.")}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <.data_table
+        rows={@secrets}
+        empty={gettext("No secrets yet. Click \"New secret\" to add a token.")}
+      >
+        <:col :let={s} label={gettext("Name")} class="font-mono text-zinc-800">{s.name}</:col>
+        <:col :let={s} label={gettext("Value")} class="text-xs font-mono text-zinc-500">
+          {mask_secret(s.value)}
+        </:col>
+        <:col :let={s} label={gettext("Description")} class="text-zinc-600 max-w-md">
+          {Text.preview(s.description || "", 80)}
+        </:col>
+        <:col :let={s} label={gettext("Updated")} class="text-xs text-zinc-500">{format_dt(s.updated_at)}</:col>
+        <:action :let={s}>
+          <.row_action_edit phx-click="edit_secret" phx-value-name={s.name} />
+          <.row_action_delete
+            phx-click="destroy_secret"
+            phx-value-name={s.name}
+            confirm={gettext("Delete secret \"%{name}\"?", name: s.name)}
+          />
+        </:action>
+      </.data_table>
     </div>
     """
   end
