@@ -23,7 +23,9 @@ config :long, LongWeb.Endpoint,
   # Bind to 0.0.0.0 so the dev server is reachable from other machines
   # on the LAN / WSL host / containers. `check_origin: false` (below) is
   # the LiveView counterpart that lets cross-host requests through.
-  http: [ip: {0, 0, 0, 0}],
+  # Port defaults to 4000; override with PORT=4002 to run a throwaway instance
+  # alongside another dev server without colliding.
+  http: [ip: {0, 0, 0, 0}, port: String.to_integer(System.get_env("PORT") || "4000")],
   check_origin: false,
   code_reloader: true,
   debug_errors: true,
