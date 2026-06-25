@@ -1649,14 +1649,7 @@ defmodule LongWeb.ManageLive do
 
   defp skill_scope_badge(assigns) do
     ~H"""
-    <%= if @skill[:scope] == :personal do %>
-      <div class="flex flex-wrap items-center gap-1.5">
-        <Badge.badge color="warning" size="xs">{gettext("Personal")}</Badge.badge>
-        <span class="text-xs text-zinc-500">{@owners[@skill.owner_member_id] || gettext("unknown")}</span>
-      </div>
-    <% else %>
-      <Badge.badge color="success" size="xs">{gettext("Global")}</Badge.badge>
-    <% end %>
+    <.scope_badge scope={@skill[:scope]} owner={@owners[@skill.owner_member_id]} />
     """
   end
 

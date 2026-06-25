@@ -112,6 +112,34 @@ defmodule LongWeb.Components.Console do
   end
 
   @doc """
+  Ownership/scope chip. `:personal` renders a person icon + the owner's name in
+  a calm neutral pill; anything else renders a globe + "Global" in emerald.
+  """
+  attr :scope, :atom, required: true
+  attr :owner, :string, default: nil
+
+  def scope_badge(assigns) do
+    ~H"""
+    <span
+      :if={@scope == :personal}
+      class="inline-flex items-center gap-1 rounded-full bg-zinc-100 py-0.5 pl-1.5 pr-2 text-xs font-medium text-zinc-700"
+      title={gettext("Personal — only this member's chats see it")}
+    >
+      <.icon name="hero-user" class="size-3 text-zinc-400" />
+      {@owner || gettext("unknown")}
+    </span>
+    <span
+      :if={@scope != :personal}
+      class="inline-flex items-center gap-1 rounded-full bg-emerald-50 py-0.5 pl-1.5 pr-2 text-xs font-medium text-emerald-700"
+      title={gettext("Global — available to everyone")}
+    >
+      <.icon name="hero-globe-alt" class="size-3 text-emerald-500" />
+      {gettext("Global")}
+    </span>
+    """
+  end
+
+  @doc """
   The console table scaffold: Quiet card shell + header + hover rows + empty
   state. Cell bodies live in `:col` slots (each receives the row); an optional
   `:action` slot renders the right-aligned actions column.
