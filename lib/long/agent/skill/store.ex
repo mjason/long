@@ -115,6 +115,18 @@ defmodule Long.Agent.Skill.Store do
   def create_skill(name, description, body, opts \\ []),
     do: GenServer.call(__MODULE__, {:create, name, description, body, opts})
 
+  @doc """
+  Update an existing skill in place, rewriting its `SKILL.md`. `opts` may
+  carry `:description` and/or `:body` (each kept as-is when omitted); the
+  skill's `name` and any other frontmatter (e.g. `tags`) are preserved.
+  `opts[:member_id]` scopes visibility — a member may update a global skill
+  or one they own; a skill they can't see returns `{:error, :not_found}`
+  (same shape as missing, so names can't be probed). Reindexes on success.
+  """
+  @spec update_skill(String.t(), keyword()) :: {:ok, Path.t()} | {:error, term()}
+  def update_skill(name, opts \\ []) when is_binary(name),
+    do: GenServer.call(__MODULE__, {:update, name, opts})
+
   @doc "Look up one skill by exact name."
   @spec get(String.t()) :: {:ok, map()} | {:error, :not_found}
   def get(name) when is_binary(name) do
@@ -196,6 +208,13 @@ defmodule Long.Agent.Skill.Store do
 
   def handle_call({:create, name, description, body, opts}, _from, state) do
     case do_create(name, description, body, opts) do
+      {:ok, dir} -> {:reply, {:ok, dir}, reload(state)}
+      {:error, _} = err -> {:reply, err, state}
+    end
+  end
+
+  def handle_call({:update, name, opts}, _from, state) do
+    case do_update(name, opts) do
       {:ok, dir} -> {:reply, {:ok, dir}, reload(state)}
       {:error, _} = err -> {:reply, err, state}
     end
@@ -542,6 +561,66 @@ defmodule Long.Agent.Skill.Store do
     #{String.trim_trailing(to_string(body || ""))}
     """
   end
+
+  # Rewrite an existing skill's SKILL.md, keeping `name`/other frontmatter and
+  # overriding only the fields supplied in `opts` (`:description`, `:body`).
+  defp do_update(name, opts) do
+    member_id = opts[:member_id]
+
+    case get(name) do
+      {:error, :not_found} ->
+        {:error, :not_found}
+
+      {:ok, skill} ->
+        if visible?(skill, member_id) do
+          frontmatter = maybe_put_description(skill.frontmatter, opts[:description])
+          body = if is_binary(opts[:body]), do: opts[:body], else: skill.body
+          skill_md = Path.join(skill.absolute_path, @skill_filename)
+          File.write!(skill_md, render_skill_md(frontmatter, body))
+          {:ok, skill.absolute_path}
+        else
+          {:error, :not_found}
+        end
+    end
+  end
+
+  defp maybe_put_description(frontmatter, description) when is_binary(description) do
+    case String.trim(description) do
+      "" -> frontmatter
+      trimmed -> Map.put(frontmatter, "description", trimmed)
+    end
+  end
+
+  defp maybe_put_description(frontmatter, _), do: frontmatter
+
+  # Serialize a (parsed) frontmatter map + body back into SKILL.md text.
+  # `name` then `description` lead; remaining keys (e.g. `tags`) follow,
+  # sorted for stable output.
+  defp render_skill_md(frontmatter, body) do
+    yaml = frontmatter |> order_frontmatter() |> Enum.map_join("\n", &dump_fm_pair/1)
+
+    """
+    ---
+    #{yaml}
+    ---
+
+    #{String.trim_trailing(to_string(body || ""))}
+    """
+  end
+
+  defp order_frontmatter(frontmatter) do
+    lead = for k <- ["name", "description"], Map.has_key?(frontmatter, k), do: {k, frontmatter[k]}
+    rest = frontmatter |> Map.drop(["name", "description"]) |> Enum.sort_by(fn {k, _} -> k end)
+    lead ++ rest
+  end
+
+  defp dump_fm_pair({key, value}) when is_list(value) and value != [] do
+    items = Enum.map_join(value, "\n", &"  - #{yaml_str(to_string(&1))}")
+    "#{key}:\n#{items}"
+  end
+
+  defp dump_fm_pair({key, value}) when is_list(value), do: "#{key}: []"
+  defp dump_fm_pair({key, value}), do: "#{key}: #{yaml_str(to_string(value))}"
 
   # Double-quoted YAML scalar, escaping backslashes then quotes.
   defp yaml_str(s) do

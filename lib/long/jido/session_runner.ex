@@ -29,7 +29,8 @@ defmodule Long.Jido.SessionRunner do
     Long.Jido.Tools.SetTimezone,
     Long.Jido.Tools.AskUser,
     Long.Jido.Tools.SkillRead,
-    Long.Jido.Tools.SkillCreate
+    Long.Jido.Tools.SkillCreate,
+    Long.Jido.Tools.SkillUpdate
   ]
 
   def topic(session_id), do: @topic_prefix <> session_id

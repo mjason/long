@@ -127,6 +127,22 @@ defmodule Long.Copy do
       en: "couldn't create the skill (%{reason}).",
       zh: "创建技能失败(%{reason})。"
     },
+    "skill.not_found" => %{
+      en: "no skill named “%{name}” that you can edit.",
+      zh: "找不到你能编辑的、名为「%{name}」的技能。"
+    },
+    "skill.update_noop" => %{
+      en: "nothing to update — provide a new description and/or body.",
+      zh: "没有要更新的内容——请提供新的描述和/或正文。"
+    },
+    "skill.update_owner_only" => %{
+      en: "Only the group owner can edit a shared skill.",
+      zh: "只有组管理员能编辑共享技能。"
+    },
+    "skill.update_failed" => %{
+      en: "couldn't update the skill (%{reason}).",
+      zh: "更新技能失败(%{reason})。"
+    },
     "tool.ask_default" => %{en: "Please provide input:", zh: "请提供输入:"},
     "tool.code_empty" => %{en: "[Status] ❌ failed: code is empty", zh: "[Status] ❌ 失败: code 为空"},
     "tool.file_no_content" => %{
