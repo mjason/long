@@ -21,7 +21,12 @@ defmodule Long.Jido.Tools.CodeRun do
         "unpdf for .pdf, JSZip for ZIP-based Office files) or decode the bytes yourself; " <>
         "for an unfamiliar format, find a suitable npm library and just try it before " <>
         "giving up. The only limit: NO subprocess (no python / libreoffice / bash / " <>
-        "Deno.Command / child_process).",
+        "Deno.Command / child_process). " <>
+        "TO CALL AN LLM from a script: POST to Deno.env.get(\"LONG_LLM_URL\") with header " <>
+        "\"x-llm-token: \" + Deno.env.get(\"LONG_LLM_TOKEN\") and JSON body " <>
+        "{prompt, context}. context=\"new\" is a blank one-shot; context=\"current\" " <>
+        "reasons with the user's memory + recent chat (read-only — nothing is written " <>
+        "back to the conversation). Response is {text}. No API key needed.",
     category: "code",
     tags: ["deno", "javascript", "typescript", "bash"],
     vsn: "3.0.0",
@@ -50,7 +55,7 @@ defmodule Long.Jido.Tools.CodeRun do
           |> Zoi.optional()
       })
 
-  alias Long.Agent.{CodeRunner, DenoEnv}
+  alias Long.Agent.{CodeRunner, DenoEnv, LLMBridge}
   alias Long.Jido.Tools.Format
 
   @default_max_output_bytes 10_000
@@ -64,7 +69,9 @@ defmodule Long.Jido.Tools.CodeRun do
     {:ok, workspace} = DenoEnv.ensure!(member_base(ctx))
     cwd = DenoEnv.confine(workspace, params[:cwd])
     File.mkdir_p!(cwd)
-    execute(build(params, code_type, workspace, cwd), workspace, cwd, timeout_ms, max_bytes)
+    # Per-run LLM token so the script can call the loopback /internal/llm.
+    extra_env = LLMBridge.deno_env(ctx[:session_id])
+    execute(build(params, code_type, workspace, cwd), workspace, cwd, timeout_ms, max_bytes, extra_env)
   end
 
   # The caller's personal workspace dir (members/<id>/), or — for an unbound
@@ -87,17 +94,17 @@ defmodule Long.Jido.Tools.CodeRun do
     CodeRunner.build_command(params[:code] || "", type, cwd)
   end
 
-  defp execute({:error, msg}, _workspace, _cwd, _timeout, _max_bytes) do
+  defp execute({:error, msg}, _workspace, _cwd, _timeout, _max_bytes, _extra_env) do
     {:ok, %{status: "error", exit_code: nil, stdout: "", msg: msg}}
   end
 
-  defp execute({:ok, exe, args, cleanup}, workspace, cwd, timeout, max_bytes) do
-    result = run_port(exe, args, workspace, cwd, timeout, max_bytes)
+  defp execute({:ok, exe, args, cleanup}, workspace, cwd, timeout, max_bytes, extra_env) do
+    result = run_port(exe, args, workspace, cwd, timeout, max_bytes, extra_env)
     cleanup.()
     {:ok, result}
   end
 
-  defp run_port(exe, args, workspace, cwd, timeout, max_bytes) do
+  defp run_port(exe, args, workspace, cwd, timeout, max_bytes, extra_env) do
     port =
       Port.open({:spawn_executable, System.find_executable(exe) || exe}, [
         :exit_status,
@@ -105,7 +112,7 @@ defmodule Long.Jido.Tools.CodeRun do
         :stderr_to_stdout,
         {:cd, cwd},
         {:args, args},
-        {:env, CodeRunner.port_env(workspace)},
+        {:env, CodeRunner.port_env(workspace) ++ extra_env},
         :hide
       ])
 

@@ -58,6 +58,14 @@ defmodule LongWeb.Router do
     post "/", FeishuController, :receive
   end
 
+  # Loopback-only LLM endpoint for sandboxed scripts (code_run / skills /
+  # monitors). Auth is the per-run `x-llm-token`; the controller also rejects
+  # non-loopback callers. See `Long.Agent.LLMBridge`.
+  scope "/internal", LongWeb do
+    pipe_through :api
+    post "/llm", InternalLLMController, :complete
+  end
+
   # GraphQL — the AI's primary data-access channel (via the `graphql`
   # native tool) AND a generic API surface for any external client.
   # /graphql is the JSON endpoint; /graphiql is the interactive

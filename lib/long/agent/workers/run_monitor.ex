@@ -18,7 +18,7 @@ defmodule Long.Agent.Workers.RunMonitor do
   require Logger
 
   alias Long.Agent
-  alias Long.Agent.{CodeRunner, DenoEnv}
+  alias Long.Agent.{CodeRunner, DenoEnv, LLMBridge}
   alias Long.Agent.Bots.Outbound
 
   # Monitors are quick checks, not agent turns. Generous but bounded.
@@ -68,18 +68,20 @@ defmodule Long.Agent.Workers.RunMonitor do
 
   # ── execution ────────────────────────────────────────────────────────
 
-  # Optionally expose one secret to the script as the SECRET env var.
-  defp env(%{secret_name: name}, cwd) when is_binary(name) and name != "" do
-    case Agent.get_secret_by_name(name) do
-      {:ok, %{value: value}} when is_binary(value) ->
-        [{~c"SECRET", String.to_charlist(value)} | CodeRunner.port_env(cwd)]
+  # Optionally expose one secret to the script as the SECRET env var, plus the
+  # per-run LLM token (LONG_LLM_TOKEN/LONG_LLM_URL) so it can call the LLM.
+  defp env(monitor, cwd) do
+    secret_env(monitor) ++ CodeRunner.port_env(cwd) ++ LLMBridge.deno_env(monitor.session_id)
+  end
 
-      _ ->
-        CodeRunner.port_env(cwd)
+  defp secret_env(%{secret_name: name}) when is_binary(name) and name != "" do
+    case Agent.get_secret_by_name(name) do
+      {:ok, %{value: value}} when is_binary(value) -> [{~c"SECRET", String.to_charlist(value)}]
+      _ -> []
     end
   end
 
-  defp env(_monitor, cwd), do: CodeRunner.port_env(cwd)
+  defp secret_env(_monitor), do: []
 
   defp run_script(exe, args, cwd, env) do
     CodeRunner.run_and_collect(exe, args, cwd, env, @timeout_ms, @max_output_bytes)
