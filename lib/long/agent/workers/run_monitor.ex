@@ -53,7 +53,16 @@ defmodule Long.Agent.Workers.RunMonitor do
     end
   rescue
     e ->
+      # A genuine internal crash (not a script exit/timeout) — this IS an app
+      # bug worth tracking, with a real stacktrace.
       Logger.error("RunMonitor: crash on #{monitor.name}: #{inspect(e)}")
+
+      ErrorTracker.report(e, __STACKTRACE__, %{
+        source: "run_monitor",
+        monitor: monitor.name,
+        monitor_id: monitor.id
+      })
+
       record(monitor, "error", %{"decision" => "crash", "reason" => inspect(e)}, "")
   end
 
@@ -181,9 +190,12 @@ defmodule Long.Agent.Workers.RunMonitor do
     # time. Bounded by `prune_runs` (newest @keep_runs per monitor).
     log_run(monitor, status, decision, output, tail)
 
+    # A script-level "error" (non-zero exit, timeout, unparseable output) is an
+    # EXPECTED operational outcome — recorded in the run history and shown in the
+    # Monitor UI. It self-heals next interval, so it does NOT go to ErrorTracker
+    # (only genuine worker crashes do — see the rescue in run/1). Just log it.
     if status == "error" do
       Logger.warning("RunMonitor: #{monitor.name} → error: #{inspect(output)}")
-      report_error(monitor, decision, output)
     end
 
     :ok
@@ -222,17 +234,6 @@ defmodule Long.Agent.Workers.RunMonitor do
     end
   end
 
-  defp report_error(monitor, decision, output) do
-    ErrorTracker.report(
-      %RuntimeError{message: "monitor run #{decision}: #{monitor.name}"},
-      [],
-      %{source: "run_monitor", monitor: monitor.name, monitor_id: monitor.id, output: inspect(output)}
-    )
-
-    :ok
-  rescue
-    _ -> :ok
-  end
 
   defp tail(nil), do: ""
   defp tail(s) when byte_size(s) <= @stdout_tail, do: s

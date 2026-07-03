@@ -16,6 +16,8 @@ defmodule LongWeb.ManageLive do
 
   use LongWeb, :live_view
 
+  require Logger
+
   # Petal Components called qualified (Badge/Button); the rest come from
   # `use PetalComponents` in the web html helpers.
   alias PetalComponents.{Badge, Button}
@@ -1221,6 +1223,15 @@ defmodule LongWeb.ManageLive do
       {:ok, _} -> {:noreply, load_section(socket, :secrets)}
       {:error, e} -> {:noreply, put_flash(socket, :error, "Delete failed: #{inspect(e)}")}
     end
+  end
+
+  # Safety net: an unknown event (or one arriving with unexpected params — e.g. a
+  # phx-change whose form shape shifted) must not crash the whole console with a
+  # FunctionClauseError. Log it so a genuinely-broken control is traceable, and
+  # no-op.
+  def handle_event(event, params, socket) do
+    Logger.warning("ManageLive: unhandled event #{inspect(event)} — params #{inspect(params)}")
+    {:noreply, socket}
   end
 
   # ── PubSub ───────────────────────────────────────────────────────────

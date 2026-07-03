@@ -91,7 +91,10 @@ config :long, Long.Agent,
 config :error_tracker,
   repo: Long.Repo,
   otp_app: :long,
-  enabled: true
+  enabled: true,
+  # Drop transport/DNS noise (client disconnects, transient outbound network
+  # blips) — not app bugs. See the module for exactly what's filtered.
+  ignorer: Long.ErrorTrackerIgnorer
 
 # ReqLLM's default Finch pool is 8 connections total (size: 1 × count: 8),
 # which gets exhausted by concurrent agent loops (each holds a streaming
