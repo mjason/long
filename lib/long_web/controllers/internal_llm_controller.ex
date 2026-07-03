@@ -1,10 +1,17 @@
 defmodule LongWeb.InternalLLMController do
   @moduledoc """
-  Loopback-only LLM endpoint for sandboxed scripts (see `Long.Agent.LLMBridge`).
+  Internal LLM endpoint for sandboxed scripts (see `Long.Agent.LLMBridge`).
   A Deno/bash script POSTs `{prompt|messages, context, max_tokens?, temperature?}`
   with its per-run `x-llm-token`; we verify the token → session, run the
   completion through the app's configured model, and return `{text, usage}`.
   The API key never leaves the server.
+
+  Auth is the signed, short-lived, session-scoped token — the only way to obtain
+  one is to be inside a running sandbox (the token is injected per-run) or to
+  hold the endpoint secret. That's a stronger gate than the rest of this
+  LAN-trusted app (e.g. `/graphql` is unauthenticated), so we don't additionally
+  pin the source IP: OrbStack routes the container's own `127.0.0.1` through its
+  proxy, so a loopback check would reject the legitimate in-container caller.
   """
   use LongWeb, :controller
 
@@ -13,14 +20,10 @@ defmodule LongWeb.InternalLLMController do
   alias Long.Agent.LLMBridge
 
   def complete(conn, params) do
-    with :ok <- ensure_loopback(conn),
-         {:ok, session_id} <- verify_token(conn),
+    with {:ok, session_id} <- verify_token(conn),
          {:ok, %{text: text, usage: usage}} <- LLMBridge.complete(session_id, params) do
       json(conn, %{text: text, usage: usage})
     else
-      {:error, :not_loopback} ->
-        conn |> put_status(:forbidden) |> json(%{error: "forbidden"})
-
       {:error, reason} when reason in [:missing, :expired, :invalid] ->
         conn |> put_status(:unauthorized) |> json(%{error: "invalid or expired token"})
 
@@ -30,16 +33,6 @@ defmodule LongWeb.InternalLLMController do
       {:error, reason} ->
         Logger.warning("InternalLLM: completion failed: #{inspect(reason)}")
         conn |> put_status(:bad_gateway) |> json(%{error: "llm call failed"})
-    end
-  end
-
-  # Only reachable from inside the container (the sandbox fetches localhost).
-  # A LAN request to :4000/internal/llm is rejected even with a token.
-  defp ensure_loopback(conn) do
-    case conn.remote_ip do
-      {127, 0, 0, 1} -> :ok
-      {0, 0, 0, 0, 0, 0, 0, 1} -> :ok
-      _ -> {:error, :not_loopback}
     end
   end
 

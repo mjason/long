@@ -5,7 +5,7 @@ defmodule Long.Agent.LLMBridge do
 
   A per-run signed token (injected into the sandbox env as `LONG_LLM_TOKEN`,
   alongside `LONG_LLM_URL`) identifies the session. The script POSTs to the
-  loopback-only `/internal/llm` endpoint, which verifies the token and calls
+  token-authed `/internal/llm` endpoint, which verifies the token and calls
   `complete/2` here. The model + credentials come from the DB (`LLMConfig`), so
   the key stays server-side.
 
